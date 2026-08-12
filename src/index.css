@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #080b12;
+  color: #e6ecf5;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-white/10 bg-ink-800/85 backdrop-blur-md shadow-panel;
+  }
+  .chip {
+    @apply rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs;
+  }
+  .btn {
+    @apply rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium
+           transition-colors hover:bg-white/10 active:bg-white/15
+           disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/5;
+  }
+  .btn-primary {
+    @apply rounded-lg border border-neon-cyan/40 bg-neon-cyan/15 px-3 py-1.5 text-sm font-semibold
+           text-neon-cyan transition-colors hover:bg-neon-cyan/25
+           disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neon-cyan/15;
+  }
+  .btn-danger {
+    @apply rounded-lg border border-neon-red/40 bg-neon-red/10 px-3 py-1.5 text-sm font-semibold
+           text-neon-red transition-colors hover:bg-neon-red/20;
+  }
+  .stat-label {
+    @apply text-[10px] uppercase tracking-[0.14em] text-white/40;
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+  }
+}
+
+/* Fibre traffic: dashes crawl along the span, faster when it is busy. */
+@keyframes flow {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+.fiber-flow {
+  animation: flow linear infinite;
+}
+
+@keyframes softpulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.pulse-soft {
+  animation: softpulse 2.4s ease-in-out infinite;
+}
+
+@keyframes alertblink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.alert-blink {
+  animation: alertblink 1s ease-in-out infinite;
+}
+
+@keyframes towerblink {
+  0%,
+  92%,
+  100% {
+    opacity: 0.2;
+  }
+  95% {
+    opacity: 1;
+  }
+}
+
+.tower-blink {
+  animation: towerblink 3s ease-in-out infinite;
+}
+
+.map-surface {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.map-surface.dragging {
+  cursor: grabbing;
+}
+.map-surface.building {
+  cursor: crosshair;
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #3ee6d6;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(62, 230, 214, 0.6);
+}
