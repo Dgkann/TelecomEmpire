@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { averagePrice, fmtMoney, fmtMoneyExact, fmtNum, monthlyBreakdown, packageMix } from '../../game/economy';
 import { researchModifiers } from '../../game/research';
+import { creditLimit, daysUntilInsolvency, loanRate, monthlyDebtService, totalDebt } from '../../game/finance';
 import { residentialSubs } from '../../game/simulation';
 import { useGame } from '../../store/gameStore';
 import type { ChurnReason, StaffRole } from '../../game/types';
@@ -38,12 +40,21 @@ export default function CompanyScreen() {
   const hireTechnician = useGame((s) => s.hireTechnician);
   const hireEmployee = useGame((s) => s.hireEmployee);
   const fireStaff = useGame((s) => s.fireStaff);
+  const takeLoan = useGame((s) => s.takeLoan);
+  const repayLoan = useGame((s) => s.repayLoan);
 
   const mods = researchModifiers(game.researchDone);
   const money = monthlyBreakdown(game, mods);
   const mix = packageMix(game.packages);
   const mobileMix = packageMix(game.packages, 'mobile');
   const subs = residentialSubs(game);
+  const headroom = creditLimit(game);
+  const debt = totalDebt(game);
+  const graceLeft = daysUntilInsolvency(game);
+  const [borrowAmount, setBorrowAmount] = useState(50000);
+  // Same amortisation the loan itself will use, just for the preview.
+  const monthlyRate = loanRate(game) / 12;
+  const estimatedPayment = (borrowAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -36));
 
   return (
     <div className="scroll-thin h-full overflow-y-auto bg-ink-900 p-6">
@@ -305,6 +316,85 @@ export default function CompanyScreen() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="panel p-5">
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Borrowing</h2>
+          <p className="mb-3 text-[11px] text-white/40">
+            Lenders look at what you earn and what you have built. Go past the limit and they come for the company.
+          </p>
+
+          {graceLeft !== null && (
+            <div className="alert-blink mb-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3">
+              <div className="text-sm font-semibold text-neon-red">Past the credit limit</div>
+              <div className="num text-[11px] text-white/60">{Math.ceil(graceLeft)} days before the banks act</div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="chip py-2">
+              <div className="stat-label">Owed</div>
+              <div className={`num text-sm ${debt > 0 ? 'text-neon-amber' : 'text-white'}`}>{fmtMoney(debt)}</div>
+            </div>
+            <div className="chip py-2">
+              <div className="stat-label">Can borrow</div>
+              <div className="num text-sm text-neon-cyan">{fmtMoney(headroom)}</div>
+            </div>
+            <div className="chip py-2">
+              <div className="stat-label">Rate</div>
+              <div className="num text-sm">{(loanRate(game) * 100).toFixed(1)}%</div>
+            </div>
+          </div>
+
+          {game.loans.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {game.loans.map((l) => (
+                <div key={l.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2">
+                  <div>
+                    <div className="num text-sm">{fmtMoney(l.remaining)} left</div>
+                    <div className="num text-[10px] text-white/40">
+                      {fmtMoney(l.monthlyPayment)}/mo at {(l.rateAnnual * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                  <button className="btn px-2 py-1 text-[11px]" onClick={() => repayLoan(l.id)}>
+                    Clear
+                  </button>
+                </div>
+              ))}
+              <div className="num mt-1 text-[11px] text-white/45">
+                Debt service {fmtMoney(monthlyDebtService(game))}/mo
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between">
+              <span className="stat-label">Draw down</span>
+              <span className="num text-lg font-semibold text-neon-cyan">{fmtMoney(borrowAmount)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(10000, headroom)}
+              step={5000}
+              value={Math.min(borrowAmount, headroom)}
+              onChange={(e) => setBorrowAmount(Number(e.target.value))}
+              className="mt-1 w-full"
+            />
+            <div className="num mt-1 flex justify-between text-[10px] text-white/35">
+              <span>over 36 months</span>
+              <span>
+                about {fmtMoney(estimatedPayment)}/mo
+              </span>
+            </div>
+            <button
+              className="btn-primary mt-2 w-full"
+              disabled={borrowAmount < 5000 || borrowAmount > headroom}
+              onClick={() => takeLoan(borrowAmount, 36)}
+            >
+              {borrowAmount > headroom ? 'More than they will lend' : `Borrow ${fmtMoney(borrowAmount)}`}
+            </button>
+          </div>
         </div>
 
         <div className="panel p-5">

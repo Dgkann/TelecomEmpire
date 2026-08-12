@@ -4,6 +4,7 @@ import { MINUTES_PER_DAY, SAVE_VERSION, nodeCapacity, towerCapacity, towerRadius
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
 import { computeRoutes, isRedundant } from '../src/game/network';
+import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
 import { clearSave, loadGame, migrate, saveGame } from '../src/game/save';
 import { createNewGame, mobileSubs, residentialSubs, step, totalCustomers } from '../src/game/simulation';
@@ -335,6 +336,53 @@ group('churn is attributed');
   const lostWithout = without.churn.reduce((a, c) => a + c.count, 0);
   const lostWith = withSpend.churn.reduce((a, c) => a + c.count, 0);
   check('retention spend reduces churn', lostWith < lostWithout, `${Math.round(lostWithout)} -> ${Math.round(lostWith)}`);
+}
+
+group('borrowing and solvency');
+{
+  const g = newGame(2468);
+  const limit = creditLimit(g);
+  check('a new company has a credit limit', limit > 0, `${limit}`);
+  check('the limit is finite', Number.isFinite(limit));
+
+  const loan = createLoan(g, 200000, 36);
+  check('a loan amortises to a positive payment', loan.monthlyPayment > 0, `${loan.monthlyPayment}`);
+  check('payments exceed pure principal, so interest is charged', loan.monthlyPayment * 36 > 200000);
+  check('the rate is sane', loan.rateAnnual > 0.01 && loan.rateAnnual < 0.3, `${loan.rateAnnual}`);
+
+  // Servicing a loan should shrink it and eventually clear it.
+  let withLoan: GameState = { ...g, loans: [loan], money: 5_000_000 };
+  const before = totalDebt(withLoan);
+  chargeLoans(withLoan);
+  check('a repayment reduces the balance', totalDebt(withLoan) < before, `${before} -> ${totalDebt(withLoan)}`);
+  for (let i = 0; i < 40; i++) chargeLoans(withLoan);
+  check('a loan clears by the end of its term', totalDebt(withLoan) === 0, `${totalDebt(withLoan)}`);
+
+  // Borrowing is not free money: the balance sheet nets out.
+  const drawn: GameState = { ...g, loans: [createLoan(g, 300000, 36)], money: g.money + 300000 };
+  check('debt shows up against the cash it provided', totalDebt(drawn) > 250000);
+}
+
+group('you can actually lose');
+{
+  // Bury the company far past any credit limit and let the grace period run.
+  let doomed: GameState = { ...newGame(1357), money: -50_000_000 };
+  doomed = runDays(doomed, GRACE_DAYS + 10);
+  check('sustained insolvency ends the game', !!doomed.gameOver, doomed.gameOver?.reason ?? 'still running');
+  check('a finished game pauses itself', doomed.speed === 0);
+
+  const frozen = step(doomed);
+  check('a finished game stops advancing', frozen.minutes === doomed.minutes);
+
+  // Being briefly overdrawn must not end anything.
+  let dip: GameState = { ...newGame(2469), money: -50_000_000 };
+  dip = runDays(dip, 5);
+  check('a short overdraft is survivable', !dip.gameOver);
+  check('the grace clock starts when you cross the limit', dip.insolventSince !== null);
+
+  const recovered = runDays({ ...dip, money: 500000 }, 2);
+  check('paying it back stops the clock', recovered.insolventSince === null);
+  check('a solvent company keeps playing', !recovered.gameOver);
 }
 
 group('a tower with no fibre behind it');

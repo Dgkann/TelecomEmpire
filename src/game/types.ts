@@ -239,6 +239,17 @@ export interface Competitor {
   lastMove: string | null;
 }
 
+export interface Loan {
+  id: string;
+  principal: number;
+  remaining: number;
+  // Annual rate, charged monthly on the outstanding balance.
+  rateAnnual: number;
+  monthlyPayment: number;
+  termMonths: number;
+  takenAt: number;
+}
+
 export type ChurnReason = 'price' | 'outage' | 'congestion' | 'support';
 
 export interface ChurnEvent {
@@ -337,6 +348,11 @@ export interface GameState {
   marketingBudget: number;
   retentionBudget: number;
   churn: ChurnEvent[];
+
+  loans: Loan[];
+  // Game minute your balance first went past the credit limit, null when solvent.
+  insolventSince: number | null;
+  gameOver: { reason: string; at: number } | null;
   transitTier: number;
   backupTransit: boolean;
   autoDispatch: boolean;

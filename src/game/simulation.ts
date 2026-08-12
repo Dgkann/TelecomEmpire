@@ -19,6 +19,7 @@ import {
 } from './constants';
 import { createAuction, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
+import { chargeLoans, checkSolvency } from './finance';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
@@ -191,6 +192,9 @@ export function createNewGame(opts: NewGameOptions): GameState {
     marketingBudget: 2000,
     retentionBudget: 0,
     churn: [],
+    loans: [],
+    insolventSince: null,
+    gameOver: null,
     transitTier: 0,
     backupTransit: false,
     autoDispatch: false,
@@ -275,6 +279,7 @@ export function redistributePackages(state: GameState) {
 }
 
 export function step(prev: GameState): GameState {
+  if (prev.gameOver) return prev;
   const s: GameState = { ...prev };
   const rng = makeRng((s.minutes * 2654435761 + s.rngSeed) >>> 0);
   const mods = researchModifiers(s.researchDone);
@@ -454,6 +459,13 @@ export function step(prev: GameState): GameState {
 
   tickAuction(s, rng);
 
+  const failure = checkSolvency(s);
+  if (failure) {
+    s.gameOver = { reason: failure, at: s.minutes };
+    s.speed = 0;
+    pushLog(s, 'The company has gone under.', 'bad');
+  }
+
   // 9. Daily / monthly beats
   if (newDay) {
     maybeSocialPost(s, rng, packetLoss, outageCount, avgSpeed);
@@ -473,6 +485,8 @@ export function step(prev: GameState): GameState {
       },
     ];
     s.monthAccumulator = { revenue: 0, expense: 0 };
+    const debtPaid = chargeLoans(s);
+    if (debtPaid > 0) pushLog(s, `Loan repayments of $${Math.round(debtPaid).toLocaleString()} went out.`, 'info');
     for (const c of s.contracts) c.downtimeMinutes = 0;
     s.finance = { ...s.finance, penalties: 0 };
   }

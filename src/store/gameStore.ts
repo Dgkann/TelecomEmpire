@@ -9,6 +9,7 @@ import {
   nodeUpgradeCost,
   towerCapacity,
 } from '../game/constants';
+import { createLoan, creditLimit } from '../game/finance';
 import { clearSave, loadGame, saveGame } from '../game/save';
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
 import {
@@ -100,6 +101,8 @@ interface Store extends UiState {
   dismissAuction: () => void;
   setMarketing: (value: number) => void;
   setRetention: (value: number) => void;
+  takeLoan: (principal: number, termMonths: number) => void;
+  repayLoan: (id: string) => void;
   setTransitTier: (tier: number) => void;
   toggleBackupTransit: () => void;
   toggleAutoDispatch: () => void;
@@ -604,6 +607,41 @@ export const useGame = create<Store>((set, get) => ({
   setMarketing: (value) => withGame(set, (draft) => void (draft.marketingBudget = Math.max(0, value))),
 
   setRetention: (value) => withGame(set, (draft) => void (draft.retentionBudget = Math.max(0, value))),
+
+  takeLoan: (principal, termMonths) => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    const headroom = creditLimit(g);
+    if (principal > headroom) {
+      s.toast('More than the banks will lend you.', 'bad');
+      return;
+    }
+    withGame(set, (draft) => {
+      draft.loans = [...draft.loans, createLoan(draft, principal, termMonths)];
+      draft.money += principal;
+      pushLog(draft, `Borrowed $${principal.toLocaleString()} over ${termMonths} months.`, 'info');
+    });
+    s.toast('Loan drawn down', 'good');
+  },
+
+  repayLoan: (id) => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    const loan = g.loans.find((l) => l.id === id);
+    if (!loan) return;
+    if (g.money < loan.remaining) {
+      s.toast('Not enough cash to clear it.', 'bad');
+      return;
+    }
+    withGame(set, (draft) => {
+      draft.money -= loan.remaining;
+      draft.loans = draft.loans.filter((l) => l.id !== id);
+      pushLog(draft, 'Loan repaid in full.', 'good');
+    });
+    s.toast('Loan cleared', 'good');
+  },
 
   setTransitTier: (tier) => {
     const s = get();

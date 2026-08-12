@@ -5,6 +5,7 @@ import { useGame } from './store/gameStore';
 import AuctionModal from './ui/AuctionModal';
 import BuildBar from './ui/BuildBar';
 import ContextPanel from './ui/ContextPanel';
+import GameOverOverlay from './ui/GameOverOverlay';
 import HelpOverlay from './ui/HelpOverlay';
 import IncidentModal from './ui/IncidentModal';
 import MainMenu from './ui/MainMenu';
@@ -111,6 +112,7 @@ function GameShell() {
         <IncidentModal />
         <AuctionModal />
         <HelpOverlay />
+        <GameOverOverlay />
         <CornerToasts />
       </div>
     </div>
