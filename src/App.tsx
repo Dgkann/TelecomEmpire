@@ -2,9 +2,12 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
 import { useGame } from './store/gameStore';
+import AuctionModal from './ui/AuctionModal';
 import BuildBar from './ui/BuildBar';
 import ContextPanel from './ui/ContextPanel';
+import IncidentModal from './ui/IncidentModal';
 import MapView from './ui/MapView';
+import SidePanel from './ui/SidePanel';
 import TopBar from './ui/TopBar';
 
 function useGameClock() {
@@ -74,9 +77,12 @@ function GameShell() {
       <TopBar />
       <div className="relative min-h-0 flex-1">
         <MapView />
+        <SidePanel />
         <ContextPanel />
         <BuildBar />
 
+        <IncidentModal />
+        <AuctionModal />
         <CornerToasts />
       </div>
     </div>
