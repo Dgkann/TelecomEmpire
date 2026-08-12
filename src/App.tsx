@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
 import { useGame } from './store/gameStore';
+import BuildBar from './ui/BuildBar';
+import ContextPanel from './ui/ContextPanel';
 import MapView from './ui/MapView';
 import TopBar from './ui/TopBar';
 
@@ -39,6 +42,29 @@ function useHotkeys() {
   }, [setSpeed, cancelBuild, select]);
 }
 
+function CornerToasts() {
+  const toasts = useGame((s) => s.toasts).filter((t) => t.gx === undefined);
+  return (
+    <div className="pointer-events-none absolute bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+      <AnimatePresence>
+        {toasts.map((t) => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 24 }}
+            className={`panel px-3 py-2 text-xs font-medium ${
+              t.tone === 'good' ? 'border-neon-lime/40 text-neon-lime' : t.tone === 'bad' ? 'border-neon-red/40 text-neon-red' : ''
+            }`}
+          >
+            {t.text}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function GameShell() {
   useGameClock();
   useHotkeys();
@@ -48,6 +74,10 @@ function GameShell() {
       <TopBar />
       <div className="relative min-h-0 flex-1">
         <MapView />
+        <ContextPanel />
+        <BuildBar />
+
+        <CornerToasts />
       </div>
     </div>
   );
