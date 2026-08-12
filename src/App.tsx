@@ -9,6 +9,9 @@ import IncidentModal from './ui/IncidentModal';
 import MapView from './ui/MapView';
 import SidePanel from './ui/SidePanel';
 import TopBar from './ui/TopBar';
+import CompanyScreen from './ui/screens/CompanyScreen';
+import NetworkScreen from './ui/screens/NetworkScreen';
+import ResearchScreen from './ui/screens/ResearchScreen';
 
 function useGameClock() {
   const tick = useGame((s) => s.tick);
@@ -69,6 +72,7 @@ function CornerToasts() {
 }
 
 function GameShell() {
+  const screen = useGame((s) => s.screen);
   useGameClock();
   useHotkeys();
 
@@ -76,10 +80,17 @@ function GameShell() {
     <div className="flex h-full flex-col">
       <TopBar />
       <div className="relative min-h-0 flex-1">
-        <MapView />
-        <SidePanel />
-        <ContextPanel />
-        <BuildBar />
+        {screen === 'map' && (
+          <>
+            <MapView />
+            <SidePanel />
+            <ContextPanel />
+            <BuildBar />
+          </>
+        )}
+        {screen === 'network' && <NetworkScreen />}
+        {screen === 'company' && <CompanyScreen />}
+        {screen === 'research' && <ResearchScreen />}
 
         <IncidentModal />
         <AuctionModal />

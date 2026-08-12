@@ -2,13 +2,20 @@ import { motion } from 'framer-motion';
 import { fmtMoney, fmtNum } from '../game/economy';
 import { fmtClock, fmtDate, totalCustomers } from '../game/simulation';
 import { useGame } from '../store/gameStore';
-import type { Speed } from '../game/types';
+import type { Screen, Speed } from '../game/types';
 
 const SPEEDS: Array<{ v: Speed; label: string }> = [
   { v: 0, label: '❚❚' },
   { v: 1, label: '1x' },
   { v: 2, label: '2x' },
   { v: 4, label: '4x' },
+];
+
+const SCREENS: Array<{ id: Screen; label: string }> = [
+  { id: 'map', label: 'Map' },
+  { id: 'network', label: 'Network' },
+  { id: 'company', label: 'Company' },
+  { id: 'research', label: 'Research' },
 ];
 
 function Stat({
@@ -42,6 +49,8 @@ function Stat({
 
 export default function TopBar() {
   const game = useGame((s) => s.game)!;
+  const screen = useGame((s) => s.screen);
+  const setScreen = useGame((s) => s.setScreen);
   const setSpeed = useGame((s) => s.setSpeed);
   const save = useGame((s) => s.save);
   const soundOn = useGame((s) => s.soundOn);
@@ -98,6 +107,20 @@ export default function TopBar() {
                 game.speed === s.v ? 'bg-neon-cyan/25 text-neon-cyan' : 'text-white/50 hover:bg-white/10'
               }`}
               title={s.v === 0 ? 'Pause (Space)' : `${s.v}x speed`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-0.5 rounded-lg bg-black/30 p-1">
+          {SCREENS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setScreen(s.id)}
+              className={`h-7 rounded-md px-3 text-xs font-semibold transition-colors ${
+                screen === s.id ? 'bg-white/15 text-white' : 'text-white/50 hover:bg-white/10'
+              }`}
             >
               {s.label}
             </button>
