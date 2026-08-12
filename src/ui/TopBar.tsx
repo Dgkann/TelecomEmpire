@@ -53,8 +53,10 @@ export default function TopBar() {
   const setScreen = useGame((s) => s.setScreen);
   const setSpeed = useGame((s) => s.setSpeed);
   const save = useGame((s) => s.save);
+  const quit = useGame((s) => s.quitToMenu);
   const soundOn = useGame((s) => s.soundOn);
   const toggleSound = useGame((s) => s.toggleSound);
+  const setShowHelp = useGame((s) => s.setShowHelp);
 
   const customers = totalCustomers(game);
   const health = game.stats.health;
@@ -128,11 +130,17 @@ export default function TopBar() {
         </div>
 
         <div className="flex items-center gap-1">
+          <button className="btn px-2 py-1 text-xs" onClick={() => setShowHelp(true)} title="How to play">
+            ?
+          </button>
           <button className="btn px-2 py-1 text-xs" onClick={toggleSound} title="Sound">
             {soundOn ? '🔊' : '🔇'}
           </button>
           <button className="btn px-2 py-1 text-xs" onClick={save} title="Save game">
             Save
+          </button>
+          <button className="btn px-2 py-1 text-xs" onClick={quit} title="Save and exit to menu">
+            Menu
           </button>
         </div>
       </div>

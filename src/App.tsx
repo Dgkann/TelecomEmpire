@@ -1,17 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
 import { useGame } from './store/gameStore';
 import AuctionModal from './ui/AuctionModal';
 import BuildBar from './ui/BuildBar';
 import ContextPanel from './ui/ContextPanel';
+import HelpOverlay from './ui/HelpOverlay';
 import IncidentModal from './ui/IncidentModal';
+import MainMenu from './ui/MainMenu';
 import MapView from './ui/MapView';
 import SidePanel from './ui/SidePanel';
 import TopBar from './ui/TopBar';
+import Tutorial from './ui/Tutorial';
 import CompanyScreen from './ui/screens/CompanyScreen';
 import NetworkScreen from './ui/screens/NetworkScreen';
 import ResearchScreen from './ui/screens/ResearchScreen';
+import { playSound } from './ui/sound';
 
 function useGameClock() {
   const tick = useGame((s) => s.tick);
@@ -19,6 +23,16 @@ function useGameClock() {
     const id = setInterval(tick, STEP_MS);
     return () => clearInterval(id);
   }, [tick]);
+}
+
+function useIncidentSound() {
+  const incidents = useGame((s) => s.game?.incidents.filter((i) => !i.resolved).length ?? 0);
+  const soundOn = useGame((s) => s.soundOn);
+  const prev = useRef(incidents);
+  useEffect(() => {
+    if (incidents > prev.current) playSound('alert', soundOn);
+    prev.current = incidents;
+  }, [incidents, soundOn]);
 }
 
 function useHotkeys() {
@@ -75,6 +89,7 @@ function GameShell() {
   const screen = useGame((s) => s.screen);
   useGameClock();
   useHotkeys();
+  useIncidentSound();
 
   return (
     <div className="flex h-full flex-col">
@@ -86,6 +101,7 @@ function GameShell() {
             <SidePanel />
             <ContextPanel />
             <BuildBar />
+            <Tutorial />
           </>
         )}
         {screen === 'network' && <NetworkScreen />}
@@ -94,6 +110,7 @@ function GameShell() {
 
         <IncidentModal />
         <AuctionModal />
+        <HelpOverlay />
         <CornerToasts />
       </div>
     </div>
@@ -101,14 +118,7 @@ function GameShell() {
 }
 
 export default function App() {
+  const started = useGame((s) => s.started);
   const game = useGame((s) => s.game);
-  const newGame = useGame((s) => s.newGame);
-
-  // No menu yet, so drop straight into a default company.
-  useEffect(() => {
-    if (!game) newGame({ companyName: 'CoreLink', logo: '📡', difficulty: 'standard', cityName: 'Marmara' });
-  }, [game, newGame]);
-
-  if (!game) return null;
-  return <GameShell />;
+  return <div className="h-full w-full">{started && game ? <GameShell /> : <MainMenu />}</div>;
 }
