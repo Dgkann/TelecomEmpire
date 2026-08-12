@@ -189,3 +189,50 @@ export function loadNetwork(
 
 export const nodeUtil = (n: NetNode) => (n.capacityGbps > 0 ? n.trafficGbps / n.capacityGbps : 0);
 export const linkUtil = (l: NetLink) => (l.capacityGbps > 0 ? l.trafficGbps / l.capacityGbps : 0);
+
+// Capacity that customer traffic actually has to fit through: the access layer
+// that terminates it, and the transit that carries it off-net.
+export function servingCapacity(nodes: NetNode[]) {
+  return nodes
+    .filter((n) => !n.down && (n.kind === 'pop' || n.kind === 'access' || n.kind === 'tower'))
+    .reduce((sum, n) => sum + n.capacityGbps, 0);
+}
+
+export interface Forecast {
+  // Gbps at peak, today and projected.
+  today: number;
+  projected: number;
+  perDay: number;
+  daysOfHeadroom: number | null;
+  confident: boolean;
+}
+
+// Straight line fit over recent daily peaks. Deliberately simple: the point is
+// to let a player see a wall coming, not to be a good statistician.
+export function forecastDemand(history: number[], today: number, daysAhead: number): Forecast {
+  const points = history.slice(-14);
+  if (points.length < 4) {
+    return { today, projected: today, perDay: 0, daysOfHeadroom: null, confident: false };
+  }
+
+  const n = points.length;
+  const meanX = (n - 1) / 2;
+  const meanY = points.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - meanX) * (points[i] - meanY);
+    den += (i - meanX) ** 2;
+  }
+  const perDay = den > 0 ? num / den : 0;
+  const projected = Math.max(0, today + perDay * daysAhead);
+  return { today, projected, perDay, daysOfHeadroom: null, confident: n >= 10 };
+}
+
+// How long until demand reaches the capacity you have, at the current trend.
+export function daysUntilFull(forecast: Forecast, capacity: number): number | null {
+  if (forecast.perDay <= 0.0001) return null;
+  const gap = capacity - forecast.today;
+  if (gap <= 0) return 0;
+  return gap / forecast.perDay;
+}

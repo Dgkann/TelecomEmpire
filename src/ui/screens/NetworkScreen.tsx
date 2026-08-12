@@ -7,7 +7,7 @@ import {
   utilColor,
 } from '../../game/constants';
 import { fmtMoney, fmtNum } from '../../game/economy';
-import { linkUtil, nodeUtil } from '../../game/network';
+import { daysUntilFull, forecastDemand, linkUtil, nodeUtil, servingCapacity } from '../../game/network';
 import { researchModifiers } from '../../game/research';
 import { mobileSubs, residentialSubs } from '../../game/simulation';
 import { useGame } from '../../store/gameStore';
@@ -35,6 +35,9 @@ export default function NetworkScreen() {
   const toggleAuto = useGame((s) => s.toggleAutoDispatch);
   const mods = researchModifiers(game.researchDone);
 
+  const forecast = forecastDemand(game.demandHistory, Math.max(game.dayPeakDemand, game.stats.demandGbps), 30);
+  const accessCapacity = servingCapacity(game.nodes);
+  const daysLeft = daysUntilFull(forecast, accessCapacity);
   const transit = TRANSIT_TIERS[game.transitTier];
   const transitUse = game.stats.demandGbps / (transit.capacity * (game.backupTransit ? 1.35 : 1));
 
@@ -149,6 +152,57 @@ export default function NetworkScreen() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="panel p-5 lg:col-span-2">
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Demand forecast</h2>
+          <p className="mb-3 text-[11px] text-white/40">
+            Straight line through recent peaks. Capacity takes time to build, so the useful moment to act is before
+            the line crosses.
+          </p>
+
+          {!forecast.confident ? (
+            <p className="text-sm text-white/40">Not enough history yet. Give it a couple of weeks.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="chip py-2">
+                  <div className="stat-label">Peak today</div>
+                  <div className="num text-sm">{forecast.today.toFixed(1)}G</div>
+                </div>
+                <div className="chip py-2">
+                  <div className="stat-label">In 30 days</div>
+                  <div className="num text-sm text-neon-cyan">{forecast.projected.toFixed(1)}G</div>
+                </div>
+                <div className="chip py-2">
+                  <div className="stat-label">Access capacity</div>
+                  <div className="num text-sm">{accessCapacity.toFixed(0)}G</div>
+                </div>
+                <div className="chip py-2">
+                  <div className="stat-label">Headroom</div>
+                  <div
+                    className={`num text-sm ${
+                      daysLeft !== null && daysLeft < 30 ? 'text-neon-red' : 'text-neon-lime'
+                    }`}
+                  >
+                    {daysLeft === null ? 'flat' : daysLeft > 365 ? '1y+' : `${Math.round(daysLeft)}d`}
+                  </div>
+                </div>
+              </div>
+
+              <Meter
+                v={forecast.projected / Math.max(0.01, accessCapacity)}
+                label="Projected peak against what you have built"
+                right={`${forecast.projected.toFixed(1)} / ${accessCapacity.toFixed(0)} Gbps`}
+              />
+
+              {daysLeft !== null && daysLeft < 30 && (
+                <div className="mt-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3 text-[12px] text-neon-red">
+                  On the current trend you run out of access capacity in about {Math.round(daysLeft)} days.
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {mods.hasMobile && (

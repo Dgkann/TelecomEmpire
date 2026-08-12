@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { fmtMoney } from '../game/economy';
 import { researchModifiers } from '../game/research';
+import { pendingRegulations, regulationProgress } from '../game/regulator';
 import { fmtClock, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 
@@ -24,6 +25,7 @@ export default function SidePanel() {
   const mods = researchModifiers(game.researchDone);
   const active = game.incidents.filter((i) => !i.resolved);
   const outages = Object.entries(game.stats.outages).filter(([, v]) => v);
+  const obligations = pendingRegulations(game);
 
   return (
     <div className="pointer-events-none absolute left-4 top-4 z-20 flex w-[268px] flex-col gap-3">
@@ -107,6 +109,29 @@ export default function SidePanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {obligations.map((r) => {
+        const progress = regulationProgress(game, r);
+        const daysLeft = Math.max(0, Math.ceil((r.dueAt - game.minutes) / 1440));
+        return (
+          <div key={r.id} className="pointer-events-auto panel border-neon-amber/40 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] uppercase tracking-widest text-neon-amber">{r.title}</div>
+              <div className="num text-[10px] text-white/40">{daysLeft}d left</div>
+            </div>
+            <div className="mt-0.5 text-[11px] leading-snug text-white/55">{r.detail}</div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${progress * 100}%`, background: progress >= 1 ? '#7ee787' : '#ffc857' }}
+              />
+            </div>
+            <div className="num mt-1 text-[10px] text-white/35">
+              {progress >= 1 ? 'On track' : `Fine if missed: $${r.fine.toLocaleString()}`}
+            </div>
+          </div>
+        );
+      })}
 
       <AnimatePresence>
         {game.offers.slice(0, 2).map((o) => {

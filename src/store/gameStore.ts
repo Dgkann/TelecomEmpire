@@ -251,6 +251,7 @@ export const useGame = create<Store>((set, get) => ({
           health: 100,
           down: false,
           builtAt: draft.minutes,
+          servicedAt: draft.minutes,
         },
       ];
       pushLog(draft, `${spec.label} built in ${district.name}.`, 'good');
@@ -342,6 +343,7 @@ export const useGame = create<Store>((set, get) => ({
               capacityGbps:
                 n.kind === 'tower' ? towerCapacity(draft.spectrum, n.tier + 1) : nodeCapacity(n.kind, n.tier + 1),
               health: Math.max(n.health, 92),
+              servicedAt: draft.minutes,
             }
           : n,
       );
@@ -363,7 +365,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
-      draft.nodes = draft.nodes.map((n) => (n.id === id ? { ...n, health: 100 } : n));
+      draft.nodes = draft.nodes.map((n) => (n.id === id ? { ...n, health: 100, servicedAt: draft.minutes } : n));
     });
     s.toast('Maintenance done', 'good', node.gx, node.gy);
   },

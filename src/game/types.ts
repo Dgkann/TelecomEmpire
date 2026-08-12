@@ -104,6 +104,8 @@ export interface NetNode {
   health: number;
   down: boolean;
   builtAt: number;
+  // Last time a crew went over it. Ageing is measured from here, not from build.
+  servicedAt: number;
 }
 
 export interface NetLink {
@@ -250,6 +252,19 @@ export interface Loan {
   takenAt: number;
 }
 
+export interface Regulation {
+  id: string;
+  kind: 'coverage' | 'price_cap';
+  title: string;
+  detail: string;
+  // Null for obligations that apply to the whole company.
+  districtId: string | null;
+  target: number;
+  dueAt: number;
+  fine: number;
+  status: 'pending' | 'met' | 'failed';
+}
+
 export type ChurnReason = 'price' | 'outage' | 'congestion' | 'support';
 
 export interface ChurnEvent {
@@ -348,6 +363,13 @@ export interface GameState {
   marketingBudget: number;
   retentionBudget: number;
   churn: ChurnEvent[];
+
+  // Daily peak demand in Gbps, oldest first. Feeds the forecast.
+  demandHistory: number[];
+  dayPeakDemand: number;
+
+  regulations: Regulation[];
+  nextRegulationAt: number;
 
   loans: Loan[];
   // Game minute your balance first went past the credit limit, null when solvent.

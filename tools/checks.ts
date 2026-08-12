@@ -3,9 +3,10 @@
 import { MINUTES_PER_DAY, SAVE_VERSION, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
-import { computeRoutes, isRedundant } from '../src/game/network';
+import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, servingCapacity } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
+import { pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { clearSave, loadGame, migrate, saveGame } from '../src/game/save';
 import { createNewGame, mobileSubs, residentialSubs, step, totalCustomers } from '../src/game/simulation';
 import type { GameState, NetLink, NetNode } from '../src/game/types';
@@ -383,6 +384,104 @@ group('you can actually lose');
   const recovered = runDays({ ...dip, money: 500000 }, 2);
   check('paying it back stops the clock', recovered.insolventSince === null);
   check('a solvent company keeps playing', !recovered.gameOver);
+}
+
+group('equipment ages');
+{
+  let g = newGame(9090);
+  g = runDays(g, 400, repairAll);
+  const oldest = g.nodes.reduce((a, b) => (a.servicedAt <= b.servicedAt ? a : b));
+  check('unserviced kit drifts below pristine', oldest.health < 100, `${oldest.health.toFixed(0)}`);
+  check('ageing has a floor', g.nodes.every((n) => n.health >= 20));
+
+  // Servicing should visibly restore it.
+  const serviced = { ...g, nodes: g.nodes.map((n) => ({ ...n, health: 100, servicedAt: g.minutes })) };
+  const later = runDays(serviced, 5, repairAll);
+  check('a serviced node stays healthy for a while', later.nodes.every((n) => n.health > 95));
+
+  // A bigger network should take longer to fix, not the same time.
+  const small = newGame(11);
+  const big: GameState = {
+    ...small,
+    nodes: [...Array(40)].map((_, i) => ({ ...small.nodes[0], id: `n${i}` })),
+  };
+  const runs = 40;
+  let smallTotal = 0;
+  let bigTotal = 0;
+  for (let i = 0; i < runs; i++) {
+    smallTotal += runDays(small, 1).incidents.reduce((a, x) => a + x.repairTotalMinutes, 0);
+    bigTotal += runDays(big, 1).incidents.reduce((a, x) => a + x.repairTotalMinutes, 0);
+  }
+  check('faults on a bigger network take longer', bigTotal >= smallTotal, `${smallTotal} vs ${bigTotal}`);
+}
+
+group('the regulator');
+{
+  // Too small to be worth regulating.
+  let tiny = newGame(4141);
+  tiny = runDays(tiny, 30, repairAll);
+  check('a tiny operator is left alone', pendingRegulations(tiny).length === 0);
+
+  // Force an obligation and let it fall due unmet.
+  const g = newGame(4242);
+  const doomed: GameState = {
+    ...g,
+    money: 500000,
+    regulations: [
+      {
+        id: 'r1',
+        kind: 'coverage',
+        title: 'Coverage obligation',
+        detail: 'test',
+        districtId: g.districts[0].id,
+        target: 0.99,
+        dueAt: g.minutes + MINUTES_PER_DAY,
+        fine: 50000,
+        status: 'pending',
+      },
+    ],
+  };
+  const moneyBefore = doomed.money;
+  const after = runDays(doomed, 3, repairAll);
+  check('an unmet obligation is marked failed', after.regulations[0].status === 'failed');
+  check('an unmet obligation costs money', after.money < moneyBefore - 40000, `${Math.round(moneyBefore - after.money)}`);
+
+  // And one that is already satisfied should pass.
+  const easy: GameState = {
+    ...g,
+    regulations: [{ ...doomed.regulations[0], id: 'r2', target: 0.001 }],
+    districts: g.districts.map((d) => ({ ...d, coverage: 0.5 })),
+  };
+  const passed = runDays(easy, 3, repairAll);
+  check('a met obligation is marked met', passed.regulations[0].status === 'met');
+  check('progress is reported as a fraction', regulationProgress(g, doomed.regulations[0]) >= 0);
+}
+
+group('demand forecasting');
+{
+  const flat = forecastDemand([5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], 5, 30);
+  check('a flat history projects flat', Math.abs(flat.projected - 5) < 0.01, `${flat.projected}`);
+  check('a flat history has no exhaustion date', daysUntilFull(flat, 10) === null);
+
+  const rising = forecastDemand([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 12, 30);
+  check('a rising history projects upward', rising.projected > 12, `${rising.projected.toFixed(1)}`);
+  check('the slope is about one per day', Math.abs(rising.perDay - 1) < 0.01, `${rising.perDay.toFixed(3)}`);
+  const untilFull = daysUntilFull(rising, 20);
+  check('exhaustion is predicted', untilFull !== null && Math.abs(untilFull - 8) < 0.5, `${untilFull}`);
+  check('already full reports zero days', daysUntilFull(rising, 5) === 0);
+
+  const thin = forecastDemand([1, 2], 2, 30);
+  check('too little history is flagged as not confident', !thin.confident);
+
+  // The live game should fill the history and stay finite.
+  let g = newGame(5150);
+  g = runDays(g, 30, repairAll);
+  check('the game records daily peaks', g.demandHistory.length >= 25, `${g.demandHistory.length}`);
+  check('recorded peaks are finite', g.demandHistory.every((v) => Number.isFinite(v) && v >= 0));
+  check('history is bounded', runDays(g, 60, repairAll).demandHistory.length <= 45);
+  const live = forecastDemand(g.demandHistory, g.stats.demandGbps, 30);
+  finite('the live forecast is a real number', live.projected);
+  check('serving capacity is positive', servingCapacity(g.nodes) > 0);
 }
 
 group('a tower with no fibre behind it');

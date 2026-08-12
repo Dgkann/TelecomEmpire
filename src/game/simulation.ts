@@ -20,6 +20,7 @@ import {
 import { createAuction, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
+import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
@@ -93,6 +94,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     health: 100,
     down: false,
     builtAt: 0,
+    servicedAt: 0,
   };
 
   const popGx = Math.max(1, Math.min(GRID - 2, coreGx + 3));
@@ -110,6 +112,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     health: 100,
     down: false,
     builtAt: 0,
+    servicedAt: 0,
   };
 
   const length = Math.hypot(core.gx - pop.gx, core.gy - pop.gy);
@@ -192,6 +195,10 @@ export function createNewGame(opts: NewGameOptions): GameState {
     marketingBudget: 2000,
     retentionBudget: 0,
     churn: [],
+    demandHistory: [],
+    dayPeakDemand: 0,
+    regulations: [],
+    nextRegulationAt: MINUTES_PER_DAY * 120,
     loans: [],
     insolventSince: null,
     gameOver: null,
@@ -330,9 +337,14 @@ export function step(prev: GameState): GameState {
     const rated = n.kind === 'tower' ? towerCapacity(s.spectrum, n.tier) : nodeCapacity(n.kind, n.tier);
     const effCap = degraded ? rated * (0.35 + 0.3 * (1 - mods.ddosMul)) : rated;
     const util = traffic / Math.max(0.01, effCap);
-    // Running hot wears equipment down; idle kit slowly recovers.
+    // Kit does not stay new. Idle equipment recovers, but only up to a ceiling
+    // that falls the longer it has gone without a crew looking at it, so a big
+    // old network needs ongoing maintenance rather than none.
+    const yearsSinceService = (s.minutes - (n.servicedAt ?? n.builtAt)) / (MINUTES_PER_DAY * 365);
+    const ceiling = clamp(100 - yearsSinceService * 14, 45, 100);
     const wear = util > 0.92 ? -0.05 : util < 0.7 ? 0.02 : 0;
-    return { ...n, trafficGbps: traffic, capacityGbps: effCap, health: clamp(n.health + wear, 20, 100) };
+    const health = clamp(Math.min(n.health + wear, ceiling), 20, 100);
+    return { ...n, trafficGbps: traffic, capacityGbps: effCap, health };
   });
   s.links = s.links.map((l) => ({ ...l, trafficGbps: load.linkTraffic[l.id] ?? 0 }));
 
@@ -356,6 +368,7 @@ export function step(prev: GameState): GameState {
   const avgNodeHealth = s.nodes.length ? s.nodes.reduce((a, n) => a + (n.down ? 0 : n.health), 0) / s.nodes.length : 100;
   const health = clamp(avgNodeHealth * (1 - packetLoss * 0.8) - Object.values(outages).filter(Boolean).length * 6, 0, 100);
 
+  s.dayPeakDemand = Math.max(s.dayPeakDemand, load.totalDemand);
   s.stats = {
     demandGbps: load.totalDemand,
     servedGbps: load.totalServed,
@@ -470,6 +483,9 @@ export function step(prev: GameState): GameState {
   if (newDay) {
     maybeSocialPost(s, rng, packetLoss, outageCount, avgSpeed);
     tickCompetitors(s, rng, diff.competitorAggression);
+    s.demandHistory = [...s.demandHistory, s.dayPeakDemand].slice(-45);
+    s.dayPeakDemand = 0;
+    tickRegulator(s, rng);
     if (s.minutes > s.nextEventAt) startCityEvent(s, rng);
     if (s.minutes > s.nextGrowthAt) growCity(s, rng);
     s.researchPoints += Math.max(0, Math.round(residentialSubs(s) / 500));
@@ -722,13 +738,19 @@ function tickIncidents(
 ) {
   // Roughly one incident every few days, scaled by how much kit you own.
   const exposure = 0.35 + s.nodes.length * 0.06 + s.links.length * 0.05;
-  const perDay = 0.16 * exposure * diff.incidentRate;
+  // Worn equipment fails more often, which is what makes servicing worth doing.
+  const avgHealth = s.nodes.length ? s.nodes.reduce((a, n) => a + n.health, 0) / s.nodes.length : 100;
+  const condition = 1 + clamp((90 - avgHealth) / 60, 0, 1.2);
+  const perDay = 0.16 * exposure * diff.incidentRate * condition;
   const chance = perDay * (dt / MINUTES_PER_DAY);
   const unresolved = s.incidents.filter((i) => !i.resolved);
 
   if (rng() < chance && unresolved.length < 4) {
     const inc = rollIncident(s, rng, mods);
     if (inc) {
+      // A fault on a large network takes longer to find and reach.
+      const scale = 1 + Math.min(0.8, s.nodes.length / 30);
+      inc.repairTotalMinutes = Math.round(inc.repairTotalMinutes * scale);
       s.incidents = [...s.incidents, inc];
       applyIncidentDown(s, inc, true);
       pushLog(s, `${inc.title} in ${s.districts.find((d) => d.id === inc.districtId)?.name ?? 'network'}`, 'bad');
@@ -1017,6 +1039,31 @@ function maybeSocialPost(s: GameState, rng: Rng, packetLoss: number, outages: nu
 }
 
 
+// The regulator only turns up once you are big enough to be worth regulating,
+// and it keeps turning up as you grow.
+function tickRegulator(s: GameState, rng: Rng) {
+  for (const outcome of settleRegulations(s)) {
+    if (outcome.met) {
+      s.reputation = clamp(s.reputation + 4, 0, 100);
+      pushLog(s, `${outcome.regulation.title} met.`, 'good');
+    } else {
+      s.money -= outcome.regulation.fine;
+      s.reputation = clamp(s.reputation - 8, 0, 100);
+      pushLog(s, `${outcome.regulation.title} missed. Fined $${outcome.regulation.fine.toLocaleString()}.`, 'bad');
+    }
+  }
+
+  const customers = residentialSubs(s) + mobileSubs(s);
+  if (s.minutes >= s.nextRegulationAt && shouldIssue(s, customers)) {
+    const reg = makeRegulation(s, rng, customers);
+    if (reg) {
+      s.regulations = [...s.regulations, reg];
+      pushLog(s, `${reg.title}: ${reg.detail}`, 'info');
+    }
+    s.nextRegulationAt = s.minutes + MINUTES_PER_DAY * randInt(rng, 90, 160);
+  }
+}
+
 function startCityEvent(s: GameState, rng: Rng) {
   const ev = pick(rng, CITY_EVENTS);
   s.activeEvent = {
@@ -1049,7 +1096,10 @@ function growCity(s: GameState, rng: Rng) {
   s.districts = s.districts.map((x) =>
     x.id === d.id ? { ...x, potential: Math.round(x.potential * 1.04), population: Math.round(x.population * 1.04) } : x,
   );
-  s.nextGrowthAt = s.minutes + MINUTES_PER_DAY * randInt(rng, 14, 26);
+  // Growth accelerates, so a network that was comfortable last year is not.
+  const years = s.minutes / (MINUTES_PER_DAY * 365);
+  const interval = Math.max(6, Math.round(randInt(rng, 14, 26) * clamp(1 - years * 0.18, 0.4, 1)));
+  s.nextGrowthAt = s.minutes + MINUTES_PER_DAY * interval;
   pushLog(s, `${d.name} is growing, new residents mean new demand.`, 'info');
 }
 

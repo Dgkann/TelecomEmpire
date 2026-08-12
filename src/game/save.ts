@@ -65,6 +65,26 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
 
   // 4 -> 5: borrowing, credit limits and a way to lose.
   4: (s) => ({ ...s, loans: s.loans ?? [], insolventSince: null, gameOver: null }),
+
+  // 5 -> 6: equipment ages from its last service, so existing kit counts as
+  // just serviced rather than instantly decrepit.
+  5: (s) => ({
+    ...s,
+    nodes: (Array.isArray(s.nodes) ? s.nodes : []).map((n) => {
+      const node = n as Record<string, unknown>;
+      return { ...node, servicedAt: node.servicedAt ?? s.minutes ?? 0 };
+    }),
+  }),
+
+  // 6 -> 7: the regulator started handing out obligations.
+  6: (s) => ({
+    ...s,
+    regulations: s.regulations ?? [],
+    nextRegulationAt: s.nextRegulationAt ?? (typeof s.minutes === 'number' ? s.minutes : 0) + 1440 * 60,
+  }),
+
+  // 7 -> 8: daily peak demand is recorded so the forecast has something to fit.
+  7: (s) => ({ ...s, demandHistory: s.demandHistory ?? [], dayPeakDemand: s.dayPeakDemand ?? 0 }),
 };
 
 const DEFAULTS = {
@@ -84,6 +104,9 @@ const DEFAULTS = {
   marketingBudget: 0,
   retentionBudget: 0,
   churn: [],
+  regulations: [],
+  demandHistory: [],
+  dayPeakDemand: 0,
   loans: [],
   insolventSince: null,
   gameOver: null,
