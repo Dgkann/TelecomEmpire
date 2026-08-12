@@ -3,7 +3,14 @@ import { averagePrice, fmtMoney, fmtMoneyExact, fmtNum, monthlyBreakdown, packag
 import { researchModifiers } from '../../game/research';
 import { residentialSubs } from '../../game/simulation';
 import { useGame } from '../../store/gameStore';
-import type { StaffRole } from '../../game/types';
+import type { ChurnReason, StaffRole } from '../../game/types';
+
+const CHURN_REASON: Record<ChurnReason, string> = {
+  price: 'too expensive',
+  outage: 'outage',
+  congestion: 'slow at peak',
+  support: 'poor support',
+};
 
 const ROLE_LABEL: Record<StaffRole, string> = {
   network_engineer: 'Network Engineer',
@@ -27,6 +34,7 @@ export default function CompanyScreen() {
   const game = useGame((s) => s.game)!;
   const updatePackage = useGame((s) => s.updatePackage);
   const setMarketing = useGame((s) => s.setMarketing);
+  const setRetention = useGame((s) => s.setRetention);
   const hireTechnician = useGame((s) => s.hireTechnician);
   const hireEmployee = useGame((s) => s.hireEmployee);
   const fireStaff = useGame((s) => s.fireStaff);
@@ -190,6 +198,27 @@ export default function CompanyScreen() {
               className="mt-2 w-full"
             />
           </div>
+
+          <div className="mt-5">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Retention budget</h3>
+                <p className="text-[11px] text-white/40">
+                  Slows people walking out. It buys time, it does not fix why they are leaving.
+                </p>
+              </div>
+              <span className="num text-lg font-semibold text-neon-violet">{fmtMoney(game.retentionBudget)}/mo</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={30000}
+              step={500}
+              value={game.retentionBudget}
+              onChange={(e) => setRetention(Number(e.target.value))}
+              className="mt-2 w-full"
+            />
+          </div>
         </div>
 
         <div className="panel p-5">
@@ -270,6 +299,35 @@ export default function CompanyScreen() {
                       <span className={`text-right ${breach ? 'text-neon-red' : 'text-white/50'}`}>
                         {Math.round(c.downtimeMinutes)}m down
                       </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="panel p-5">
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Where customers went</h2>
+          <p className="mb-3 text-[11px] text-white/40">Most recent losses first.</p>
+          {game.churn.length === 0 ? (
+            <p className="text-sm text-white/40">Nobody has left yet.</p>
+          ) : (
+            <div className="scroll-thin flex max-h-[260px] flex-col gap-1.5 overflow-y-auto">
+              {game.churn.slice(0, 12).map((c) => {
+                const d = game.districts.find((x) => x.id === c.districtId);
+                const rival = game.competitors.find((x) => x.id === c.toId);
+                return (
+                  <div key={c.id} className="rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="num text-sm font-semibold text-neon-red">-{Math.round(c.count)}</span>
+                      <span className="text-[11px]" style={{ color: rival?.color ?? '#8ea0b8' }}>
+                        {c.toName}
+                      </span>
+                    </div>
+                    <div className="num mt-0.5 flex justify-between text-[10px] text-white/40">
+                      <span>{d?.name}</span>
+                      <span>{CHURN_REASON[c.reason]}</span>
                     </div>
                   </div>
                 );

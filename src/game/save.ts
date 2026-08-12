@@ -59,6 +59,9 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
       };
     }),
   }),
+
+  // 3 -> 4: churn is recorded per event and retention spend became a lever.
+  3: (s) => ({ ...s, churn: s.churn ?? [], retentionBudget: s.retentionBudget ?? 0 }),
 };
 
 const DEFAULTS = {
@@ -76,6 +79,8 @@ const DEFAULTS = {
   history: [],
   monthAccumulator: { revenue: 0, expense: 0 },
   marketingBudget: 0,
+  retentionBudget: 0,
+  churn: [],
   transitTier: 0,
   backupTransit: false,
   autoDispatch: false,

@@ -48,6 +48,17 @@ const MEH_POSTS = [
   (c: string) => `Speeds with ${c} are okay until about 9pm, then it crawls.`,
 ];
 
+const SWITCH_POSTS = [
+  (c: string, r: string) => `Left ${c} for ${r} today. Same speed, smaller bill.`,
+  (c: string, r: string) => `${r} just wired my street. Sorry ${c}, you had your chance.`,
+  (c: string, r: string) => `Cancelled ${c} after the third outage. ${r} it is.`,
+];
+
+// A defection names the rival that took them, so the feed matches the churn list.
+export function makeSwitchPost(rng: Rng, company: string, rival: string) {
+  return { text: pick(rng, SWITCH_POSTS)(company, rival), stars: rng() < 0.7 ? 1 : 2 };
+}
+
 export function makePost(rng: Rng, company: string, mood: 'good' | 'bad' | 'meh', speed: number) {
   if (mood === 'good') return { text: pick(rng, GOOD_POSTS)(company, speed), stars: rng() < 0.6 ? 5 : 4 };
   if (mood === 'bad') return { text: pick(rng, BAD_POSTS)(company), stars: rng() < 0.6 ? 1 : 2 };

@@ -314,6 +314,29 @@ group('pricing does not spiral');
   check('a neglected operator loses the city', playerShareTarget(weak, weak.districts[0]) < 0.3, `${playerShareTarget(weak, weak.districts[0]).toFixed(2)}`);
 }
 
+group('churn is attributed');
+{
+  // A network that cannot keep up should shed customers to somebody.
+  let g = newGame(1212);
+  g = { ...g, packages: g.packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 2.4 } : p)) };
+  g = runDays(g, 200, repairAll);
+
+  check('losses are recorded', g.churn.length > 0, `${g.churn.length} events`);
+  check('every loss names a district', g.churn.every((c) => g.districts.some((d) => d.id === c.districtId)));
+  check('every loss has a reason', g.churn.every((c) => ['price', 'outage', 'congestion', 'support'].includes(c.reason)));
+  check('loss counts are positive and finite', g.churn.every((c) => Number.isFinite(c.count) && c.count > 0));
+  check('the log stays bounded', g.churn.length <= 30, `${g.churn.length}`);
+  check('at least some losses go to a named rival', g.churn.some((c) => c.toId !== null));
+
+  // Retention spend should visibly slow the bleeding.
+  const base = { ...newGame(1313), packages: newGame(1313).packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 2.4 } : p)) };
+  const without = runDays({ ...base, retentionBudget: 0 }, 120, repairAll);
+  const withSpend = runDays({ ...base, retentionBudget: 30000 }, 120, repairAll);
+  const lostWithout = without.churn.reduce((a, c) => a + c.count, 0);
+  const lostWith = withSpend.churn.reduce((a, c) => a + c.count, 0);
+  check('retention spend reduces churn', lostWith < lostWithout, `${Math.round(lostWithout)} -> ${Math.round(lostWith)}`);
+}
+
 group('a tower with no fibre behind it');
 {
   let g = newGame(555);

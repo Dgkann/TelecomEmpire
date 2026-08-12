@@ -335,6 +335,8 @@ export interface GameState {
   monthAccumulator: { revenue: number; expense: number };
 
   marketingBudget: number;
+  retentionBudget: number;
+  churn: ChurnEvent[];
   transitTier: number;
   backupTransit: boolean;
   autoDispatch: boolean;

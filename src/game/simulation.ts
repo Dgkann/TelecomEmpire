@@ -18,16 +18,16 @@ import {
   towerRadius,
 } from './constants';
 import { createAuction, settleAuction } from './spectrum';
-import { playerShareTarget, tickCompetitors } from './competitors';
+import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
 import { rollIncident } from './incidents';
-import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, personName } from './names';
+import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
 import { computeRoutes, loadNetwork, servingNodes } from './network';
 import { researchModifiers, type ResearchMods } from './research';
 import { makeRng, pick, rand, randInt, uid, type Rng } from './rng';
-import type { Building, Difficulty, District, GameState, Incident, NetNode, Technician } from './types';
+import type { Building, ChurnReason, Difficulty, District, GameState, Incident, NetNode, Technician } from './types';
 
 export function dateFromMinutes(minutes: number) {
   return new Date(START_DATE.getTime() + minutes * 60000);
@@ -189,6 +189,8 @@ export function createNewGame(opts: NewGameOptions): GameState {
     history: [],
     monthAccumulator: { revenue: 0, expense: 0 },
     marketingBudget: 2000,
+    retentionBudget: 0,
+    churn: [],
     transitTier: 0,
     backupTransit: false,
     autoDispatch: false,
@@ -496,12 +498,18 @@ function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayF
       diff.growthMul;
 
     const gap = addressable - current;
-    let delta = gap > 0 ? gap * 0.09 * appeal * dayFrac : gap * 0.05 * dayFrac;
+    const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1);
+    // Two different ways to lose people. The market shrinking under you as
+    // rivals build out, and your own customers walking because they are unhappy.
+    const marketLoss = gap < 0 ? -gap * 0.05 * dayFrac * retention : 0;
+    const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul * retention;
+    const unhappyLoss = current * churnRate * dayFrac;
 
-    // Unhappy customers leave regardless of headroom.
-    const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul;
-    delta -= current * churnRate * dayFrac;
+    let delta = gap > 0 ? gap * 0.09 * appeal * dayFrac : -marketLoss;
+    delta -= unhappyLoss;
 
+    const lost = marketLoss + unhappyLoss;
+    if (lost > 0.0001) recordChurn(s, d, lost, pIndex, rng, marketLoss > unhappyLoss);
     if (Math.abs(delta) < 0.0001) continue;
     applyDelta(s, d.id, delta, rng, changed);
   }
@@ -631,6 +639,52 @@ export function redistributeMobilePackages(s: GameState) {
 }
 
 // ---------------------------------------------------------------------------
+
+// Customers leaving is more useful to a player as "who took them and why" than
+// as a falling number, so each loss is attributed to a rival and a cause.
+function recordChurn(s: GameState, d: District, count: number, pIndex: number, rng: Rng, toMarket: boolean) {
+  const outage = s.stats.outages[d.id];
+  const pressure = s.stats.packetLoss > 0.02;
+  const reason: ChurnReason = outage
+    ? 'outage'
+    : pressure
+      ? 'congestion'
+      : pIndex > 1.1
+        ? 'price'
+        : s.employees.filter((e) => e.role === 'support').length === 0
+          ? 'support'
+          : 'price';
+
+  const rival = strongestRival(s, d.id);
+  // Losing ground to the market means somebody picked them up. Losing your own
+  // unhappy customers usually means they just went quiet.
+  const poached = rival && rng() < (toMarket ? 0.9 : 0.45);
+
+  // Losses arrive a fraction at a time, so same-day losses of the same kind in
+  // the same district roll into one entry rather than flooding the list.
+  const openIndex = s.churn.findIndex(
+    (c) => c.districtId === d.id && c.reason === reason && s.minutes - c.at < MINUTES_PER_DAY,
+  );
+  if (openIndex >= 0) {
+    const open = s.churn[openIndex];
+    const merged = { ...open, count: open.count + count, at: s.minutes };
+    s.churn = [merged, ...s.churn.filter((_, i) => i !== openIndex)];
+    return;
+  }
+
+  s.churn = [
+    {
+      id: uid('churn'),
+      at: s.minutes,
+      districtId: d.id,
+      count,
+      toId: poached ? rival!.id : null,
+      toName: poached ? rival!.name : 'left the market',
+      reason,
+    },
+    ...s.churn,
+  ].slice(0, 30);
+}
 
 function averageSatisfaction(s: GameState) {
   const active = s.districts.filter((d) => d.unlocked);
@@ -935,7 +989,13 @@ function maybeSocialPost(s: GameState, rng: Rng, packetLoss: number, outages: nu
     const badChance = clamp(packetLoss * 1.6 + outages * 0.35 + (60 - averageSatisfaction(s)) / 90, 0.05, 0.92);
     const roll = rng();
     const mood = roll < badChance ? 'bad' : roll < badChance + 0.25 ? 'meh' : 'good';
-    const { text, stars } = makePost(rng, s.companyName, mood, Math.round(avgSpeed * rand(rng, 0.88, 0.98)));
+
+    // If people have been defecting lately, some of the noise names the rival.
+    const recentDefection = s.churn.find((c) => c.toId && s.minutes - c.at < MINUTES_PER_DAY * 3);
+    const { text, stars } =
+      mood === 'bad' && recentDefection && rng() < 0.5
+        ? makeSwitchPost(rng, s.companyName, recentDefection.toName)
+        : makePost(rng, s.companyName, mood, Math.round(avgSpeed * rand(rng, 0.88, 0.98)));
     // Back-to-back identical posts read as a bug rather than a busy timeline.
     if (s.posts[0]?.text === text) continue;
     s.posts = [{ id: uid('p'), handle: `@${handleName(rng)}`, text, stars, at: s.minutes }, ...s.posts].slice(0, 40);

@@ -99,6 +99,7 @@ interface Store extends UiState {
   placeBid: (amount: number) => void;
   dismissAuction: () => void;
   setMarketing: (value: number) => void;
+  setRetention: (value: number) => void;
   setTransitTier: (tier: number) => void;
   toggleBackupTransit: () => void;
   toggleAutoDispatch: () => void;
@@ -601,6 +602,8 @@ export const useGame = create<Store>((set, get) => ({
   dismissAuction: () => withGame(set, (draft) => void (draft.auction = null)),
 
   setMarketing: (value) => withGame(set, (draft) => void (draft.marketingBudget = Math.max(0, value))),
+
+  setRetention: (value) => withGame(set, (draft) => void (draft.retentionBudget = Math.max(0, value))),
 
   setTransitTier: (tier) => {
     const s = get();
