@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "esbuild tools/checks.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/checks.mjs --log-level=error && node node_modules/.cache/checks.mjs",
     "balance": "esbuild tools/balance.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs",
-    "mobile-check": "esbuild tools/mobile-check.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/mobile.mjs --log-level=error && node node_modules/.cache/mobile.mjs"
+    "mobile-check": "esbuild tools/mobile-check.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/mobile.mjs --log-level=error && node node_modules/.cache/mobile.mjs",
+    "verify-commits": "bash tools/verify-commits.sh"
   },
   "dependencies": {
     "framer-motion": "^11.11.9",
