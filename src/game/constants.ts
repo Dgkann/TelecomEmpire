@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -105,6 +105,11 @@ export const FIBER_UPGRADE_COST_PER_UNIT = 2200;
 export const FIBER_MAINTENANCE_PER_UNIT = 22;
 
 export const POWER_COST_PER_KW_MONTH = 130;
+
+// The reference residential price the whole market is measured against. Both
+// your price index and every rival's are relative to this, so nobody's price
+// can chase anybody else's in a loop.
+export const BASELINE_ARPU = 34;
 
 export const TRANSIT_TIERS = [
   { label: 'Basic transit', capacity: 12, monthly: 3200, reliability: 0.9 },

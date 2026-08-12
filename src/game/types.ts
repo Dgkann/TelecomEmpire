@@ -227,9 +227,29 @@ export interface Competitor {
   name: string;
   color: string;
   aggression: number;
-  // districtId -> 0..1 market share
+  // districtId -> 0..1 market share, derived each day from relative pull
   share: Record<string, number>;
   priceIndex: number;
+  // Rivals run a balance sheet and spend it on rollout, price and technology.
+  cash: number;
+  // districtId -> 0..1 of the district their own access network reaches
+  coverage: Record<string, number>;
+  mobileCoverage: Record<string, number>;
+  tech: number;
+  lastMove: string | null;
+}
+
+export type ChurnReason = 'price' | 'outage' | 'congestion' | 'support';
+
+export interface ChurnEvent {
+  id: string;
+  at: number;
+  districtId: string;
+  count: number;
+  // Who took them. Null when they simply dropped off the network.
+  toId: string | null;
+  toName: string;
+  reason: ChurnReason;
 }
 
 export interface SocialPost {
@@ -270,7 +290,7 @@ export interface NetworkStats {
   outages: Record<string, boolean>;
 }
 
-export type OverlayMode = 'normal' | 'load' | 'coverage';
+export type OverlayMode = 'normal' | 'load' | 'coverage' | 'rivals';
 export type Screen = 'map' | 'network' | 'company' | 'research';
 
 export interface GameState {

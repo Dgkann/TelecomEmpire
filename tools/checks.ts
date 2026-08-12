@@ -1,7 +1,8 @@
 // Invariant checks, run headless. Exits non-zero on failure so CI can gate on it.
 // Run with: npm run check
 import { MINUTES_PER_DAY, SAVE_VERSION, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
-import { monthlyBreakdown } from '../src/game/economy';
+import { monthlyBreakdown, priceIndex } from '../src/game/economy';
+import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
 import { computeRoutes, isRedundant } from '../src/game/network';
 import { researchModifiers } from '../src/game/research';
 import { clearSave, loadGame, migrate, saveGame } from '../src/game/save';
@@ -256,6 +257,61 @@ group('spectrum and mobile');
   check('mobile revenue is counted', monthlyBreakdown(g, researchModifiers(g.researchDone)).revenueMobile > 0);
   check('mobile subscribers count as customers', totalCustomers(g) > Math.round(residentialSubs(g)));
   finite('mobile subscriber count is a real number', mobileSubs(g));
+}
+
+group('competitors');
+{
+  let g = newGame(8080);
+  const startCoverage = g.competitors.map((c) => Object.values(c.coverage).reduce((a, b) => a + b, 0));
+  check('rivals start with coverage behind their share', startCoverage.every((v) => v > 0));
+  check('rivals start with cash', g.competitors.every((c) => c.cash > 0));
+
+  g = runDays(g, 180, repairAll);
+
+  const grew = g.competitors.some(
+    (c, i) => Object.values(c.coverage).reduce((a, b) => a + b, 0) > startCoverage[i] + 0.01,
+  );
+  check('rivals expand their own coverage over time', grew);
+
+  const badShare = g.competitors.find((c) =>
+    Object.values(c.share).some((v) => !Number.isFinite(v) || v < 0 || v > 1),
+  );
+  check('rival share stays a valid fraction', !badShare, badShare?.name);
+  check('rival cash stays finite', g.competitors.every((c) => Number.isFinite(c.cash)));
+  check('rival prices stay in a sane band', g.competitors.every((c) => c.priceIndex >= 0.5 && c.priceIndex <= 1.5));
+
+  const d = g.districts[0];
+  const pull = districtPull(g, d);
+  check('pull totals exceed the parts, leaving people unserved', pull.total > pull.player);
+  const leader = leaderOf(g, d);
+  check('a district has a leader', !!leader.name);
+
+  // Holding a district with radio alone should still count as presence.
+  const bare = newGame(4321);
+  const noReach = districtPull(bare, { ...bare.districts[1], coverage: 0, mobileCoverage: 0 }).player;
+  const radioOnly = districtPull(bare, { ...bare.districts[1], coverage: 0, mobileCoverage: 0.8 }).player;
+  check('mobile coverage counts as presence against rivals', radioOnly > noReach, `${noReach} -> ${radioOnly}`);
+}
+
+group('pricing does not spiral');
+{
+  // Rivals used to cut whenever you looked expensive, which moved the market
+  // average, which made you look more expensive again. Everyone hit the floor.
+  let g = newGame(606);
+  g = { ...g, packages: g.packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 2 } : p)) };
+  const before = priceIndex(g);
+  g = runDays(g, 240, repairAll);
+
+  check('your price index does not move when you do not change prices', Math.abs(priceIndex(g) - before) < 0.001);
+  check('rivals do not all collapse to the price floor', g.competitors.some((c) => c.priceIndex > 0.8), g.competitors.map((c) => c.priceIndex.toFixed(2)).join('/'));
+  check('rivals undercut an expensive player', g.competitors.every((c) => c.priceIndex < before));
+
+  // Cheap and well run should out-pull three rivals; expensive and neglected should not.
+  const strong = newGame(707);
+  const good = { ...strong, reputation: 90, districts: strong.districts.map((d) => ({ ...d, coverage: 0.9, satisfaction: 90 })) };
+  const weak = { ...strong, reputation: 30, districts: strong.districts.map((d) => ({ ...d, coverage: 0.2, satisfaction: 40 })) };
+  check('a well run operator can lead its city', playerShareTarget(good, good.districts[0]) > 0.5, `${playerShareTarget(good, good.districts[0]).toFixed(2)}`);
+  check('a neglected operator loses the city', playerShareTarget(weak, weak.districts[0]) < 0.3, `${playerShareTarget(weak, weak.districts[0]).toFixed(2)}`);
 }
 
 group('a tower with no fibre behind it');

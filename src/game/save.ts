@@ -37,6 +37,28 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
           ],
     };
   },
+
+  // 2 -> 3: rivals gained a balance sheet, their own coverage and a tech level.
+  2: (s) => ({
+    ...s,
+    competitors: (Array.isArray(s.competitors) ? s.competitors : []).map((c) => {
+      const rival = c as Record<string, unknown>;
+      const share = (rival.share ?? {}) as Record<string, number>;
+      // Back the share they already had with coverage, so nothing jumps on load.
+      const coverage: Record<string, number> = {};
+      for (const [districtId, value] of Object.entries(share)) {
+        coverage[districtId] = Math.min(0.9, value * 1.8);
+      }
+      return {
+        cash: 250000,
+        tech: 0.2,
+        lastMove: null,
+        mobileCoverage: {},
+        coverage,
+        ...rival,
+      };
+    }),
+  }),
 };
 
 const DEFAULTS = {

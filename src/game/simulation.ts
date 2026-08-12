@@ -18,6 +18,8 @@ import {
   towerRadius,
 } from './constants';
 import { createAuction, settleAuction } from './spectrum';
+import { playerShareTarget, tickCompetitors } from './competitors';
+import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
 import { rollIncident } from './incidents';
@@ -158,9 +160,9 @@ export function createNewGame(opts: NewGameOptions): GameState {
     researchDone: [],
     researchActive: null,
     competitors: [
-      { id: 'novatel', name: 'NovaTel', color: '#ff9f43', aggression: 0.9 * diff.competitorAggression, share: {}, priceIndex: 1 },
-      { id: 'hypernet', name: 'HyperNet', color: '#a78bfa', aggression: 1.1 * diff.competitorAggression, share: {}, priceIndex: 0.92 },
-      { id: 'telestar', name: 'Telestar', color: '#7ee787', aggression: 0.7 * diff.competitorAggression, share: {}, priceIndex: 1.12 },
+      { id: 'novatel', name: 'NovaTel', color: '#ff9f43', aggression: 0.9, share: {}, priceIndex: 1, cash: 250000, coverage: {}, mobileCoverage: {}, tech: 0.2, lastMove: null },
+      { id: 'hypernet', name: 'HyperNet', color: '#a78bfa', aggression: 1.1, share: {}, priceIndex: 0.92, cash: 250000, coverage: {}, mobileCoverage: {}, tech: 0.2, lastMove: null },
+      { id: 'telestar', name: 'Telestar', color: '#7ee787', aggression: 0.7, share: {}, priceIndex: 1.12, cash: 250000, coverage: {}, mobileCoverage: {}, tech: 0.2, lastMove: null },
     ],
     posts: [],
     log: [{ id: uid('log'), at: 8 * 60, text: `${opts.companyName} is licensed to operate in ${home.name}.`, tone: 'info' }],
@@ -205,8 +207,11 @@ export function createNewGame(opts: NewGameOptions): GameState {
   for (const d of state.districts) {
     let remaining = d.competition;
     for (const c of state.competitors) {
-      const take = remaining * (0.25 + Math.random() * 0.3);
+      const take = remaining * (0.25 + rng() * 0.3);
       c.share[d.id] = take;
+      // Their share has to be backed by coverage they actually built.
+      c.coverage[d.id] = clamp(take * 1.3, 0, 0.9);
+      c.mobileCoverage[d.id] = 0;
       remaining -= take;
     }
   }
@@ -450,7 +455,7 @@ export function step(prev: GameState): GameState {
   // 9. Daily / monthly beats
   if (newDay) {
     maybeSocialPost(s, rng, packetLoss, outageCount, avgSpeed);
-    tickCompetitors(s, diff, rng);
+    tickCompetitors(s, rng, diff.competitorAggression);
     if (s.minutes > s.nextEventAt) startCityEvent(s, rng);
     if (s.minutes > s.nextGrowthAt) growCity(s, rng);
     s.researchPoints += Math.max(0, Math.round(residentialSubs(s) / 500));
@@ -480,8 +485,7 @@ function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayF
 
   for (const d of s.districts) {
     if (!d.unlocked || d.coverage <= 0.001) continue;
-    const rivalShare = Object.values(s.competitors).reduce((sum, c) => sum + (c.share[d.id] ?? 0), 0);
-    const addressable = d.potential * d.coverage * clamp(1 - rivalShare * 0.85, 0.05, 1);
+    const addressable = d.potential * playerShareTarget(s, d);
     const current = residentialSubs(s, d.id);
 
     const appeal =
@@ -590,9 +594,9 @@ function growMobile(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac
   const districts = s.districts.map((d) => {
     if (!d.unlocked || d.mobileCoverage <= 0.001) return d;
 
-    const rivalShare = s.competitors.reduce((sum, c) => sum + (c.share[d.id] ?? 0), 0);
+    const rivalRadio = s.competitors.reduce((sum, c) => sum + (c.mobileCoverage[d.id] ?? 0), 0);
     const addressable =
-      d.population * MOBILE_MARKET_SHARE * d.mobileCoverage * clamp(1 - rivalShare * 0.7, 0.05, 1);
+      d.population * MOBILE_MARKET_SHARE * d.mobileCoverage * clamp(1 - rivalRadio * 0.5, 0.15, 1);
 
     const appeal =
       clamp(1.5 - avgPrice / 26, 0.25, 1.9) *
@@ -938,28 +942,6 @@ function maybeSocialPost(s: GameState, rng: Rng, packetLoss: number, outages: nu
   }
 }
 
-function tickCompetitors(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], rng: Rng) {
-  s.competitors = s.competitors.map((c) => {
-    const share = { ...c.share };
-    for (const d of s.districts) {
-      const mine = d.potential > 0 ? residentialSubs(s, d.id) / d.potential : 0;
-      const cur = share[d.id] ?? 0;
-      // Rivals push into districts you are not defending, and retreat where you are strong.
-      const drift = (0.006 * c.aggression * (1 - mine * 1.4) - 0.004 * mine) * rand(rng, 0.4, 1.6);
-      share[d.id] = clamp(cur + drift, 0, 0.92);
-    }
-    // Price war: they undercut when you are cheap and relax when you are not.
-    const myIndex = priceIndex(s);
-    const priceIdx = clamp(c.priceIndex + (myIndex < 0.95 ? -0.012 : 0.006) * c.aggression, 0.6, 1.4);
-    return { ...c, share, priceIndex: priceIdx };
-  });
-
-  const d0 = s.districts[0];
-  if (rng() < 0.03 * diff.competitorAggression) {
-    const rival = pick(rng, s.competitors);
-    pushLog(s, `${rival.name} announced a price cut in ${d0.name}.`, 'bad');
-  }
-}
 
 function startCityEvent(s: GameState, rng: Rng) {
   const ev = pick(rng, CITY_EVENTS);
@@ -997,12 +979,8 @@ function growCity(s: GameState, rng: Rng) {
   pushLog(s, `${d.name} is growing, new residents mean new demand.`, 'info');
 }
 
-export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+export { clamp } from './util';
 
-// Eases `current` toward `target`; rate is the fraction closed per call.
-function approach(current: number, target: number, rate: number) {
-  return current + (target - current) * clamp(rate, 0, 1);
-}
 
 export function pushLog(s: GameState, text: string, tone: 'good' | 'bad' | 'info') {
   s.log = [{ id: uid('log'), at: s.minutes, text, tone }, ...s.log].slice(0, 60);

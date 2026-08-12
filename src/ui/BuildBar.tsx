@@ -16,6 +16,7 @@ const OVERLAYS: Array<{ id: OverlayMode; label: string }> = [
   { id: 'normal', label: 'Normal' },
   { id: 'load', label: 'Network Load' },
   { id: 'coverage', label: 'Coverage' },
+  { id: 'rivals', label: 'Rivals' },
 ];
 
 export default function BuildBar() {

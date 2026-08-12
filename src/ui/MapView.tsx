@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NODE_SPECS, utilColor, FIBER_COST_PER_UNIT, towerRadius } from '../game/constants';
 import { isRoad } from '../game/cityGen';
+import { leaderOf } from '../game/competitors';
 import { linkUtil, nodeUtil } from '../game/network';
 import { daylight, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
@@ -182,6 +183,41 @@ const COVERAGE_RADIUS: Record<NetNode['kind'], number> = {
   tower: 8.5,
   datacenter: 2,
 };
+
+// Tints each district by whoever currently leads it, so a rival creeping into
+// your city is visible without opening a screen.
+const RivalsLayer = memo(function RivalsLayer({ game }: { game: GameState }) {
+  return (
+    <g>
+      {game.districts.map((d) => {
+        const leader = leaderOf(game, d);
+        return (
+          <g key={`rv${d.id}`}>
+            {d.cells.map((c) => (
+              <polygon
+                key={`rv${c.gx}_${c.gy}`}
+                points={tileDiamond(c.gx, c.gy, 0.02)}
+                fill={leader.color}
+                opacity={0.1 + Math.min(0.4, leader.share * 0.6)}
+              />
+            ))}
+            <text
+              x={isoX(d.center.gx, d.center.gy)}
+              y={isoY(d.center.gx, d.center.gy) - 52}
+              textAnchor="middle"
+              fontSize={11}
+              fontWeight={600}
+              fill={leader.color}
+              style={{ pointerEvents: 'none' }}
+            >
+              {leader.name} {Math.round(leader.share * 100)}%
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+});
 
 const CoverageLayer = memo(function CoverageLayer({
   nodes,
@@ -549,10 +585,12 @@ export default function MapView() {
             <CoverageLayer nodes={game.nodes} districts={game.districts} spectrum={game.spectrum} />
           )}
 
+          {overlay === 'rivals' && <RivalsLayer game={game} />}
+
           <BuildingsLayer
             buildings={game.buildings}
             night={night}
-            dim={overlay === 'load'}
+            dim={overlay === 'load' || overlay === 'rivals'}
             minutes={game.minutes}
           />
 

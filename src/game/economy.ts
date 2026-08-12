@@ -1,4 +1,5 @@
 import {
+  BASELINE_ARPU,
   FIBER_MAINTENANCE_PER_UNIT,
   NODE_SPECS,
   POWER_COST_PER_KW_MONTH,
@@ -98,12 +99,9 @@ export function averageSpeed(packages: Package[]) {
   return mix.reduce((s, m) => s + m.pkg.speedMbps * m.share, 0);
 }
 
-// Market-relative price pressure: below 1 means you are the cheap option.
+// Below 1 means you are the cheap option against the market reference price.
 export function priceIndex(state: GameState) {
-  const avg = averagePrice(state.packages);
-  const marketAvg =
-    state.competitors.reduce((s, c) => s + 34 * c.priceIndex, 0) / Math.max(1, state.competitors.length) || 34;
-  return avg / Math.max(1, marketAvg);
+  return averagePrice(state.packages) / BASELINE_ARPU;
 }
 
 export const fmtMoney = (n: number) => {
