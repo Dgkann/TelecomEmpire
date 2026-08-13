@@ -11,6 +11,7 @@ import HelpOverlay from './ui/HelpOverlay';
 import IncidentModal from './ui/IncidentModal';
 import MainMenu from './ui/MainMenu';
 import MapView from './ui/MapView';
+import NavigationRail from './ui/NavigationRail';
 import SidePanel from './ui/SidePanel';
 import TopBar from './ui/TopBar';
 import Tutorial from './ui/Tutorial';
@@ -18,6 +19,7 @@ import CompanyScreen from './ui/screens/CompanyScreen';
 import NetworkScreen from './ui/screens/NetworkScreen';
 import ResearchScreen from './ui/screens/ResearchScreen';
 import { playSound } from './ui/sound';
+import SaveManager from './ui/SaveManager';
 
 function useGameClock() {
   const tick = useGame((s) => s.tick);
@@ -35,6 +37,21 @@ function useIncidentSound() {
     if (incidents > prev.current) playSound('alert', soundOn);
     prev.current = incidents;
   }, [incidents, soundOn]);
+}
+
+function useActionSounds() {
+  const nodes = useGame((s) => s.game?.nodes.length ?? 0);
+  const links = useGame((s) => s.game?.links.length ?? 0);
+  const tiers = useGame((s) => (s.game?.nodes.reduce((sum, n) => sum + n.tier, 0) ?? 0) + (s.game?.links.reduce((sum, l) => sum + l.tier, 0) ?? 0));
+  const contracts = useGame((s) => s.game?.contracts.length ?? 0);
+  const soundOn = useGame((s) => s.soundOn);
+  const prev = useRef({ nodes, links, tiers, contracts });
+  useEffect(() => {
+    if (nodes > prev.current.nodes || tiers > prev.current.tiers) playSound('build', soundOn);
+    else if (links > prev.current.links) playSound('connect', soundOn);
+    else if (contracts > prev.current.contracts) playSound('cash', soundOn);
+    prev.current = { nodes, links, tiers, contracts };
+  }, [nodes, links, tiers, contracts, soundOn]);
 }
 
 function useHotkeys() {
@@ -92,30 +109,35 @@ function GameShell() {
   useGameClock();
   useHotkeys();
   useIncidentSound();
+  useActionSounds();
 
   return (
     <div className="flex h-full flex-col">
       <TopBar />
-      <div className="relative min-h-0 flex-1">
-        {screen === 'map' && (
-          <>
-            <MapView />
-            <SidePanel />
-            <ContextPanel />
-            <BuildBar />
-            <Tutorial />
-          </>
-        )}
-        {screen === 'network' && <NetworkScreen />}
-        {screen === 'company' && <CompanyScreen />}
-        {screen === 'research' && <ResearchScreen />}
+      <div className="flex min-h-0 flex-1">
+        <NavigationRail />
+        <div className="relative min-w-0 flex-1">
+          {screen === 'map' && (
+            <>
+              <MapView />
+              <SidePanel />
+              <ContextPanel />
+              <BuildBar />
+              <Tutorial />
+            </>
+          )}
+          {screen === 'network' && <NetworkScreen />}
+          {screen === 'company' && <CompanyScreen />}
+          {screen === 'research' && <ResearchScreen />}
 
-        <IncidentModal />
-        <AuctionModal />
-        <HelpOverlay />
-        <GameOverOverlay />
-        <VictoryOverlay />
-        <CornerToasts />
+          <IncidentModal />
+          <AuctionModal />
+          <HelpOverlay />
+          <GameOverOverlay />
+          <VictoryOverlay />
+          <SaveManager />
+          <CornerToasts />
+        </div>
       </div>
     </div>
   );
