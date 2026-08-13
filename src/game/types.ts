@@ -316,7 +316,17 @@ export interface NetworkStats {
   outages: Record<string, boolean>;
 }
 
-export type OverlayMode = 'normal' | 'load' | 'coverage' | 'rivals';
+export interface TelemetryPoint {
+  at: number;
+  demandGbps: number;
+  servedGbps: number;
+  packetLoss: number;
+  latencyMs: number;
+  customers: number;
+  cash: number;
+}
+
+export type OverlayMode = 'normal' | 'load' | 'coverage' | 'rivals' | 'customers';
 export type Screen = 'map' | 'network' | 'company' | 'research';
 
 export interface GameState {
@@ -367,6 +377,8 @@ export interface GameState {
   // Daily peak demand in Gbps, oldest first. Feeds the forecast.
   demandHistory: number[];
   dayPeakDemand: number;
+  // Hourly samples, newest last. Kept for two in-game weeks.
+  telemetry: TelemetryPoint[];
 
   // Index into RANKS. The company ladder, and something to aim at.
   rank: number;

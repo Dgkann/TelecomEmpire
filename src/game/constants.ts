@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;

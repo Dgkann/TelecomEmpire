@@ -53,14 +53,16 @@ interface UiState {
   toasts: Toast[];
   soundOn: boolean;
   showHelp: boolean;
+  showSaveManager: boolean;
+  activeSaveSlot: number;
 }
 
 interface Store extends UiState {
   game: GameState | null;
   started: boolean;
 
-  newGame: (opts: NewGameOptions) => void;
-  continueGame: () => boolean;
+  newGame: (opts: NewGameOptions, slot?: number) => void;
+  continueGame: (slot?: number) => boolean;
   resetSave: () => void;
   save: () => void;
   quitToMenu: () => void;
@@ -78,6 +80,8 @@ interface Store extends UiState {
   dismissToast: (id: string) => void;
   toggleSound: () => void;
   setShowHelp: (v: boolean) => void;
+  setShowSaveManager: (v: boolean) => void;
+  saveToSlot: (slot: number) => void;
 
   placeNode: (kind: NodeKind, gx: number, gy: number) => void;
   clickNodeForLink: (nodeId: string) => void;
@@ -121,6 +125,8 @@ const initialUi: UiState = {
   toasts: [],
   soundOn: true,
   showHelp: false,
+  showSaveManager: false,
+  activeSaveSlot: 0,
 };
 
 function withGame(set: (fn: (s: Store) => Partial<Store>) => void, mutate: (g: GameState) => void) {
@@ -137,35 +143,35 @@ export const useGame = create<Store>((set, get) => ({
   game: null,
   started: false,
 
-  newGame: (opts) => {
+  newGame: (opts, slot = 0) => {
     const game = createNewGame(opts);
-    saveGame(game);
-    set({ ...initialUi, game, started: true });
+    saveGame(game, slot);
+    set({ ...initialUi, activeSaveSlot: slot, game, started: true });
   },
 
-  continueGame: () => {
-    const game = loadGame();
+  continueGame: (slot = 0) => {
+    const game = loadGame(slot);
     if (!game) return false;
-    set({ ...initialUi, game: { ...game, speed: 0 }, started: true });
+    set({ ...initialUi, activeSaveSlot: slot, game: { ...game, speed: 0 }, started: true });
     return true;
   },
 
   resetSave: () => {
-    clearSave();
+    clearSave(get().activeSaveSlot);
     set({ game: null, started: false });
   },
 
   save: () => {
     const g = get().game;
     if (g) {
-      saveGame(g);
+      saveGame(g, get().activeSaveSlot);
       get().toast('Game saved.', 'good');
     }
   },
 
   quitToMenu: () => {
     const g = get().game;
-    if (g) saveGame(g);
+    if (g) saveGame(g, get().activeSaveSlot);
     set({ started: false });
   },
 
@@ -178,7 +184,7 @@ export const useGame = create<Store>((set, get) => ({
     // Autosave once a game day.
     if (g.minutes - g.autosaveAt > MINUTES_PER_DAY) {
       g = { ...g, autosaveAt: g.minutes };
-      saveGame(g);
+      saveGame(g, s.activeSaveSlot);
     }
     set({ game: g });
   },
@@ -199,6 +205,15 @@ export const useGame = create<Store>((set, get) => ({
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   toggleSound: () => set((s) => ({ soundOn: !s.soundOn })),
   setShowHelp: (v) => set({ showHelp: v }),
+  setShowSaveManager: (v) => set({ showSaveManager: v }),
+  saveToSlot: (slot) => {
+    const g = get().game;
+    if (!g) return;
+    if (saveGame(g, slot)) {
+      set({ activeSaveSlot: slot });
+      get().toast(`Saved to slot ${slot + 1}.`, 'good');
+    }
+  },
 
   placeNode: (kind, gx, gy) => {
     const s = get();

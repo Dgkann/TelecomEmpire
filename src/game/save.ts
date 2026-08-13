@@ -89,6 +89,9 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   // 8 -> 9: the company ladder. Existing saves start at the bottom rung and
   // climb on their next day, so nothing is lost.
   8: (s) => ({ ...s, rank: s.rank ?? 0, victoryAt: s.victoryAt ?? null }),
+
+  // 9 -> 10: lightweight NOC telemetry powers the daily load timeline.
+  9: (s) => ({ ...s, telemetry: s.telemetry ?? [] }),
 };
 
 const DEFAULTS = {
@@ -113,6 +116,7 @@ const DEFAULTS = {
   regulations: [],
   demandHistory: [],
   dayPeakDemand: 0,
+  telemetry: [],
   loans: [],
   insolventSince: null,
   gameOver: null,
@@ -154,57 +158,105 @@ export function migrate(state: LegacyState, fromVersion: number): GameState | nu
   return current as unknown as GameState;
 }
 
-export function saveGame(state: GameState) {
+export const SAVE_SLOT_COUNT = 3;
+
+const keyForSlot = (slot: number) => (slot === 0 ? SAVE_KEY : `${SAVE_KEY}-slot-${slot + 1}`);
+const safeSlot = (slot: number) => Math.max(0, Math.min(SAVE_SLOT_COUNT - 1, Math.floor(slot)));
+
+export function saveGame(state: GameState, slot = 0) {
   try {
-    const slot: SaveSlot = { version: SAVE_VERSION, savedAt: Date.now(), state };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(slot));
+    const payload: SaveSlot = { version: SAVE_VERSION, savedAt: Date.now(), state };
+    localStorage.setItem(keyForSlot(safeSlot(slot)), JSON.stringify(payload));
     return true;
   } catch {
     return false;
   }
 }
 
-export function loadGame(): GameState | null {
+export function loadGame(slot = 0): GameState | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(keyForSlot(safeSlot(slot)));
     if (!raw) return null;
-    const slot = JSON.parse(raw) as SaveSlot;
+    const payload = JSON.parse(raw) as SaveSlot;
     // A save from a newer build than this one cannot be read backwards.
-    if (typeof slot.version !== 'number' || slot.version > SAVE_VERSION) return null;
-    return migrate(slot.state as unknown as LegacyState, slot.version);
+    if (typeof payload.version !== 'number' || payload.version > SAVE_VERSION) return null;
+    return migrate(payload.state as unknown as LegacyState, payload.version);
   } catch {
     return null;
   }
 }
 
-export function hasSave() {
+export function hasSave(slot = 0) {
   try {
-    return localStorage.getItem(SAVE_KEY) !== null;
+    return localStorage.getItem(keyForSlot(safeSlot(slot))) !== null;
   } catch {
     return false;
   }
 }
 
-export function saveMeta(): { savedAt: number; company: string; customers: number } | null {
+export interface SaveMeta {
+  slot: number;
+  savedAt: number;
+  company: string;
+  city: string;
+  customers: number;
+  minutes: number;
+}
+
+export function saveMeta(slot = 0): SaveMeta | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const resolvedSlot = safeSlot(slot);
+    const raw = localStorage.getItem(keyForSlot(resolvedSlot));
     if (!raw) return null;
-    const slot = JSON.parse(raw) as SaveSlot;
-    const buildings = Array.isArray(slot.state?.buildings) ? slot.state.buildings : [];
+    const payload = JSON.parse(raw) as SaveSlot;
+    const buildings = Array.isArray(payload.state?.buildings) ? payload.state.buildings : [];
     const subs = buildings.reduce(
       (s, b) => (b.segment === 'residential' ? s + b.households * b.connected : s),
       0,
     );
-    return { savedAt: slot.savedAt, company: slot.state.companyName, customers: Math.round(subs) };
+    return {
+      slot: resolvedSlot,
+      savedAt: payload.savedAt,
+      company: payload.state.companyName,
+      city: payload.state.cityName,
+      customers: Math.round(subs) + (payload.state.contracts?.length ?? 0),
+      minutes: payload.state.minutes ?? 0,
+    };
   } catch {
     return null;
   }
 }
 
-export function clearSave() {
+export function listSaveMeta() {
+  return Array.from({ length: SAVE_SLOT_COUNT }, (_, slot) => saveMeta(slot));
+}
+
+export function clearSave(slot = 0) {
   try {
-    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(keyForSlot(safeSlot(slot)));
   } catch {
     // ignore
+  }
+}
+
+export function exportSave(slot = 0): string | null {
+  try {
+    return localStorage.getItem(keyForSlot(safeSlot(slot)));
+  } catch {
+    return null;
+  }
+}
+
+export function importSave(raw: string, slot = 0): GameState | null {
+  try {
+    const parsed = JSON.parse(raw) as SaveSlot;
+    if (typeof parsed.version !== 'number' || parsed.version > SAVE_VERSION || !parsed.state) return null;
+    const state = migrate(parsed.state as unknown as LegacyState, parsed.version);
+    if (!state) return null;
+    const payload: SaveSlot = { version: SAVE_VERSION, savedAt: Date.now(), state };
+    localStorage.setItem(keyForSlot(safeSlot(slot)), JSON.stringify(payload));
+    return state;
+  } catch {
+    return null;
   }
 }

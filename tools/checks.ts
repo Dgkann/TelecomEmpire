@@ -9,8 +9,9 @@ import { researchModifiers } from '../src/game/research';
 import { pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
 import { cacheRatio } from '../src/game/simulation';
+import { contractRisk, operationsInsights } from '../src/game/operations';
 import { hostingRevenue } from '../src/game/economy';
-import { clearSave, loadGame, migrate, saveGame } from '../src/game/save';
+import { clearSave, exportSave, importSave, listSaveMeta, loadGame, migrate, saveGame } from '../src/game/save';
 import { createNewGame, mobileSubs, residentialSubs, step, totalCustomers } from '../src/game/simulation';
 import type { GameState, NetLink, NetNode } from '../src/game/types';
 
@@ -136,6 +137,34 @@ group('save and load');
     check('a loaded save can be stepped', Number.isFinite(step(loaded).money));
   }
   clearSave();
+}
+
+group('save archive and NOC telemetry');
+{
+  clearSave(0);
+  clearSave(1);
+  let first = newGame(1010);
+  first = { ...first, companyName: 'Slot One' };
+  const second = { ...newGame(2020), companyName: 'Slot Two' };
+  saveGame(first, 0);
+  saveGame(second, 1);
+  check('multiple slots stay independent', loadGame(0)?.companyName === 'Slot One' && loadGame(1)?.companyName === 'Slot Two');
+  check('slot metadata lists both companies', listSaveMeta()[1]?.company === 'Slot Two');
+  const raw = exportSave(0);
+  clearSave(2);
+  const imported = raw ? importSave(raw, 2) : null;
+  check('a save exports and imports into another slot', imported?.companyName === 'Slot One' && loadGame(2)?.companyName === 'Slot One');
+
+  let sampled = newGame(3031);
+  for (let i = 0; i < 13; i++) sampled = step(sampled);
+  check('the NOC records hourly telemetry', sampled.telemetry.length >= 1);
+  check('telemetry values remain finite', sampled.telemetry.every((p) => Number.isFinite(p.demandGbps) && Number.isFinite(p.cash)));
+
+  const stressed = { ...sampled, links: sampled.links.map((l, i) => i === 0 ? { ...l, trafficGbps: l.capacityGbps } : l) };
+  check('operations detects a capacity priority', operationsInsights(stressed).some((i) => i.id.startsWith('capacity-')));
+  const synthetic = { id: 'c-test', clientName: 'Test Bank', districtId: stressed.districts[0].id, buildingId: stressed.buildings[0].id, bandwidthGbps: 1, monthlyRevenue: 1000, slaPercent: 99.9, downtimeMinutes: 50, penaltyPaid: 0, startedAt: 0, termMonths: 12, segment: 'enterprise' as const };
+  check('contract risk reports consumed SLA allowance', contractRisk(stressed, synthetic).usage > 0);
+  clearSave(0); clearSave(1); clearSave(2);
 }
 
 group('migrating a version 1 save');

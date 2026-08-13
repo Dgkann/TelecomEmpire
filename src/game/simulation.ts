@@ -200,6 +200,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     churn: [],
     demandHistory: [],
     dayPeakDemand: 0,
+    telemetry: [],
     rank: 0,
     victoryAt: null,
     regulations: [],
@@ -451,6 +452,23 @@ export function step(prev: GameState): GameState {
     costMarketing: money.costMarketing,
     penalties: s.finance.penalties,
   };
+
+  // One compact sample per in-game hour. This stays small enough for local saves
+  // while giving the NOC a useful day/night history.
+  if (Math.floor(prev.minutes / 60) < Math.floor(s.minutes / 60)) {
+    s.telemetry = [
+      ...(s.telemetry ?? []),
+      {
+        at: s.minutes,
+        demandGbps: s.stats.demandGbps,
+        servedGbps: s.stats.servedGbps,
+        packetLoss: s.stats.packetLoss,
+        latencyMs: s.stats.latencyMs,
+        customers: totalCustomers(s),
+        cash: s.money,
+      },
+    ].slice(-24 * 14);
+  }
 
   // 6. Reputation
   const outageCount = Object.values(outages).filter(Boolean).length;
