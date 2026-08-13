@@ -5,8 +5,10 @@ import { researchModifiers } from '../../game/research';
 import { RANKS, cityShare, nextRank, rankOf } from '../../game/progression';
 import { creditLimit, daysUntilInsolvency, loanRate, monthlyDebtService, totalDebt } from '../../game/finance';
 import { residentialSubs } from '../../game/simulation';
+import { contractRisk } from '../../game/operations';
 import { useGame } from '../../store/gameStore';
 import type { ChurnReason, StaffRole } from '../../game/types';
+import TrendChart from '../TrendChart';
 
 const CHURN_REASON: Record<ChurnReason, string> = {
   price: 'too expensive',
@@ -43,6 +45,10 @@ export default function CompanyScreen() {
   const fireStaff = useGame((s) => s.fireStaff);
   const takeLoan = useGame((s) => s.takeLoan);
   const repayLoan = useGame((s) => s.repayLoan);
+  const focus = useGame((s) => s.focus);
+  const select = useGame((s) => s.select);
+  const setScreen = useGame((s) => s.setScreen);
+  const setOverlay = useGame((s) => s.setOverlay);
 
   const mods = researchModifiers(game.researchDone);
   const money = monthlyBreakdown(game, mods);
@@ -58,8 +64,19 @@ export default function CompanyScreen() {
   const estimatedPayment = (borrowAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -36));
 
   return (
-    <div className="scroll-thin h-full overflow-y-auto bg-ink-900 p-6">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-3">
+    <div className="screen-shell">
+      <div className="mx-auto grid max-w-[1240px] gap-5 lg:grid-cols-3">
+        <div className="flex flex-wrap items-end justify-between gap-4 lg:col-span-3">
+          <div>
+            <div className="stat-label text-neon-cyan">Commercial control</div>
+            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">Operator performance</h1>
+            <p className="mt-1 text-[13px] text-white/45">Balance growth, service pricing and the cost of keeping the network alive.</p>
+          </div>
+          <div className={`rounded-lg border px-3 py-2 text-right ${money.profit >= 0 ? 'border-neon-lime/20 bg-neon-lime/[0.05]' : 'border-neon-red/30 bg-neon-red/[0.07]'}`}>
+            <div className="stat-label">Operating position</div>
+            <div className={`text-sm font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>{money.profit >= 0 ? 'Profitable' : 'Costs exceed revenue'}</div>
+          </div>
+        </div>
         <div className="panel p-5 lg:col-span-3">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
             <div>
@@ -88,9 +105,19 @@ export default function CompanyScreen() {
               <div className="num text-2xl font-semibold">${averagePrice(game.packages).toFixed(2)}</div>
             </div>
           </div>
+          <div className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">
+            <div>
+              <div className="mb-1.5 flex justify-between"><span className="stat-label text-neon-lime">Monthly revenue</span><span className="num text-[12px] text-neon-lime">{fmtMoney(money.totalRevenue)}</span></div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div className="h-full rounded-full bg-neon-lime/80" animate={{ width: `${(money.totalRevenue / Math.max(1, money.totalRevenue, money.totalCost)) * 100}%` }} /></div>
+            </div>
+            <div>
+              <div className="mb-1.5 flex justify-between"><span className="stat-label text-neon-red">Operating cost</span><span className="num text-[12px] text-neon-red">{fmtMoney(money.totalCost)}</span></div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div className="h-full rounded-full bg-neon-amber/80" animate={{ width: `${(money.totalCost / Math.max(1, money.totalRevenue, money.totalCost)) * 100}%` }} /></div>
+            </div>
+          </div>
         </div>
 
-        <div className="panel p-5 lg:col-span-3">
+        <div className="panel panel-tone-violet p-5 lg:col-span-3">
           <div className="mb-3 flex items-baseline justify-between">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Company standing</h2>
@@ -144,7 +171,7 @@ export default function CompanyScreen() {
           )}
         </div>
 
-        <div className="panel p-5 lg:col-span-2">
+        <div className="panel panel-tone-blue p-5 lg:col-span-2">
           <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Internet packages</h2>
           <p className="mb-4 text-[11px] text-white/40">
             Cheap gigabit wins customers fast, and fills your network just as fast.
@@ -287,7 +314,7 @@ export default function CompanyScreen() {
           </div>
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-green p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Monthly finances</h2>
           <div className="divide-y divide-white/5">
             <div className="pb-2">
@@ -323,34 +350,49 @@ export default function CompanyScreen() {
           </div>
 
           {game.history.length > 1 && (
-            <div className="mt-4">
-              <div className="stat-label mb-2">Revenue history</div>
-              <div className="flex h-16 items-end gap-1">
-                {game.history.slice(-14).map((h, i) => {
-                  const max = Math.max(...game.history.slice(-14).map((x) => Math.max(x.revenue, x.expense))) || 1;
-                  return (
-                    <div key={i} className="flex flex-1 flex-col justify-end gap-0.5">
-                      <div className="w-full rounded-sm bg-neon-lime/70" style={{ height: `${(h.revenue / max) * 48}px` }} />
-                      <div className="w-full rounded-sm bg-neon-red/50" style={{ height: `${(h.expense / max) * 48}px` }} />
-                    </div>
-                  );
-                })}
+            <div className="mt-4 border-t border-white/[0.07] pt-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div><div className="stat-label">Operating trend</div><div className="text-[11px] text-white/35">Last {Math.min(14, game.history.length)} completed months</div></div>
+                <span className="font-mono text-[10px] text-white/30">MONTHLY</span>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                <div className="rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                  <TrendChart
+                    height={86}
+                    formatValue={fmtMoney}
+                    series={[
+                      { label: 'Revenue $', values: game.history.slice(-14).map((h) => h.revenue), color: '#75df9a' },
+                      { label: 'Expense $', values: game.history.slice(-14).map((h) => h.expense), color: '#ff6577' },
+                    ]}
+                  />
+                </div>
+                <div className="rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                  <TrendChart
+                    height={86}
+                    formatValue={fmtNum}
+                    series={[{ label: 'Customers', values: game.history.slice(-14).map((h) => h.customers), color: '#68a5ff' }]}
+                  />
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        <div className="panel p-5 lg:col-span-2">
+        <div className="panel panel-tone-violet p-5 lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Contracts</h2>
           {game.contracts.length === 0 ? (
-            <p className="text-sm text-white/40">
-              No contracts yet. Offers appear on the map once a district has real coverage.
-            </p>
+            <div className="rounded-lg border border-dashed border-white/10 bg-black/10 p-5 text-center">
+              <div className="text-sm text-white/60">No enterprise portfolio yet</div>
+              <div className="mt-1 text-[11px] text-white/35">Increase business-district coverage; qualified offers will appear in the map action stack.</div>
+              <button className="btn mt-3" onClick={() => { setOverlay('customers'); setScreen('map'); }}>Open customer map</button>
+            </div>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {game.contracts.map((c) => {
-                const allowed = 43200 * (1 - c.slaPercent / 100);
-                const breach = c.downtimeMinutes > allowed;
+                const risk = contractRisk(game, c);
+                const breach = risk.usage > 1;
+                const building = game.buildings.find((b) => b.id === c.buildingId);
+                const riskTone = risk.score >= 0.65 ? '#ff6577' : risk.score >= 0.3 ? '#ffc857' : '#7ee787';
                 return (
                   <div key={c.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                     <div className="flex items-center justify-between">
@@ -369,6 +411,11 @@ export default function CompanyScreen() {
                         {Math.round(c.downtimeMinutes)}m down
                       </span>
                     </div>
+                    <div className="mt-2">
+                      <div className="flex justify-between text-[10px]"><span className="text-white/40">SLA allowance used</span><span className="num" style={{ color: riskTone }}>{Math.round(risk.usage * 100)}%</span></div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${Math.min(100, risk.usage * 100)}%`, background: riskTone }} /></div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2"><span className="text-[10px] text-white/38">{risk.districtOut ? 'District outage active' : risk.fragile ? 'Single-path exposure' : `${Math.round(risk.allowance)}m monthly allowance`}</span>{building && <button className="text-[9px] font-semibold uppercase tracking-wider text-neon-cyan" onClick={() => { setOverlay('customers'); focus(building.gx, building.gy); select({ type: 'building', id: building.id }); }}>Show on map →</button>}</div>
+                    </div>
                   </div>
                 );
               })}
@@ -376,7 +423,7 @@ export default function CompanyScreen() {
           )}
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-amber p-5">
           <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Borrowing</h2>
           <p className="mb-3 text-[11px] text-white/40">
             Lenders look at what you earn and what you have built. Go past the limit and they come for the company.
@@ -455,7 +502,7 @@ export default function CompanyScreen() {
           </div>
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-red p-5">
           <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Where customers went</h2>
           <p className="mb-3 text-[11px] text-white/40">Most recent losses first.</p>
           {game.churn.length === 0 ? (
@@ -484,7 +531,7 @@ export default function CompanyScreen() {
           )}
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-blue p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Staff</h2>
 
           <div className="mb-3 flex flex-col gap-1.5">

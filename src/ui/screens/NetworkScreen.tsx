@@ -1,16 +1,18 @@
+import { motion } from 'framer-motion';
 import {
   BACKUP_TRANSIT_MONTHLY,
-  NODE_SPECS,
   SPECTRUM_BANDS,
   TRANSIT_TIERS,
   towerRadius,
   utilColor,
 } from '../../game/constants';
-import { fmtMoney, fmtNum } from '../../game/economy';
+import { fmtMoney, fmtNum, monthlyBreakdown } from '../../game/economy';
 import { daysUntilFull, forecastDemand, linkUtil, nodeUtil, servingCapacity } from '../../game/network';
 import { researchModifiers } from '../../game/research';
-import { mobileSubs, residentialSubs } from '../../game/simulation';
+import { cacheRatio, mobileSubs, residentialSubs } from '../../game/simulation';
 import { useGame } from '../../store/gameStore';
+import SiteIcon from '../SiteIcon';
+import TrendChart from '../TrendChart';
 
 function Meter({ v, label, right }: { v: number; label: string; right: string }) {
   return (
@@ -33,6 +35,9 @@ export default function NetworkScreen() {
   const setTransitTier = useGame((s) => s.setTransitTier);
   const toggleBackup = useGame((s) => s.toggleBackupTransit);
   const toggleAuto = useGame((s) => s.toggleAutoDispatch);
+  const setScreen = useGame((s) => s.setScreen);
+  const setOverlay = useGame((s) => s.setOverlay);
+  const setTool = useGame((s) => s.setTool);
   const mods = researchModifiers(game.researchDone);
 
   const forecast = forecastDemand(game.demandHistory, Math.max(game.dayPeakDemand, game.stats.demandGbps), 30);
@@ -40,10 +45,46 @@ export default function NetworkScreen() {
   const daysLeft = daysUntilFull(forecast, accessCapacity);
   const transit = TRANSIT_TIERS[game.transitTier];
   const transitUse = game.stats.demandGbps / (transit.capacity * (game.backupTransit ? 1.35 : 1));
+  const demandSeries = [...game.demandHistory.slice(-29), Math.max(game.dayPeakDemand, game.stats.demandGbps)];
+  const dayTelemetry = game.telemetry.slice(-24);
+  const dataCenters = game.nodes.filter((n) => n.kind === 'datacenter');
+  const finance = monthlyBreakdown(game, mods);
 
   return (
-    <div className="scroll-thin h-full overflow-y-auto bg-ink-900 p-6">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-2">
+    <div className="screen-shell">
+      <div className="mx-auto grid max-w-[1240px] gap-5 lg:grid-cols-2">
+        <div className="flex flex-wrap items-end justify-between gap-4 lg:col-span-2">
+          <div>
+            <div className="stat-label text-neon-cyan">Network operations</div>
+            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">Live service control</h1>
+            <p className="mt-1 text-[13px] text-white/45">Capacity, quality and resilience across every active route.</p>
+          </div>
+          <div className={`rounded-lg border px-3 py-2 text-right ${daysLeft !== null && daysLeft < 30 ? 'border-neon-red/30 bg-neon-red/[0.07]' : 'border-neon-lime/20 bg-neon-lime/[0.05]'}`}>
+            <div className="stat-label">Capacity outlook</div>
+            <div className={`num text-sm font-semibold ${daysLeft !== null && daysLeft < 30 ? 'text-neon-red' : 'text-neon-lime'}`}>
+              {!forecast.confident ? 'Collecting baseline' : daysLeft === null ? 'Demand stable' : daysLeft > 365 ? 'More than 1 year' : `${Math.round(daysLeft)} days headroom`}
+            </div>
+          </div>
+        </div>
+
+        <div className="panel panel-tone-blue p-5 lg:col-span-2">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">24-hour traffic timeline</h2><p className="mt-1 text-[11px] text-white/40">Hourly demand, carried traffic and loss across the current operating day.</p></div>
+            <div className="num text-[10px] text-white/35">{dayTelemetry.length}/24 SAMPLES</div>
+          </div>
+          {dayTelemetry.length > 1 ? (
+            <TrendChart height={112} formatValue={(v) => `${v.toFixed(1)}G`} series={[
+              { label: 'Demand', values: dayTelemetry.map((p) => p.demandGbps), color: '#68a5ff' },
+              { label: 'Carried', values: dayTelemetry.map((p) => p.servedGbps), color: '#2dd4bf' },
+              { label: 'Loss ×10', values: dayTelemetry.map((p) => p.packetLoss * 10), color: '#ff6577', dashed: true },
+            ]} />
+          ) : (
+            <div className="rounded-lg border border-dashed border-white/10 bg-black/10 p-5 text-center">
+              <div className="text-sm text-white/60">Building the first traffic baseline</div>
+              <div className="mt-1 text-[11px] text-white/35">Keep the clock running; the NOC records one sample every in-game hour.</div>
+            </div>
+          )}
+        </div>
         <div className="panel p-5 lg:col-span-2">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
             {[
@@ -53,15 +94,26 @@ export default function NetworkScreen() {
               { label: 'Packet loss', value: `${(game.stats.packetLoss * 100).toFixed(1)}%`, tone: game.stats.packetLoss > 0.02 ? 'text-neon-red' : 'text-neon-lime' },
               { label: 'Latency', value: `${Math.round(game.stats.latencyMs)} ms`, tone: game.stats.latencyMs > 40 ? 'text-neon-amber' : undefined },
             ].map((s) => (
-              <div key={s.label}>
+              <div key={s.label} className="kpi border-0 bg-transparent px-0 py-0">
                 <div className="stat-label">{s.label}</div>
                 <div className={`num text-2xl font-semibold ${s.tone ?? 'text-white'}`}>{s.value}</div>
               </div>
             ))}
           </div>
+          <div className="mt-5 border-t border-white/[0.07] pt-4">
+            <div className="mb-2 flex items-center justify-between gap-4">
+              <div><div className="stat-label">Live delivery path</div><div className="text-[12px] text-white/40">Traffic accepted by the network at this instant</div></div>
+              <div className="num text-[12px] text-white/55"><span className="text-neon-cyan">{game.stats.servedGbps.toFixed(2)}G carried</span> / {game.stats.demandGbps.toFixed(2)}G requested</div>
+            </div>
+            <div className="relative h-2 overflow-hidden rounded-full bg-neon-red/18">
+              <motion.div className="h-full rounded-full bg-neon-cyan" animate={{ width: `${Math.min(100, (game.stats.servedGbps / Math.max(0.01, game.stats.demandGbps)) * 100)}%` }} />
+              <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
+              <div className="absolute inset-y-0 left-3/4 w-px bg-white/20" />
+            </div>
+          </div>
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-green p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Sites</h2>
           <div className="flex flex-col gap-2">
             {game.nodes.map((n) => (
@@ -73,8 +125,8 @@ export default function NetworkScreen() {
                 }}
                 className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.08]"
               >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white/5 text-base">
-                  {NODE_SPECS[n.kind].icon}
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/[0.07] bg-black/15">
+                  <SiteIcon kind={n.kind} className="h-7 w-7" title={`${n.kind} site`} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -92,7 +144,7 @@ export default function NetworkScreen() {
           </div>
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-blue p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Fibre spans</h2>
           <div className="flex flex-col gap-2">
             {game.links.length === 0 && <p className="text-sm text-white/40">No fibre built yet.</p>}
@@ -125,7 +177,7 @@ export default function NetworkScreen() {
           </div>
         </div>
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-violet p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Districts</h2>
           <div className="flex flex-col gap-2">
             {game.districts.map((d) => (
@@ -154,12 +206,25 @@ export default function NetworkScreen() {
           </div>
         </div>
 
-        <div className="panel p-5 lg:col-span-2">
+        <div className="panel panel-tone-amber p-5 lg:col-span-2">
           <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Demand forecast</h2>
           <p className="mb-3 text-[11px] text-white/40">
             Straight line through recent peaks. Capacity takes time to build, so the useful moment to act is before
             the line crosses.
           </p>
+
+          {demandSeries.length > 1 && (
+            <div className="mb-4 rounded-lg border border-white/[0.07] bg-black/15 p-3">
+              <TrendChart
+                height={92}
+                formatValue={(value) => `${value.toFixed(1)}G`}
+                series={[
+                  { label: 'Daily peak Gbps', values: demandSeries, color: '#2dd4bf' },
+                  { label: 'Access capacity', values: demandSeries.map(() => accessCapacity), color: '#f3b843', dashed: true },
+                ]}
+              />
+            </div>
+          )}
 
           {!forecast.confident ? (
             <p className="text-sm text-white/40">Not enough history yet. Give it a couple of weeks.</p>
@@ -205,8 +270,41 @@ export default function NetworkScreen() {
           )}
         </div>
 
+        <div className="panel panel-tone-green p-5">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Data centre operations</h2><p className="mt-1 text-[11px] text-white/40">Edge cache offload and hosting economics.</p></div><SiteIcon kind="datacenter" className="h-8 w-8" /></div>
+          {dataCenters.length ? (
+            <>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div className="chip py-2"><div className="stat-label">Sites</div><div className="num text-sm">{dataCenters.length}</div></div>
+                <div className="chip py-2"><div className="stat-label">Cache offload</div><div className="num text-sm text-neon-cyan">{Math.round(cacheRatio(game) * 100)}%</div></div>
+                <div className="chip py-2"><div className="stat-label">Hosting</div><div className="num text-sm text-neon-lime">{fmtMoney(finance.revenueHosting)}</div></div>
+              </div>
+              <div className="mt-3 flex flex-col gap-1.5">{dataCenters.map((n) => (
+                <button key={n.id} className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-left hover:bg-white/[0.07]" onClick={() => { focus(n.gx, n.gy); select({ type: 'node', id: n.id }); }}>
+                  <SiteIcon kind="datacenter" className="h-6 w-6" /><span className="min-w-0 flex-1 truncate text-xs font-medium">{n.name}</span><span className="num text-[10px] text-white/40">T{n.tier} · {Math.round(nodeUtil(n) * 100)}%</span>
+                </button>
+              ))}</div>
+            </>
+          ) : (
+            <div className="mt-4 rounded-lg border border-dashed border-white/10 p-4 text-center"><div className="text-sm text-white/55">No edge infrastructure yet</div><div className="mt-1 text-[11px] text-white/35">Research Edge Compute, then place a data centre to reduce transit load.</div><button className="btn mt-3" onClick={() => { setScreen('map'); setTool('datacenter'); }}>Open build tools</button></div>
+          )}
+        </div>
+
+        <div className="panel panel-tone-violet p-5">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Competitor intelligence</h2><p className="mt-1 text-[11px] text-white/40">Coverage, pricing posture and strongest district.</p></div><button className="btn py-1.5 text-[10px]" onClick={() => { setOverlay('rivals'); setScreen('map'); }}>Open overlay</button></div>
+          <div className="mt-4 flex flex-col gap-2">{game.competitors.map((rival) => {
+            const strongest = [...game.districts].sort((a, b) => (rival.share[b.id] ?? 0) - (rival.share[a.id] ?? 0))[0];
+            const avgCoverage = game.districts.reduce((sum, d) => sum + (rival.coverage[d.id] ?? 0), 0) / Math.max(1, game.districts.length);
+            return <button key={rival.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.07]" onClick={() => strongest && focus(strongest.center.gx, strongest.center.gy)}>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold"><i className="h-2 w-2 rounded-full" style={{ background: rival.color }} />{rival.name}</span><span className="num text-[10px] text-white/45">PRICE {rival.priceIndex.toFixed(2)}×</span></div>
+              <div className="mt-1 grid grid-cols-3 text-[10px] text-white/42"><span>{Math.round(avgCoverage * 100)}% cover</span><span className="text-center">Tech {Math.round(rival.tech * 100)}</span><span className="truncate text-right">Lead: {strongest?.name}</span></div>
+              {rival.lastMove && <div className="mt-1 truncate text-[10px]" style={{ color: rival.color }}>{rival.lastMove}</div>}
+            </button>;
+          })}</div>
+        </div>
+
         {mods.hasMobile && (
-          <div className="panel p-5">
+          <div className="panel panel-tone-violet p-5">
             <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Spectrum</h2>
             <p className="mb-3 text-[11px] text-white/40">
               Low bands reach further, high bands carry more. Reach comes from your best band, capacity from all of them.
@@ -276,7 +374,7 @@ export default function NetworkScreen() {
           </div>
         )}
 
-        <div className="panel p-5">
+        <div className="panel panel-tone-blue p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Upstream & automation</h2>
           <Meter
             v={transitUse}

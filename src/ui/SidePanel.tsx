@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { fmtMoney } from '../game/economy';
 import { researchModifiers } from '../game/research';
+import { operationsInsights } from '../game/operations';
 import { pendingRegulations, regulationProgress } from '../game/regulator';
 import { fmtClock, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
@@ -21,14 +22,16 @@ export default function SidePanel() {
   const acceptOffer = useGame((s) => s.acceptOffer);
   const declineOffer = useGame((s) => s.declineOffer);
   const select = useGame((s) => s.select);
+  const setScreen = useGame((s) => s.setScreen);
 
   const mods = researchModifiers(game.researchDone);
   const active = game.incidents.filter((i) => !i.resolved);
   const outages = Object.entries(game.stats.outages).filter(([, v]) => v);
   const obligations = pendingRegulations(game);
+  const insights = operationsInsights(game);
 
   return (
-    <div className="pointer-events-none absolute left-4 top-4 z-20 flex w-[268px] flex-col gap-3">
+    <div className="pointer-events-none absolute left-4 top-4 z-20 hidden w-[268px] flex-col gap-3 lg:flex">
       <AnimatePresence>
         {game.activeEvent && (
           <motion.div
@@ -47,6 +50,39 @@ export default function SidePanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {insights.length > 0 && (
+        <div className="pointer-events-auto panel p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-widest text-neon-cyan">Action center</div>
+            <span className="num text-[9px] text-white/35">LIVE PRIORITIES</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {insights.map((item) => {
+              const tone = item.severity === 'critical' ? '#ff5d73' : item.severity === 'warning' ? '#ffc857' : '#7ee787';
+              return (
+                <button
+                  key={item.id}
+                  className="group rounded-lg border border-white/[0.08] bg-white/[0.035] p-2.5 text-left transition-colors hover:bg-white/[0.075]"
+                  onClick={() => {
+                    if (item.target.type === 'screen') return setScreen(item.target.id);
+                    focus(item.target.gx, item.target.gy);
+                    select({ type: item.target.type, id: item.target.id });
+                    if (item.id.startsWith('incident-')) openIncident(item.id.slice('incident-'.length));
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: tone, boxShadow: `0 0 9px ${tone}` }} />
+                    <span className="truncate text-[11px] font-semibold text-white/85">{item.title}</span>
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/42">{item.detail}</div>
+                  <div className="mt-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: tone }}>{item.action} →</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {(active.length > 0 || outages.length > 0) && (
@@ -177,10 +213,10 @@ export default function SidePanel() {
       {game.posts.length > 0 && (
         <div className="pointer-events-auto panel p-3">
           <div className="mb-2 text-[10px] uppercase tracking-widest text-white/40">Word on the street</div>
-          <div className="scroll-thin flex max-h-[168px] flex-col gap-2 overflow-y-auto">
+          <div className="scroll-thin flex max-h-[180px] flex-col divide-y divide-white/[0.07] overflow-y-auto">
             <AnimatePresence initial={false}>
               {game.posts.slice(0, 6).map((p) => (
-                <motion.div key={p.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+                <motion.div key={p.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="py-2 first:pt-0 last:pb-0">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-neon-blue">{p.handle}</span>
                     <Stars n={p.stars} />

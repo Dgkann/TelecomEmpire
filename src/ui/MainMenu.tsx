@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { DIFFICULTY } from '../game/constants';
-import { clearSave, saveMeta } from '../game/save';
+import { clearSave, importSave, listSaveMeta, SAVE_SLOT_COUNT } from '../game/save';
 import { useGame } from '../store/gameStore';
 import type { Difficulty } from '../game/types';
 
@@ -14,7 +14,11 @@ const CITIES = [
 export default function MainMenu() {
   const newGame = useGame((s) => s.newGame);
   const continueGame = useGame((s) => s.continueGame);
-  const [meta, setMeta] = useState(saveMeta());
+  const [metas, setMetas] = useState(() => listSaveMeta());
+  const [newSlot, setNewSlot] = useState(() => {
+    const empty = listSaveMeta().findIndex((m) => !m);
+    return empty < 0 ? 0 : empty;
+  });
   const [setup, setSetup] = useState(false);
   const [name, setName] = useState('CoreLink');
   const [logo, setLogo] = useState(LOGOS[0]);
@@ -22,61 +26,89 @@ export default function MainMenu() {
   const [city, setCity] = useState(CITIES[0].name);
 
   return (
-    <div className="relative grid h-full w-full place-items-center overflow-hidden bg-ink-900">
+    <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#0b1218]">
       <div
         className="pointer-events-none absolute inset-0 opacity-60"
         style={{
           background:
-            'radial-gradient(900px 500px at 20% 10%, rgba(62,230,214,0.14), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(167,139,250,0.14), transparent 60%)',
+            'linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px)',
+          backgroundSize: '72px 72px',
         }}
       />
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative w-[560px] max-w-[92vw]"
+        className="relative grid w-[1040px] max-w-[92vw] items-center gap-12 lg:grid-cols-[1fr_540px]"
       >
-        <div className="mb-8 text-center">
-          <div className="text-[11px] uppercase tracking-[0.5em] text-neon-cyan/70">Build the network</div>
-          <h1 className="mt-1 text-5xl font-bold tracking-tight">
-            Telecom <span className="text-neon-cyan">Empire</span>
+        <div className="hidden lg:block">
+          <div className="text-[12px] font-medium text-white/45">Network planning simulator</div>
+          <h1 className="mt-3 text-6xl font-semibold leading-[0.92] tracking-[-0.035em] text-white/90">
+            Telecom<br /><span className="text-[#79aaa5]">Empire</span>
           </h1>
-          <p className="mt-3 text-sm text-white/45">
-            One small ISP, one city, and a lot of fibre to lay.
+          <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-white/50">
+            Light the fibre. Survive the evening peak. Build the network the city cannot live without.
           </p>
+          <div className="mt-10 h-44 w-full max-w-sm rounded-sm border border-white/[0.08] bg-black/10 p-5">
+            <svg viewBox="0 0 360 130" className="h-full w-full text-neon-cyan" aria-hidden="true">
+              <path d="M35 86 105 46l72 32 65-52 82 58" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="7 7" className="fiber-flow" style={{ animationDuration: '26s' }} />
+              {[[35,86],[105,46],[177,78],[242,26],[324,84]].map(([x,y], i) => <g key={i}><circle cx={x} cy={y} r="9" fill="#09111f" stroke="currentColor" strokeWidth="2" /><circle cx={x} cy={y} r="2.5" fill="currentColor" /></g>)}
+              <path d="M35 105h289" stroke="rgba(255,255,255,.08)" />
+              <text x="35" y="124" fill="rgba(220,231,243,.35)" fontSize="9" fontFamily="IBM Plex Mono">BACKBONE STATUS / READY FOR COMMISSIONING</text>
+            </svg>
+          </div>
         </div>
 
         {!setup ? (
-          <div className="panel flex flex-col gap-2 p-5">
-            {meta && (
-              <button
-                className="rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 p-4 text-left transition-colors hover:bg-neon-cyan/20"
-                onClick={() => continueGame()}
-              >
-                <div className="text-sm font-semibold text-neon-cyan">Continue</div>
-                <div className="num text-[11px] text-white/50">
-                  {meta.company} · {meta.customers.toLocaleString()} customers · saved{' '}
-                  {new Date(meta.savedAt).toLocaleString()}
-                </div>
-              </button>
-            )}
+          <div className="panel flex flex-col gap-2 border-white/[0.12] p-6">
+            <div className="mb-4 lg:hidden">
+              <div className="text-[11px] font-medium text-white/45">Network operations</div>
+              <div className="mt-1 font-display text-4xl font-semibold uppercase">Telecom <span className="text-neon-cyan">Empire</span></div>
+            </div>
+            <div className="mb-2">
+              <div className="section-title">Control room</div>
+              <p className="mt-1 text-[12px] text-white/40">Start a new operator or return to the live network.</p>
+            </div>
+            {metas.map((meta, slot) => meta && (
+              <div key={slot} className="flex gap-2 rounded-lg border border-neon-cyan/25 bg-neon-cyan/[0.06] p-3">
+                <button className="min-w-0 flex-1 text-left" onClick={() => continueGame(slot)}>
+                  <div className="text-sm font-semibold text-neon-cyan">Continue · Slot {slot + 1}</div>
+                  <div className="num truncate text-[10px] text-white/45">{meta.company} · {meta.city} · {meta.customers.toLocaleString()} customers · {new Date(meta.savedAt).toLocaleString()}</div>
+                </button>
+                <button className="icon-button text-neon-red" aria-label={`Delete slot ${slot + 1}`} onClick={() => { clearSave(slot); setMetas(listSaveMeta()); }}>×</button>
+              </div>
+            ))}
             <button className="btn py-3 text-left" onClick={() => setSetup(true)}>
-              <span className="text-sm font-semibold">New game</span>
+              <span className="text-sm font-semibold">Commission new network</span>
             </button>
-            {meta && (
-              <button
-                className="btn py-3 text-left text-white/50"
-                onClick={() => {
-                  clearSave();
-                  setMeta(null);
-                }}
-              >
-                <span className="text-sm">Delete save</span>
-              </button>
-            )}
+            <label className="btn cursor-pointer py-3 text-left text-white/50">
+              <span className="text-sm">Import save file</span>
+              <input className="hidden" type="file" accept="application/json,.json" onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const empty = metas.findIndex((m) => !m);
+                importSave(await file.text(), empty < 0 ? 0 : empty);
+                setMetas(listSaveMeta());
+              }} />
+            </label>
           </div>
         ) : (
-          <div className="panel flex flex-col gap-5 p-5">
+          <div className="panel flex flex-col gap-5 border-white/[0.12] p-5">
+            <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
+              <div>
+                <div className="section-title">Operator profile</div>
+                <div className="text-[11px] text-white/40">Choose your starting conditions.</div>
+              </div>
+              <div className="font-mono text-[10px] text-neon-cyan/60">NEW / 01</div>
+            </div>
             <div>
+              <div className="stat-label mb-1.5">Save slot</div>
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                {Array.from({ length: SAVE_SLOT_COUNT }, (_, slot) => (
+                  <button key={slot} onClick={() => setNewSlot(slot)} className={`rounded-lg border p-2 text-xs ${newSlot === slot ? 'border-neon-cyan/60 bg-neon-cyan/10 text-neon-cyan' : 'border-white/10 bg-white/[0.03] text-white/50'}`}>
+                    Slot {slot + 1} · {metas[slot] ? 'overwrite' : 'empty'}
+                  </button>
+                ))}
+              </div>
               <div className="stat-label mb-1.5">Company</div>
               <div className="flex gap-2">
                 <input
@@ -146,7 +178,7 @@ export default function MainMenu() {
               </button>
               <button
                 className="btn-primary flex-[2]"
-                onClick={() => newGame({ companyName: name.trim() || 'CoreLink', logo, difficulty, cityName: city })}
+                onClick={() => newGame({ companyName: name.trim() || 'CoreLink', logo, difficulty, cityName: city }, newSlot)}
               >
                 Start building
               </button>

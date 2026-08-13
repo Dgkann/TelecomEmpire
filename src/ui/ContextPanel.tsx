@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, nodeUpgradeCost, utilColor } from '../game/constants';
+import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, linkCapacity, nodeCapacity, nodeUpgradeCost, towerCapacity, utilColor } from '../game/constants';
 import { fmtMoneyExact, fmtNum } from '../game/economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil } from '../game/network';
 import { researchModifiers } from '../game/research';
 import { residentialSubs } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 import { useMemo } from 'react';
+import SiteIcon from './SiteIcon';
 
 function Bar({ value, label, right }: { value: number; label: string; right?: string }) {
   const pct = Math.min(1, value);
@@ -45,6 +46,19 @@ export default function ContextPanel() {
   const node = selection?.type === 'node' ? game.nodes.find((n) => n.id === selection.id) : undefined;
   const link = selection?.type === 'link' ? game.links.find((l) => l.id === selection.id) : undefined;
   const district = selection?.type === 'district' ? game.districts.find((d) => d.id === selection.id) : undefined;
+  const nodeMaxTier = node
+    ? node.kind === 'core'
+      ? mods.maxCoreTier
+      : node.kind === 'tower'
+        ? mods.maxTowerTier
+        : NODE_SPECS[node.kind].maxTier
+    : 0;
+  const nextNodeCapacity = node && node.tier < nodeMaxTier
+    ? node.kind === 'tower'
+      ? towerCapacity(game.spectrum, node.tier + 1)
+      : nodeCapacity(node.kind, node.tier + 1)
+    : null;
+  const nextLinkCapacity = link && link.tier < mods.maxLinkTier ? linkCapacity(link.tier + 1) * mods.linkCapacityMul : null;
 
   // Topology only changes when something is added, removed or knocked out,
   // so key the expensive redundancy check on a cheap signature of that.
@@ -75,8 +89,9 @@ export default function ContextPanel() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 24 }}
           transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-          className="panel absolute right-4 top-4 z-20 w-[290px] p-4"
+          className="panel absolute right-4 top-4 z-20 w-[310px] overflow-hidden border-white/[0.14] p-4 shadow-[0_24px_64px_-24px_rgba(0,0,0,.9)]"
         >
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-neon-cyan/80 via-neon-cyan/20 to-transparent" />
           <button
             className="absolute right-3 top-3 text-white/40 hover:text-white"
             onClick={() => select(null)}
@@ -87,12 +102,15 @@ export default function ContextPanel() {
 
           {node && (
             <div className="space-y-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/40">
-                  {NODE_SPECS[node.kind].label} · Tier {node.tier}
+              <div className="flex items-start gap-3 pr-6">
+                <SiteIcon kind={node.kind} className="h-10 w-10 shrink-0" title={NODE_SPECS[node.kind].label} />
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">
+                    {NODE_SPECS[node.kind].label} · Tier {node.tier}
+                  </div>
+                  <div className="truncate text-lg font-semibold leading-tight">{node.name}</div>
+                  {node.down && <div className="mt-1 text-xs font-semibold text-neon-red">OUT OF SERVICE</div>}
                 </div>
-                <div className="text-lg font-semibold leading-tight">{node.name}</div>
-                {node.down && <div className="mt-1 text-xs font-semibold text-neon-red">OUT OF SERVICE</div>}
               </div>
 
               <Bar
@@ -121,9 +139,20 @@ export default function ContextPanel() {
                 </p>
               )}
 
+              {nextNodeCapacity !== null && (
+                <div className="rounded-lg border border-neon-cyan/15 bg-neon-cyan/[0.045] p-2.5">
+                  <div className="stat-label mb-1.5">Upgrade preview</div>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+                    <div><div className="num text-sm text-white/55">{node.capacityGbps.toFixed(1)}G</div><div className="text-[9px] text-white/30">current</div></div>
+                    <span className="text-neon-cyan/60">→</span>
+                    <div><div className="num text-sm font-semibold text-neon-cyan">{nextNodeCapacity.toFixed(1)}G</div><div className="text-[9px] text-white/30">after upgrade</div></div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
-                <button className="btn-primary" onClick={() => upgradeNode(node.id)}>
-                  Upgrade · {fmtMoneyExact(nodeUpgradeCost(node.kind, node.tier))}
+                <button className="btn-primary" disabled={node.tier >= nodeMaxTier} onClick={() => upgradeNode(node.id)}>
+                  {node.tier >= nodeMaxTier ? 'Max tier' : `Upgrade · ${fmtMoneyExact(nodeUpgradeCost(node.kind, node.tier))}`}
                 </button>
                 {node.health < 99 && (
                   <button className="btn" onClick={() => repairNode(node.id)}>
@@ -161,6 +190,12 @@ export default function ContextPanel() {
                 right={`${link.trafficGbps.toFixed(1)} / ${link.capacityGbps.toFixed(0)} Gbps`}
               />
               <div className="text-[11px] text-white/45">Length {link.length.toFixed(1)} km</div>
+              {nextLinkCapacity !== null && (
+                <div className="flex items-center justify-between rounded-lg border border-neon-blue/15 bg-neon-blue/[0.045] px-3 py-2 text-[11px]">
+                  <span className="text-white/45">After optics upgrade</span>
+                  <span className="num font-semibold text-neon-blue">{link.capacityGbps.toFixed(0)}G → {nextLinkCapacity.toFixed(0)}G</span>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 <button
                   className="btn-primary"

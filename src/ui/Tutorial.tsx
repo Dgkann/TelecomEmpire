@@ -42,6 +42,7 @@ export default function Tutorial() {
   const game = useGame((s) => s.game)!;
   const advance = useGame((s) => s.advanceTutorial);
   const skip = useGame((s) => s.skipTutorial);
+  const selection = useGame((s) => s.selection);
   const stepIndex = game.tutorialStep;
   const step = STEPS[stepIndex];
 
@@ -65,25 +66,27 @@ export default function Tutorial() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className="panel absolute bottom-28 left-4 z-20 w-[268px] border-neon-cyan/30 p-4"
+        className={`panel absolute right-4 top-4 z-20 w-[400px] max-w-[calc(100%-32px)] border-neon-cyan/25 px-4 py-3 xl:w-[520px] ${selection ? 'hidden' : ''}`}
       >
-        <div className="flex items-center justify-between">
-          <div className="text-[10px] uppercase tracking-widest text-neon-cyan">
-            Step {stepIndex + 1} of {STEPS.length}
+        <div className="flex items-start gap-3">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-neon-cyan/35 bg-neon-cyan/10 font-mono text-xs font-semibold text-neon-cyan">
+            {stepIndex + 1}
           </div>
-          <button className="text-[10px] text-white/35 hover:text-white" onClick={skip}>
-            skip
-          </button>
-        </div>
-        <div className="mt-1 text-sm font-semibold">{step.title}</div>
-        <p className="mt-1 text-[12px] leading-snug text-white/55">{step.body}</p>
-        <div className="mt-3 flex gap-1">
-          {STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 flex-1 rounded-full ${i < stepIndex ? 'bg-neon-cyan' : i === stepIndex ? 'bg-neon-cyan/50' : 'bg-white/10'}`}
-            />
-          ))}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-neon-cyan">Commissioning guide</div>
+                <div className="text-sm font-semibold">{step.title}</div>
+              </div>
+              <button className="shrink-0 text-[11px] text-white/35 hover:text-white" onClick={skip}>Skip guide</button>
+            </div>
+            <p className="mt-0.5 text-[12px] leading-snug text-white/55">{step.body}</p>
+            <div className="mt-2 flex gap-1">
+              {STEPS.map((_, i) => (
+                <div key={i} className={`h-0.5 flex-1 rounded-full ${i < stepIndex ? 'bg-neon-cyan' : i === stepIndex ? 'bg-neon-cyan/55' : 'bg-white/10'}`} />
+              ))}
+            </div>
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>

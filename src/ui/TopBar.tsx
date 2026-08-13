@@ -1,44 +1,31 @@
 import { motion } from 'framer-motion';
 import { fmtMoney, fmtNum } from '../game/economy';
-import { fmtClock, fmtDate, totalCustomers } from '../game/simulation';
 import { rankOf } from '../game/progression';
+import { fmtClock, fmtDate, totalCustomers } from '../game/simulation';
 import { useGame } from '../store/gameStore';
-import type { Screen, Speed } from '../game/types';
+import type { Speed } from '../game/types';
+import { AlertIcon } from './icons';
 
 const SPEEDS: Array<{ v: Speed; label: string }> = [
-  { v: 0, label: '❚❚' },
-  { v: 1, label: '1x' },
-  { v: 2, label: '2x' },
-  { v: 4, label: '4x' },
+  { v: 0, label: 'Ⅱ' },
+  { v: 1, label: '1×' },
+  { v: 2, label: '2×' },
+  { v: 4, label: '4×' },
 ];
 
-const SCREENS: Array<{ id: Screen; label: string }> = [
-  { id: 'map', label: 'Map' },
-  { id: 'network', label: 'Network' },
-  { id: 'company', label: 'Company' },
-  { id: 'research', label: 'Research' },
-];
-
-function Stat({
-  label,
-  value,
-  tone,
-  bar,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-  bar?: number;
-}) {
+function Stat({ label, shortLabel, value, tone, bar, secondary }: { label: string; shortLabel?: string; value: string; tone?: string; bar?: number; secondary?: string }) {
   return (
-    <div className="flex min-w-[86px] flex-col justify-center px-3">
-      <div className="stat-label">{label}</div>
-      <div className={`num text-[15px] font-semibold leading-tight ${tone ?? 'text-white'}`}>{value}</div>
+    <div className="flex min-w-0 flex-1 flex-col justify-center border-l border-white/[0.06] px-2 first:border-l-0 lg:px-3">
+      <div className="stat-label truncate"><span className="hidden lg:inline">{label}</span><span className="lg:hidden">{shortLabel ?? label}</span></div>
+      <div className="flex items-baseline gap-1.5">
+        <div className={`num truncate text-[15px] font-semibold leading-tight ${tone ?? 'text-white'}`}>{value}</div>
+        {secondary && <span className="hidden text-[11px] text-white/35 2xl:inline">{secondary}</span>}
+      </div>
       {bar !== undefined && (
-        <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-1 h-[3px] w-full max-w-[92px] overflow-hidden rounded-full bg-white/10">
           <motion.div
             className="h-full rounded-full"
-            style={{ background: bar > 0.66 ? '#4ade80' : bar > 0.33 ? '#facc15' : '#ff5c68' }}
+            style={{ background: bar > 0.66 ? '#75df9a' : bar > 0.33 ? '#f3b843' : '#ff6577' }}
             animate={{ width: `${Math.round(bar * 100)}%` }}
             transition={{ duration: 0.4 }}
           />
@@ -50,103 +37,66 @@ function Stat({
 
 export default function TopBar() {
   const game = useGame((s) => s.game)!;
-  const screen = useGame((s) => s.screen);
-  const setScreen = useGame((s) => s.setScreen);
   const setSpeed = useGame((s) => s.setSpeed);
-  const save = useGame((s) => s.save);
-  const quit = useGame((s) => s.quitToMenu);
-  const soundOn = useGame((s) => s.soundOn);
-  const toggleSound = useGame((s) => s.toggleSound);
-  const setShowHelp = useGame((s) => s.setShowHelp);
-
+  const setScreen = useGame((s) => s.setScreen);
   const customers = totalCustomers(game);
   const health = game.stats.health;
   const profit = game.monthAccumulator.revenue - game.monthAccumulator.expense;
+  const incidents = game.incidents.filter((i) => !i.resolved).length;
 
   return (
-    <div className="z-30 flex h-14 items-stretch gap-1 border-b border-white/10 bg-ink-800/90 px-3 backdrop-blur-md">
-      <div className="flex items-center gap-2 pr-3">
-        <div className="grid h-9 w-9 place-items-center rounded-lg bg-neon-cyan/15 text-lg">{game.logo}</div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold">{game.companyName}</div>
-          <div className="text-[10px] text-white/40">
-            {game.cityName} · <span className="text-neon-cyan/70">{rankOf(game).name}</span>
+    <header className="relative z-40 flex h-16 shrink-0 items-stretch border-b border-white/[0.09] bg-[#111b23]">
+      <div className="flex w-[160px] shrink-0 items-center gap-2 border-r border-white/[0.07] px-3 lg:w-[220px] lg:gap-3 lg:px-4">
+        <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-sm border border-white/10 bg-black/15 text-lg">
+          {game.logo}
+          <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-ink-800 bg-neon-lime" />
+        </div>
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-[16px] font-semibold text-white/90">{game.companyName}</div>
+          <div className="truncate text-[11px] text-white/40">
+            {game.cityName} <span className="px-1 text-white/20">/</span> <span className="text-neon-cyan/80">{rankOf(game).name}</span>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-1 items-stretch divide-x divide-white/5">
-        <Stat
-          label="Money"
-          value={fmtMoney(game.money)}
-          tone={game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'}
-        />
-        <Stat label="Customers" value={fmtNum(customers)} />
-        <Stat label="Reputation" value={`${Math.round(game.reputation)}`} bar={game.reputation / 100} />
-        <Stat
-          label="Network"
-          value={`${Math.round(health)}%`}
-          tone={health > 80 ? 'text-white' : health > 55 ? 'text-neon-amber' : 'text-neon-red'}
-          bar={health / 100}
-        />
-        <Stat
-          label="This month"
-          value={`${profit >= 0 ? '+' : ''}${fmtMoney(profit)}`}
-          tone={profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}
-        />
-        <Stat label="Traffic" value={`${game.stats.demandGbps.toFixed(1)} Gbps`} />
+      <div className="flex min-w-0 flex-1 items-stretch px-1">
+        <Stat label="Cash" value={fmtMoney(game.money)} tone={game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'} />
+        <div className="hidden min-w-0 flex-1 lg:flex"><Stat label="Monthly P/L" shortLabel="P/L" value={`${profit >= 0 ? '+' : ''}${fmtMoney(profit)}`} tone={profit >= 0 ? 'text-neon-lime' : 'text-neon-red'} /></div>
+        <Stat label="Customers" shortLabel="Subs" value={fmtNum(customers)} secondary={`rep ${Math.round(game.reputation)}`} />
+        <Stat label="Network" shortLabel="Health" value={`${Math.round(health)}%`} tone={health > 80 ? 'text-neon-lime' : health > 55 ? 'text-neon-amber' : 'text-neon-red'} bar={health / 100} />
+        <div className="hidden min-w-0 flex-1 xl:flex"><Stat label="Traffic" value={`${game.stats.demandGbps.toFixed(1)}G`} secondary="Gbps" /></div>
       </div>
 
-      <div className="flex items-center gap-3 pl-2">
-        <div className="text-right leading-tight">
-          <div className="num text-sm font-semibold">{fmtClock(game.minutes)}</div>
-          <div className="text-[10px] text-white/40">{fmtDate(game.minutes)}</div>
-        </div>
+      <button
+        onClick={() => setScreen('network')}
+        className={`flex w-14 shrink-0 items-center justify-center border-l border-white/[0.07] transition-colors ${incidents ? 'bg-neon-red/10 text-neon-red' : 'text-white/35 hover:bg-white/5 hover:text-white/70'}`}
+        title={incidents ? `${incidents} active alert${incidents > 1 ? 's' : ''}` : 'No active alerts'}
+        aria-label={incidents ? `${incidents} active alerts` : 'No active alerts'}
+      >
+        <span className="relative"><AlertIcon className="h-5 w-5" />{incidents > 0 && <span className="absolute -right-2 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-neon-red px-1 font-mono text-[9px] font-bold text-ink-900">{incidents}</span>}</span>
+      </button>
 
-        <div className="flex items-center gap-0.5 rounded-lg bg-black/30 p-1">
+      <div className="flex shrink-0 items-center gap-3 border-l border-white/[0.07] px-3">
+        <div className="text-right leading-tight">
+          <div className="num text-[15px] font-semibold text-white">{fmtClock(game.minutes)}</div>
+          <div className="text-[11px] text-white/40">{fmtDate(game.minutes)}</div>
+        </div>
+        <div className="flex items-center gap-0.5 rounded-sm border border-white/[0.08] bg-black/10 p-1">
           {SPEEDS.map((s) => (
             <button
               key={s.v}
               onClick={() => setSpeed(s.v)}
-              className={`h-7 w-9 rounded-md text-xs font-semibold transition-colors ${
-                game.speed === s.v ? 'bg-neon-cyan/25 text-neon-cyan' : 'text-white/50 hover:bg-white/10'
+              className={`h-7 min-w-8 rounded-sm px-1.5 font-mono text-[11px] font-semibold transition-colors ${
+                game.speed === s.v ? 'bg-white/[0.09] text-white' : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
               }`}
               title={s.v === 0 ? 'Pause (Space)' : `${s.v}x speed`}
+              aria-label={s.v === 0 ? 'Pause' : `${s.v}x speed`}
             >
               {s.label}
             </button>
           ))}
-        </div>
-
-        <div className="flex items-center gap-0.5 rounded-lg bg-black/30 p-1">
-          {SCREENS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setScreen(s.id)}
-              className={`h-7 rounded-md px-3 text-xs font-semibold transition-colors ${
-                screen === s.id ? 'bg-white/15 text-white' : 'text-white/50 hover:bg-white/10'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <button className="btn px-2 py-1 text-xs" onClick={() => setShowHelp(true)} title="How to play">
-            ?
-          </button>
-          <button className="btn px-2 py-1 text-xs" onClick={toggleSound} title="Sound">
-            {soundOn ? '🔊' : '🔇'}
-          </button>
-          <button className="btn px-2 py-1 text-xs" onClick={save} title="Save game">
-            Save
-          </button>
-          <button className="btn px-2 py-1 text-xs" onClick={quit} title="Save and exit to menu">
-            Menu
-          </button>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
