@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { fmtMoney, fmtNum } from '../game/economy';
 import { fmtClock, fmtDate, totalCustomers } from '../game/simulation';
+import { rankOf } from '../game/progression';
 import { useGame } from '../store/gameStore';
 import type { Screen, Speed } from '../game/types';
 
@@ -68,7 +69,9 @@ export default function TopBar() {
         <div className="grid h-9 w-9 place-items-center rounded-lg bg-neon-cyan/15 text-lg">{game.logo}</div>
         <div className="leading-tight">
           <div className="text-sm font-semibold">{game.companyName}</div>
-          <div className="text-[10px] text-white/40">{game.cityName}</div>
+          <div className="text-[10px] text-white/40">
+            {game.cityName} · <span className="text-neon-cyan/70">{rankOf(game).name}</span>
+          </div>
         </div>
       </div>
 

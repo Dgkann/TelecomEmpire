@@ -1,12 +1,15 @@
 // Invariant checks, run headless. Exits non-zero on failure so CI can gate on it.
 // Run with: npm run check
-import { MINUTES_PER_DAY, SAVE_VERSION, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
+import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, SAVE_VERSION, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
 import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, servingCapacity } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
 import { pendingRegulations, regulationProgress } from '../src/game/regulator';
+import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
+import { cacheRatio } from '../src/game/simulation';
+import { hostingRevenue } from '../src/game/economy';
 import { clearSave, loadGame, migrate, saveGame } from '../src/game/save';
 import { createNewGame, mobileSubs, residentialSubs, step, totalCustomers } from '../src/game/simulation';
 import type { GameState, NetLink, NetNode } from '../src/game/types';
@@ -482,6 +485,108 @@ group('demand forecasting');
   const live = forecastDemand(g.demandHistory, g.stats.demandGbps, 30);
   finite('the live forecast is a real number', live.projected);
   check('serving capacity is positive', servingCapacity(g.nodes) > 0);
+}
+
+group('data centres earn their keep');
+{
+  const g = newGame(3030);
+  const dc: NetNode = {
+    id: 'dc1',
+    kind: 'datacenter',
+    name: 'Test DC',
+    gx: g.districts[0].center.gx,
+    gy: g.districts[0].center.gy,
+    districtId: g.districts[0].id,
+    tier: 1,
+    capacityGbps: 40,
+    trafficGbps: 0,
+    health: 100,
+    down: false,
+    builtAt: 0,
+    servicedAt: 0,
+  };
+  const withDc: GameState = { ...g, nodes: [...g.nodes, dc] };
+
+  check('no data centre means no hosting income', hostingRevenue(g) === 0);
+  check('a data centre earns hosting income', hostingRevenue(withDc) > 0, `${Math.round(hostingRevenue(withDc))}`);
+
+  // It has to beat what it costs to run, otherwise building one is a trap.
+  const before = monthlyBreakdown(g, researchModifiers(g.researchDone));
+  const after = monthlyBreakdown(withDc, researchModifiers(withDc.researchDone));
+  check(
+    'a data centre is profitable to run',
+    after.profit > before.profit,
+    `${Math.round(before.profit)} -> ${Math.round(after.profit)}`,
+  );
+
+  check('no data centre means no caching', cacheRatio(g) === 0);
+  check('a data centre offloads traffic', cacheRatio(withDc) > 0, `${cacheRatio(withDc)}`);
+  const many: GameState = { ...g, nodes: [...g.nodes, dc, { ...dc, id: 'dc2' }, { ...dc, id: 'dc3' }, { ...dc, id: 'dc4' }, { ...dc, id: 'dc5' }] };
+  check('caching is capped', cacheRatio(many) <= 0.3, `${cacheRatio(many)}`);
+
+  // And the offload should show up as less traffic on the network.
+  const plain = runDays(g, 20, repairAll);
+  const cached = runDays(withDc, 20, repairAll);
+  check('caching lowers carried traffic', cached.stats.demandGbps < plain.stats.demandGbps * 1.01);
+}
+
+group('the company ladder');
+{
+  const g = newGame(6060);
+  check('a new company starts at the bottom', g.rank === 0 && rankOf(g).id === 'local');
+  check('the first rung has no requirements', RANKS[0].requirements.length === 0);
+  check('every later rung has requirements', RANKS.slice(1).every((r) => r.requirements.length > 0));
+  check('customer counting is finite', Number.isFinite(customerCount(g)));
+  check('city share starts small', cityShare(g) >= 0 && cityShare(g) < 1, `${cityShare(g).toFixed(2)}`);
+
+  // A brand new company cannot possibly qualify for the second rung.
+  check('a new company is not promoted immediately', !meetsRank(g, RANKS[1]));
+
+  // Force the requirements and it should climb exactly one rung per check.
+  const big: GameState = {
+    ...g,
+    districts: g.districts.map((d) => ({ ...d, unlocked: true, coverage: 0.9, satisfaction: 90, mobileSubs: 3000 })),
+    reputation: 90,
+  };
+  const promoted = { ...big };
+  const gained = checkPromotion(promoted);
+  check('meeting the requirements promotes you', !!gained, gained?.name ?? 'no promotion');
+  check('promotion moves exactly one rung', promoted.rank === 1);
+
+  // Ranks must be reachable in order, never skipped.
+  let ladder = { ...big, rank: 0 };
+  let steps = 0;
+  while (checkPromotion(ladder) && steps < 10) steps += 1;
+  check('the ladder stops at the top', ladder.rank <= RANKS.length - 1, `${ladder.rank}`);
+
+  // Higher rank should mean a better credit limit.
+  const low = creditLimit({ ...big, rank: 0 });
+  const high = creditLimit({ ...big, rank: RANKS.length - 1 });
+  check('rank improves what lenders offer', high > low, `${low} -> ${high}`);
+}
+
+group('the ladder is reachable');
+{
+  // A rank nobody can ever reach is worse than no rank at all. This pins the
+  // top rung against the size of the market it is asking you to win.
+  const g = newGame(12345);
+  const residentialMarket = g.districts.reduce((a, d) => a + d.potential, 0);
+  const mobileMarket = g.districts.reduce((a, d) => a + d.population, 0) * MOBILE_MARKET_SHARE;
+  const market = residentialMarket + mobileMarket;
+
+  const top = RANKS[RANKS.length - 1];
+  const customerReq = top.requirements.find((r) => r.label.includes('customers'));
+  const required = Number(customerReq?.label.replace(/[^0-9]/g, '') ?? 0);
+
+  check('the city is big enough for the top rank', required < market * 0.75, `needs ${required}, market ${Math.round(market)}`);
+  check('the top rank is still an achievement', required > market * 0.3, `needs ${required}, market ${Math.round(market)}`);
+
+  // Every rung should ask for more than the one below it.
+  const targets = RANKS.slice(1).map((r) => {
+    const req = r.requirements.find((x) => x.label.includes('customers'));
+    return Number(req?.label.replace(/[^0-9]/g, '') ?? 0);
+  });
+  check('rungs get harder in order', targets.every((v, i) => i === 0 || v > targets[i - 1]), targets.join(' < '));
 }
 
 group('a tower with no fibre behind it');

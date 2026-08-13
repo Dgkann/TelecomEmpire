@@ -1,5 +1,6 @@
 import { DIFFICULTY, MINUTES_PER_DAY, NODE_SPECS } from './constants';
 import { monthlyBreakdown } from './economy';
+import { rankOf } from './progression';
 import { researchModifiers } from './research';
 import { uid } from './rng';
 import { clamp } from './util';
@@ -29,7 +30,7 @@ export function assetValue(s: GameState) {
 export function creditLimit(s: GameState) {
   const money = monthlyBreakdown(s, researchModifiers(s.researchDone));
   const owed = s.loans.reduce((sum, l) => sum + l.remaining, 0);
-  const raw = money.totalRevenue * 5 + assetValue(s) * 0.4;
+  const raw = (money.totalRevenue * 5 + assetValue(s) * 0.4) * rankOf(s).creditMultiplier;
   return Math.max(40000, Math.round(raw - owed));
 }
 

@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -224,6 +224,15 @@ export const DIFFICULTY: Record<
     blurb: 'Fragile margins, hungry rivals, and a network that bites back.',
   },
 };
+
+// A data centre earns from hosting and colocation. Sited where the businesses
+// are, it earns more.
+export const DATACENTER_HOSTING_BASE = 38000;
+
+// Edge caching serves popular traffic locally, so it never crosses your network
+// at all. This is the real reason to build one: it adds headroom everywhere.
+export const DATACENTER_CACHE_PER_TIER = 0.08;
+export const DATACENTER_CACHE_CAP = 0.3;
 
 // Share of a subscriber's headline speed really on the wire at peak. Biggest balance dial.
 export const OVERSUBSCRIPTION = 0.005;

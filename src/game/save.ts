@@ -85,6 +85,10 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
 
   // 7 -> 8: daily peak demand is recorded so the forecast has something to fit.
   7: (s) => ({ ...s, demandHistory: s.demandHistory ?? [], dayPeakDemand: s.dayPeakDemand ?? 0 }),
+
+  // 8 -> 9: the company ladder. Existing saves start at the bottom rung and
+  // climb on their next day, so nothing is lost.
+  8: (s) => ({ ...s, rank: s.rank ?? 0, victoryAt: s.victoryAt ?? null }),
 };
 
 const DEFAULTS = {
@@ -104,6 +108,8 @@ const DEFAULTS = {
   marketingBudget: 0,
   retentionBudget: 0,
   churn: [],
+  rank: 0,
+  victoryAt: null,
   regulations: [],
   demandHistory: [],
   dayPeakDemand: 0,

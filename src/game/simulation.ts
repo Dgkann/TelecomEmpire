@@ -8,6 +8,8 @@ import {
   MINUTES_PER_STEP,
   MOBILE_AVG_SPEED,
   MOBILE_MARKET_SHARE,
+  DATACENTER_CACHE_CAP,
+  DATACENTER_CACHE_PER_TIER,
   MOBILE_OVERSUBSCRIPTION,
   OVERSUBSCRIPTION,
   SPECTRUM_BANDS,
@@ -21,6 +23,7 @@ import { createAuction, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
 import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
+import { checkPromotion, isTopRank } from './progression';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
@@ -197,6 +200,8 @@ export function createNewGame(opts: NewGameOptions): GameState {
     churn: [],
     demandHistory: [],
     dayPeakDemand: 0,
+    rank: 0,
+    victoryAt: null,
     regulations: [],
     nextRegulationAt: MINUTES_PER_DAY * 120,
     loans: [],
@@ -265,6 +270,14 @@ function seedStartingCustomers(state: GameState, count: number, districtId: stri
   redistributePackages(state);
 }
 
+// Fraction of all traffic served straight out of your own data centres.
+export function cacheRatio(s: GameState) {
+  const total = s.nodes
+    .filter((n) => n.kind === 'datacenter' && !n.down)
+    .reduce((sum, n) => sum + DATACENTER_CACHE_PER_TIER * n.tier, 0);
+  return Math.min(DATACENTER_CACHE_CAP, total);
+}
+
 export function residentialSubs(state: GameState, districtId?: string) {
   return state.buildings.reduce(
     (s, b) =>
@@ -310,6 +323,10 @@ export function step(prev: GameState): GameState {
   const curve = demandCurve(s.minutes) * eventMul;
   const avgSpeed = averageSpeed(s.packages);
 
+  // Edge caches serve popular traffic locally, so it never touches the network.
+  // This is what makes a data centre worth its running costs.
+  const cacheOffload = cacheRatio(s);
+
   const districtDemand: Record<string, number> = {};
   for (const d of s.districts) {
     const subs = residentialSubs(s, d.id);
@@ -318,7 +335,7 @@ export function step(prev: GameState): GameState {
       .filter((c) => c.districtId === d.id)
       .reduce((sum, c) => sum + c.bandwidthGbps * CONTRACT_CONTENTION * (0.45 + 0.55 * curve), 0);
     const mobDemand = (d.mobileSubs * MOBILE_AVG_SPEED * MOBILE_OVERSUBSCRIPTION * curve) / 1000;
-    districtDemand[d.id] = resDemand + bizDemand + mobDemand;
+    districtDemand[d.id] = (resDemand + bizDemand + mobDemand) * (1 - cacheOffload);
   }
 
   // 2. Route and load
@@ -486,6 +503,14 @@ export function step(prev: GameState): GameState {
     s.demandHistory = [...s.demandHistory, s.dayPeakDemand].slice(-45);
     s.dayPeakDemand = 0;
     tickRegulator(s, rng);
+
+    const promoted = checkPromotion(s);
+    if (promoted) {
+      s.reputation = clamp(s.reputation + 5, 0, 100);
+      pushLog(s, `${s.companyName} is now a ${promoted.name}.`, 'good');
+      // Reaching the top rung is the win, but the game carries on afterwards.
+      if (isTopRank(s) && s.victoryAt === null) s.victoryAt = s.minutes;
+    }
     if (s.minutes > s.nextEventAt) startCityEvent(s, rng);
     if (s.minutes > s.nextGrowthAt) growCity(s, rng);
     s.researchPoints += Math.max(0, Math.round(residentialSubs(s) / 500));

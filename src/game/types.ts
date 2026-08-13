@@ -368,6 +368,10 @@ export interface GameState {
   demandHistory: number[];
   dayPeakDemand: number;
 
+  // Index into RANKS. The company ladder, and something to aim at.
+  rank: number;
+  victoryAt: number | null;
+
   regulations: Regulation[];
   nextRegulationAt: number;
 

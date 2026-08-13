@@ -1,5 +1,6 @@
 import {
   BASELINE_ARPU,
+  DATACENTER_HOSTING_BASE,
   FIBER_MAINTENANCE_PER_UNIT,
   NODE_SPECS,
   POWER_COST_PER_KW_MONTH,
@@ -14,6 +15,7 @@ export interface MonthlyBreakdown {
   revenueMobile: number;
   revenueBusiness: number;
   revenueEnterprise: number;
+  revenueHosting: number;
   costSalaries: number;
   costPower: number;
   costMaintenance: number;
@@ -53,7 +55,9 @@ export function monthlyBreakdown(state: GameState, mods: ResearchMods): MonthlyB
   const transit = TRANSIT_TIERS[state.transitTier];
   const costTransit = (transit.monthly + (state.backupTransit ? BACKUP_TRANSIT_MONTHLY : 0)) * mods.transitCostMul;
 
-  const totalRevenue = revenueResidential + revenueMobile + revenueBusiness + revenueEnterprise;
+  const revenueHosting = hostingRevenue(state);
+
+  const totalRevenue = revenueResidential + revenueMobile + revenueBusiness + revenueEnterprise + revenueHosting;
   const totalCost = costSalaries + costPower + costMaintenance + costTransit + state.marketingBudget;
 
   return {
@@ -61,6 +65,7 @@ export function monthlyBreakdown(state: GameState, mods: ResearchMods): MonthlyB
     revenueMobile,
     revenueBusiness,
     revenueEnterprise,
+    revenueHosting,
     costSalaries,
     costPower,
     costMaintenance,
@@ -97,6 +102,18 @@ export function averageSpeed(packages: Package[]) {
   const mix = packageMix(packages);
   if (!mix.length) return 100;
   return mix.reduce((s, m) => s + m.pkg.speedMbps * m.share, 0);
+}
+
+// What the data centres bring in. Business heavy districts pay better, so where
+// you put one matters.
+export function hostingRevenue(state: GameState) {
+  return state.nodes
+    .filter((n) => n.kind === 'datacenter' && !n.down)
+    .reduce((sum, n) => {
+      const district = state.districts.find((d) => d.id === n.districtId);
+      const demand = 0.7 + (district?.businessDensity ?? 0.3);
+      return sum + DATACENTER_HOSTING_BASE * (1 + (n.tier - 1) * 1.2) * demand;
+    }, 0);
 }
 
 // Below 1 means you are the cheap option against the market reference price.
