@@ -779,8 +779,12 @@ function tickIncidents(
   dt: number,
   rng: Rng,
 ) {
-  // Roughly one incident every few days, scaled by how much kit you own.
-  const exposure = 0.35 + s.nodes.length * 0.06 + s.links.length * 0.05;
+  // Roughly one incident every few days, scaled by how much kit you own. The
+  // curve flattens on purpose: a large operator has crews and spares standing
+  // by, so doubling the network must not double the outage rate, otherwise
+  // every build makes the next one harder to afford.
+  const kit = s.nodes.length + s.links.length * 0.8;
+  const exposure = (0.2 + Math.pow(Math.max(kit, 0), 0.58) * 0.165) * mods.incidentRateMul;
   // Worn equipment fails more often, which is what makes servicing worth doing.
   const avgHealth = s.nodes.length ? s.nodes.reduce((a, n) => a + n.health, 0) / s.nodes.length : 100;
   const condition = 1 + clamp((90 - avgHealth) / 60, 0, 1.2);

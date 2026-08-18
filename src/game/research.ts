@@ -153,6 +153,7 @@ export function researchModifiers(done: string[]) {
     maxTowerTier: done.includes('mobile_5g') ? 4 : 2,
     transitCostMul: (done.includes('backbone100g') ? 0.85 : 1) * (done.includes('edge_compute') ? 0.7 : 1),
     incidentDurationMul: done.includes('noc') ? 0.8 : 1,
+    incidentRateMul: (done.includes('noc') ? 0.85 : 1) * (done.includes('ai_ops') ? 0.75 : 1),
     ddosMul: done.includes('ddos_scrub') ? 0.5 : 1,
     lossImpactMul: done.includes('ai_ops') ? 0.75 : 1,
     mobileRevenueMul: done.includes('mobile_5g') ? 1.35 : 1,
