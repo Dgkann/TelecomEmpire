@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   BACKUP_TRANSIT_MONTHLY,
@@ -7,7 +8,7 @@ import {
   utilColor,
 } from '../../game/constants';
 import { fmtMoney, fmtNum, monthlyBreakdown } from '../../game/economy';
-import { daysUntilFull, forecastDemand, linkUtil, nodeUtil, servingCapacity } from '../../game/network';
+import { computeRoutes, daysUntilFull, forecastDemand, linkUtil, nodeUtil, servingCapacity } from '../../game/network';
 import { researchModifiers } from '../../game/research';
 import { cacheRatio, mobileSubs, residentialSubs } from '../../game/simulation';
 import { useGame } from '../../store/gameStore';
@@ -35,6 +36,16 @@ export default function NetworkScreen() {
   const setTransitTier = useGame((s) => s.setTransitTier);
   const toggleBackup = useGame((s) => s.toggleBackupTransit);
   const toggleAuto = useGame((s) => s.toggleAutoDispatch);
+
+  // Routing is a Dijkstra per core, so only redo it when the topology moves.
+  const topology = `${game.nodes.length}:${game.links.length}:${game.nodes.filter((n) => n.down).map((n) => n.id).join(',')}:${game.links.filter((l) => l.down).map((l) => l.id).join(',')}`;
+  const { routes, usedSpans } = useMemo(() => {
+    const r = computeRoutes(game);
+    const used = new Set<string>();
+    for (const info of Object.values(r)) for (const id of info.path) used.add(id);
+    return { routes: r, usedSpans: used };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topology]);
   const setScreen = useGame((s) => s.setScreen);
   const setOverlay = useGame((s) => s.setOverlay);
   const setTool = useGame((s) => s.setTool);
@@ -146,11 +157,14 @@ export default function NetworkScreen() {
 
         <div className="panel panel-tone-blue p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Fibre spans</h2>
+          <p className="mb-3 text-[11px] text-white/40">Traffic takes the shortest way to a core, so a spare span sits at zero until the one it backs up fails.</p>
           <div className="flex flex-col gap-2">
             {game.links.length === 0 && <p className="text-sm text-white/40">No fibre built yet.</p>}
             {game.links.map((l) => {
               const a = game.nodes.find((n) => n.id === l.aId);
               const b = game.nodes.find((n) => n.id === l.bId);
+              const stranded = !l.down && !routes[l.aId] && !routes[l.bId];
+              const standby = !l.down && !stranded && !usedSpans.has(l.id);
               return (
                 <button
                   key={l.id}
@@ -165,6 +179,8 @@ export default function NetworkScreen() {
                       {a?.name} <span className="text-white/30">↔</span> {b?.name}
                     </span>
                     {l.down && <span className="chip border-neon-red/40 text-[10px] text-neon-red">CUT</span>}
+                    {stranded && <span className="chip border-neon-red/40 text-[10px] text-neon-red" title="Neither end can reach a core right now">NO ROUTE</span>}
+                    {standby && <span className="chip border-white/20 text-[10px] text-white/50" title="Nothing routes over this span today. It is what keeps the district redundant.">STANDBY</span>}
                   </div>
                   <Meter
                     v={linkUtil(l)}
