@@ -762,6 +762,20 @@ group('automatic balancing earns its 900k');
 }
 
 
+group('a client is somewhere a client could be');
+{
+  let g = newGame(12345);
+  g = runDays(g, 200, (s) => {
+    let n = s;
+    for (const o of n.offers) n = { ...n, contracts: [...n.contracts, { ...o, downtimeMinutes: 0, penaltyPaid: 0, startedAt: n.minutes }] };
+    return { ...n, offers: [] };
+  });
+  const parks = g.contracts.filter((c) => g.buildings.find((b) => b.id === c.buildingId)?.kind === 'park');
+  check('no contract is sited in a park', parks.length === 0, `${parks.length} of ${g.contracts.length}`);
+  check('contracts are still being signed', g.contracts.length > 0, `${g.contracts.length}`);
+}
+
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);

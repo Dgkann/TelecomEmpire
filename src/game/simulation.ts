@@ -987,8 +987,9 @@ function makeOffer(s: GameState, mods: ResearchMods, rng: Rng) {
   if (!eligible.length) return null;
   const d = pick(rng, eligible);
   const wantEnterprise = mods.hasEnterprise && rng() < 0.4;
+  // Parks fall through segmentOf into 'business' and have nobody in them.
   const pool = s.buildings.filter(
-    (b) => b.districtId === d.id && (wantEnterprise ? b.segment === 'enterprise' : b.segment === 'business'),
+    (b) => b.districtId === d.id && b.kind !== 'park' && (wantEnterprise ? b.segment === 'enterprise' : b.segment === 'business'),
   );
   if (!pool.length) return null;
   const building = pick(rng, pool);

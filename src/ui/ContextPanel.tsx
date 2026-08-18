@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, linkCapacity, nodeCapacity, nodeUpgradeCost, towerCapacity, utilColor } from '../game/constants';
 import { fmtMoneyExact, fmtNum } from '../game/economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil } from '../game/network';
+import { contractRisk } from '../game/operations';
 import { researchModifiers } from '../game/research';
 import { residentialSubs } from '../game/simulation';
 import { useGame } from '../store/gameStore';
@@ -46,6 +47,9 @@ export default function ContextPanel() {
   const node = selection?.type === 'node' ? game.nodes.find((n) => n.id === selection.id) : undefined;
   const link = selection?.type === 'link' ? game.links.find((l) => l.id === selection.id) : undefined;
   const district = selection?.type === 'district' ? game.districts.find((d) => d.id === selection.id) : undefined;
+  const building = selection?.type === 'building' ? game.buildings.find((b) => b.id === selection.id) : undefined;
+  const buildingContract = building ? game.contracts.find((c) => c.buildingId === building.id) : undefined;
+  const buildingRisk = buildingContract ? contractRisk(game, buildingContract) : null;
   const nodeMaxTier = node
     ? node.kind === 'core'
       ? mods.maxCoreTier
@@ -208,6 +212,72 @@ export default function ContextPanel() {
                   Remove
                 </button>
               </div>
+            </div>
+          )}
+
+          {building && (
+            <div className="space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-white/40">
+                  {buildingContract ? 'Enterprise client' : 'Building'}
+                </div>
+                <div className="text-lg font-semibold leading-tight">
+                  {buildingContract?.clientName ?? game.districts.find((d) => d.id === building.districtId)?.name}
+                </div>
+                <div className="text-[11px] text-white/40">
+                  {game.districts.find((d) => d.id === building.districtId)?.name} · {building.kind}
+                </div>
+              </div>
+
+              {buildingContract && buildingRisk ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="chip">
+                      <div className="stat-label">Bandwidth</div>
+                      <div className="num">{buildingContract.bandwidthGbps} Gbps</div>
+                    </div>
+                    <div className="chip">
+                      <div className="stat-label">Monthly</div>
+                      <div className="num">{fmtMoneyExact(buildingContract.monthlyRevenue)}</div>
+                    </div>
+                    <div className="chip">
+                      <div className="stat-label">SLA</div>
+                      <div className="num">{buildingContract.slaPercent}%</div>
+                    </div>
+                    <div className="chip">
+                      <div className="stat-label">Penalties paid</div>
+                      <div className="num">{fmtMoneyExact(buildingContract.penaltyPaid)}</div>
+                    </div>
+                  </div>
+
+                  <Bar
+                    value={buildingRisk.usage}
+                    label="Downtime allowance used"
+                    right={`${Math.round(buildingContract.downtimeMinutes)} / ${Math.round(buildingRisk.allowance)} min`}
+                  />
+
+                  <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2.5 text-[11px] leading-snug text-white/55">
+                    {buildingRisk.districtOut
+                      ? 'This district is down right now, and the allowance is burning.'
+                      : buildingRisk.fragile
+                        ? 'Every path to this client runs through one span. A single cut breaches the SLA.'
+                        : buildingRisk.usage >= 1
+                          ? 'The allowance is spent. Further downtime is charged as a penalty.'
+                          : 'Service is within the agreed allowance.'}
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="chip">
+                    <div className="stat-label">Households</div>
+                    <div className="num">{fmtNum(building.households)}</div>
+                  </div>
+                  <div className="chip">
+                    <div className="stat-label">Connected</div>
+                    <div className="num">{Math.round(building.connected * 100)}%</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
