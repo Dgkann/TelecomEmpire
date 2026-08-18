@@ -1,6 +1,6 @@
 // Invariant checks, run headless. Exits non-zero on failure so CI can gate on it.
 // Run with: npm run check
-import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, SAVE_VERSION, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
+import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, TRANSIT_TIERS, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
 import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, servingCapacity } from '../src/game/network';
@@ -10,10 +10,11 @@ import { pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
 import { cacheRatio } from '../src/game/simulation';
 import { contractRisk, operationsInsights } from '../src/game/operations';
+import { repairCost } from '../src/game/incidents';
 import { hostingRevenue } from '../src/game/economy';
 import { clearSave, exportSave, importSave, listSaveMeta, loadGame, migrate, saveGame } from '../src/game/save';
 import { createNewGame, mobileSubs, residentialSubs, step, totalCustomers } from '../src/game/simulation';
-import type { GameState, NetLink, NetNode } from '../src/game/types';
+import type { GameState, Incident, NetLink, NetNode } from '../src/game/types';
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
@@ -648,6 +649,70 @@ group('a tower with no fibre behind it');
 }
 
 // ---------------------------------------------------------------------------
+
+group('growing the network is not self-defeating');
+{
+  // Repairs used to be billed off the clock, and the clock carried a
+  // network-size penalty, so every new site quietly raised the price of every
+  // future call-out. Parts must be priced off the fault alone.
+  const g = newGame(4242);
+  const fault: Incident = {
+    id: 'i1', kind: 'fiber_cut', title: 'Fibre Cut', description: '',
+    targetId: g.links[0].id, targetType: 'link', districtId: g.districts[0].id,
+    startedAt: 0, repairMinutesLeft: null, repairTotalMinutes: 400, repairBaseMinutes: 400,
+    assignedTechId: null, affected: 0, resolved: false, degrade: false,
+  };
+  const onABigNetwork: Incident = { ...fault, repairTotalMinutes: 720 };
+  check(
+    'a bigger network does not make the same fault dearer',
+    repairCost(fault, 'emergency') === repairCost(onABigNetwork, 'emergency'),
+    `${repairCost(fault, 'emergency')} vs ${repairCost(onABigNetwork, 'emergency')}`,
+  );
+  check(
+    'a scheduled repair still undercuts an emergency',
+    repairCost(fault, 'normal') * 2 < repairCost(fault, 'emergency'),
+    `${repairCost(fault, 'normal')} vs ${repairCost(fault, 'emergency')}`,
+  );
+  check(
+    'an emergency call-out costs less than the site it fixes',
+    repairCost(fault, 'emergency') < NODE_SPECS.pop.baseCost,
+    `${repairCost(fault, 'emergency')} vs ${NODE_SPECS.pop.baseCost}`,
+  );
+}
+
+group('upstream transit is a signposted wall, not a hidden one');
+{
+  // The one bottleneck the map cannot draw. Before it was flagged, a player
+  // watched every site read healthy while satisfaction fell city-wide.
+  let g = newGame(777);
+  g = runDays(g, 60, repairAll);
+  const cap = TRANSIT_TIERS[g.transitTier].capacity;
+  const saturated = { ...g, stats: { ...g.stats, demandGbps: cap * 1.4 }, demandHistory: [cap * 1.4] };
+  const warned = operationsInsights(saturated).find((i) => i.id === 'transit-headroom');
+  check('saturated transit reaches the priority list', Boolean(warned));
+  check('it is raised as critical', warned?.severity === 'critical', warned?.severity ?? 'missing');
+
+  const nearly = { ...g, stats: { ...g.stats, demandGbps: cap * 0.85 }, demandHistory: [cap * 0.85] };
+  check(
+    'the warning arrives before the wall, not on it',
+    Boolean(operationsInsights(nearly).find((i) => i.id === 'transit-headroom')),
+  );
+
+  const roomy = { ...g, stats: { ...g.stats, demandGbps: cap * 0.4 }, demandHistory: [cap * 0.4] };
+  check(
+    'headroom is not nagged about',
+    !operationsInsights(roomy).find((i) => i.id === 'transit-headroom'),
+  );
+
+  // The first step up used to treble the bill at the poorest moment.
+  const steps = TRANSIT_TIERS.map((t) => t.monthly);
+  check(
+    'no rung more than doubles the one below it until the top',
+    steps.slice(1, 3).every((m, k) => m <= steps[k] * 2.2),
+    steps.join(' / '),
+  );
+}
+
 
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
