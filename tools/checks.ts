@@ -1,6 +1,6 @@
 // Invariant checks, run headless. Exits non-zero on failure so CI can gate on it.
 // Run with: npm run check
-import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, TRANSIT_TIERS, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
+import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, SLA_PENALTY_CAP, TRANSIT_TIERS, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
 import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, loadNetwork, servingCapacity } from '../src/game/network';
@@ -773,6 +773,44 @@ group('a client is somewhere a client could be');
   const parks = g.contracts.filter((c) => g.buildings.find((b) => b.id === c.buildingId)?.kind === 'park');
   check('no contract is sited in a park', parks.length === 0, `${parks.length} of ${g.contracts.length}`);
   check('contracts are still being signed', g.contracts.length > 0, `${g.contracts.length}`);
+}
+
+
+group('an SLA breach cannot cost unbounded money');
+{
+  // A month of downtime used to be billed at 2% of the fee per hour with no
+  // ceiling, so one long outage could cost many times the contract's worth.
+  let g = newGame(4321);
+  g = runDays(g, 120, (s) => {
+    let n = s;
+    for (const o of n.offers) n = { ...n, contracts: [...n.contracts, { ...o, downtimeMinutes: 0, penaltyPaid: 0, startedAt: n.minutes }] };
+    return { ...n, offers: [] };
+  });
+  check('the run produced contracts to test', g.contracts.length > 0, `${g.contracts.length}`);
+
+  // The month boundary is wherever the sim resets the counter, so watch for that
+  // rather than guessing at a day number.
+  const paidAtMonthStart = new Map(g.contracts.map((c) => [c.id, c.penaltyPaid]));
+  const lastDowntime = new Map(g.contracts.map((c) => [c.id, c.downtimeMinutes]));
+  let worst = 0;
+  for (let step_ = 0; step_ < (MINUTES_PER_DAY / 5) * 120; step_++) {
+    g = step(g);
+    for (const c of g.contracts) {
+      const before = lastDowntime.get(c.id) ?? 0;
+      if (c.downtimeMinutes < before) {
+        const spent = c.penaltyPaid - (paidAtMonthStart.get(c.id) ?? 0);
+        worst = Math.max(worst, spent / c.monthlyRevenue);
+        paidAtMonthStart.set(c.id, c.penaltyPaid);
+      }
+      lastDowntime.set(c.id, c.downtimeMinutes);
+    }
+  }
+  check(
+    'no month bills more than the cap',
+    worst <= SLA_PENALTY_CAP + 1e-6,
+    `worst month ${worst.toFixed(2)}x, cap ${SLA_PENALTY_CAP}x`,
+  );
+  check('the cap is a real ceiling, not zero', SLA_PENALTY_CAP > 0);
 }
 
 

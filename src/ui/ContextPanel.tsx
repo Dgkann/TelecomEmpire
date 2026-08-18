@@ -3,11 +3,14 @@ import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, linkCapacity, nodeCapacity, no
 import { fmtMoneyExact, fmtNum } from '../game/economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil } from '../game/network';
 import { contractRisk } from '../game/operations';
+import { SLA_PENALTY_CAP } from '../game/constants';
 import { researchModifiers } from '../game/research';
 import { residentialSubs } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 import { useMemo } from 'react';
 import SiteIcon from './SiteIcon';
+
+const fmtMins = (m: number) => (m < 120 ? `${Math.round(m)} min` : `${Math.round(m / 60)}h`);
 
 function Bar({ value, label, right }: { value: number; label: string; right?: string }) {
   const pct = Math.min(1, value);
@@ -253,8 +256,12 @@ export default function ContextPanel() {
                   <Bar
                     value={buildingRisk.usage}
                     label="Downtime allowance used"
-                    right={`${Math.round(buildingContract.downtimeMinutes)} / ${Math.round(buildingRisk.allowance)} min`}
+                    right={`${fmtMins(buildingContract.downtimeMinutes)} / ${fmtMins(buildingRisk.allowance)}`}
                   />
+
+                  <div className="text-[10px] text-white/35">
+                    Penalties are capped at {fmtMoneyExact(buildingContract.monthlyRevenue * SLA_PENALTY_CAP)} a month.
+                  </div>
 
                   <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2.5 text-[11px] leading-snug text-white/55">
                     {buildingRisk.districtOut

@@ -6,6 +6,7 @@ import {
   MINUTES_PER_DAY,
   MINUTES_PER_MONTH,
   MINUTES_PER_STEP,
+  SLA_PENALTY_CAP,
   MOBILE_AVG_SPEED,
   MOBILE_MARKET_SHARE,
   DATACENTER_CACHE_CAP,
@@ -957,13 +958,15 @@ function tickContracts(
       if (!out) return c;
       const downtimeMinutes = c.downtimeMinutes + dt;
       const allowed = MINUTES_PER_MONTH * (1 - c.slaPercent / 100);
-      let penaltyPaid = c.penaltyPaid;
-      if (downtimeMinutes > allowed) {
-        const fee = c.monthlyRevenue * 0.02 * (dt / 60);
-        penalties += fee;
-        penaltyPaid += fee;
-      }
-      return { ...c, downtimeMinutes, penaltyPaid };
+      // Owed so far this month, capped, so a bad month cannot cost unbounded money.
+      const owed = (mins: number) =>
+        Math.min(
+          c.monthlyRevenue * SLA_PENALTY_CAP,
+          (Math.max(0, mins - allowed) / 60) * c.monthlyRevenue * 0.02,
+        );
+      const fee = owed(downtimeMinutes) - owed(c.downtimeMinutes);
+      penalties += fee;
+      return { ...c, downtimeMinutes, penaltyPaid: c.penaltyPaid + fee };
     });
     if (penalties > 0) {
       s.money -= penalties;

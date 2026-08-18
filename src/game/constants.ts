@@ -119,6 +119,8 @@ export const TRANSIT_TIERS = [
   { label: 'Global backbone', capacity: 700, monthly: 96000, reliability: 0.995 },
 ];
 export const BACKUP_TRANSIT_MONTHLY = 15000;
+// A month of breaches cannot cost more than this many months of the fee.
+export const SLA_PENALTY_CAP = 2;
 
 // Low bands reach far and carry little, high bands the reverse. That is the trade.
 export interface BandSpec {
