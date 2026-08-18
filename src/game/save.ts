@@ -101,6 +101,12 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
       repairBaseMinutes: i.repairBaseMinutes ?? i.repairTotalMinutes,
     })),
   }),
+  // A rung was inserted at index 1, so anything above it shifts up to keep the
+  // capacity a running save already paid for.
+  11: (s) => {
+    const tier = (s.transitTier as number) ?? 0;
+    return { ...s, transitTier: tier >= 1 ? tier + 1 : tier };
+  },
 };
 
 const DEFAULTS = {

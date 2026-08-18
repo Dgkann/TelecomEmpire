@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -113,6 +113,7 @@ export const BASELINE_ARPU = 34;
 
 export const TRANSIT_TIERS = [
   { label: 'Basic transit', capacity: 12, monthly: 3200, reliability: 0.9 },
+  { label: 'Metro peering', capacity: 26, monthly: 6200, reliability: 0.92 },
   { label: 'Dual-homed transit', capacity: 45, monthly: 11000, reliability: 0.95 },
   { label: 'Tier-1 blend', capacity: 160, monthly: 34000, reliability: 0.98 },
   { label: 'Global backbone', capacity: 700, monthly: 96000, reliability: 0.995 },
