@@ -374,7 +374,7 @@ export default function NetworkScreen() {
           </div>
         )}
 
-        <div className="panel panel-tone-blue p-5">
+        <div id="transit" className="panel panel-tone-blue scroll-mt-6 p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Upstream & automation</h2>
           <Meter
             v={transitUse}

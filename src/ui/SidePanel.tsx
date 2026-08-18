@@ -15,6 +15,18 @@ function Stars({ n }: { n: number }) {
   );
 }
 
+// The screen mounts after this runs, and scrollIntoView aims at the wrong place
+// until layout settles, so wait for a real offset and move the shell itself.
+function scrollToAnchor(id: string, tries = 40) {
+  const el = document.getElementById(id);
+  const shell = el?.closest('.screen-shell') as HTMLElement | null;
+  if (el && shell && el.offsetTop > 0) {
+    shell.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
+    return;
+  }
+  if (tries > 0) requestAnimationFrame(() => scrollToAnchor(id, tries - 1));
+}
+
 export default function SidePanel() {
   const game = useGame((s) => s.game)!;
   const openIncident = useGame((s) => s.openIncident);
@@ -65,7 +77,14 @@ export default function SidePanel() {
                   key={item.id}
                   className="group rounded-lg border border-white/[0.08] bg-white/[0.035] p-2.5 text-left transition-colors hover:bg-white/[0.075]"
                   onClick={() => {
-                    if (item.target.type === 'screen') return setScreen(item.target.id);
+                    if (item.target.type === 'screen') {
+                      const { id, anchor } = item.target;
+                      setScreen(id);
+                      // The target screen has not mounted yet, so wait for the
+                      // anchor to exist rather than looking once and giving up.
+                      if (anchor) scrollToAnchor(anchor);
+                      return;
+                    }
                     focus(item.target.gx, item.target.gy);
                     select({ type: item.target.type, id: item.target.id });
                     if (item.id.startsWith('incident-')) openIncident(item.id.slice('incident-'.length));

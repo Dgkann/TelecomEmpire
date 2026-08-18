@@ -12,7 +12,7 @@ export interface OperationsInsight {
   action: string;
   target:
     | { type: 'node' | 'link' | 'district' | 'building'; id: string; gx: number; gy: number }
-    | { type: 'screen'; id: 'network' | 'company' };
+    | { type: 'screen'; id: 'network' | 'company'; anchor?: string };
 }
 
 export function contractRisk(state: GameState, contract: EnterpriseContract) {
@@ -85,7 +85,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
         ? `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps upstream. More sites will not help, only transit.`
         : `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps used. ${nextTransit.label} carries ${nextTransit.capacity} Gbps.`,
       action: 'Open transit',
-      target: { type: 'screen', id: 'network' },
+      target: { type: 'screen', id: 'network', anchor: 'transit' },
     });
   }
 
