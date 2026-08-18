@@ -345,7 +345,12 @@ export function step(prev: GameState): GameState {
 
   const transit = TRANSIT_TIERS[s.transitTier];
   const transitCap = transit.capacity * (s.backupTransit ? 1.35 : 1);
-  const transitPressure = load.totalDemand / Math.max(0.01, transitCap);
+  const transitRaw = load.totalDemand / Math.max(0.01, transitCap);
+  // Running out of upstream is meant to bite, but it is the one pressure no
+  // amount of local building can relieve, and it lands on every district at
+  // once. Past the line it is eased rather than applied raw, so a player who is
+  // slightly oversubscribed has time to notice and buy their way out.
+  const transitPressure = transitRaw <= 1 ? transitRaw : 1 + (transitRaw - 1) * 0.45;
 
   s.nodes = s.nodes.map((n) => {
     const traffic = load.nodeTraffic[n.id] ?? 0;

@@ -1,3 +1,4 @@
+import { TRANSIT_TIERS } from './constants';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil } from './network';
 import type { EnterpriseContract, GameState } from './types';
 
@@ -65,6 +66,27 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       detail: `${isLink ? 'Fibre span' : hottestNode?.name ?? 'Site'} is the current network bottleneck.`,
       action: 'Inspect bottleneck',
       target: { type: isLink ? 'link' : 'node', id: item!.id, gx: anchor?.gx ?? 0, gy: anchor?.gy ?? 0 },
+    });
+  }
+
+  // Upstream capacity is the one bottleneck the map cannot show, because it
+  // sits off the edge of the city. Left unflagged, a player watches every site
+  // read healthy while satisfaction falls everywhere at once.
+  const transitCap = TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1);
+  const peak = Math.max(state.stats.demandGbps, ...state.demandHistory.slice(-7));
+  const transitUse = peak / Math.max(0.01, transitCap);
+  const nextTransit = TRANSIT_TIERS[state.transitTier + 1];
+  if (transitUse >= 0.75 && nextTransit) {
+    const over = transitUse >= 1;
+    insights.push({
+      id: 'transit-headroom',
+      severity: over ? 'critical' : 'warning',
+      title: over ? 'Upstream transit is saturated' : `Transit at ${Math.round(transitUse * 100)}% of capacity`,
+      detail: over
+        ? `Peak demand is ${peak.toFixed(1)} Gbps against ${transitCap.toFixed(0)} Gbps upstream. Every district is losing satisfaction, and no site upgrade can fix it.`
+        : `Peak demand is ${peak.toFixed(1)} Gbps of ${transitCap.toFixed(0)} Gbps. ${nextTransit.label} carries ${nextTransit.capacity} Gbps.`,
+      action: 'Open transit',
+      target: { type: 'screen', id: 'network' },
     });
   }
 
