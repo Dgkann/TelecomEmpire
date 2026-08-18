@@ -92,8 +92,7 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
 
   // 9 -> 10: lightweight NOC telemetry powers the daily load timeline.
   9: (s) => ({ ...s, telemetry: s.telemetry ?? [] }),
-  // Repairs used to be billed off the scaled clock. Faults already in flight
-  // get their unscaled size back so they are not overcharged.
+  // Faults in flight get their unscaled size back.
   10: (s) => ({
     ...s,
     incidents: ((s.incidents ?? []) as any[]).map((i: any) => ({
@@ -101,8 +100,7 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
       repairBaseMinutes: i.repairBaseMinutes ?? i.repairTotalMinutes,
     })),
   }),
-  // A rung was inserted at index 1, so anything above it shifts up to keep the
-  // capacity a running save already paid for.
+  // A rung was inserted at index 1, so anything above it shifts up.
   11: (s) => {
     const tier = (s.transitTier as number) ?? 0;
     return { ...s, transitTier: tier >= 1 ? tier + 1 : tier };

@@ -107,8 +107,7 @@ for (let day = 0; day < DAYS; day++) {
     }
   }
   g.offers = [];
-  // 4. buy upstream when the game says so. Without this the tool measured a
-  //    player pinned behind the transit wall rather than the game itself.
+  // 4. buy upstream when the game says so
   if (operationsInsights(g).some((i) => i.id === 'transit-headroom') && g.transitTier < TRANSIT_TIERS.length - 1) {
     g.transitTier += 1;
   }

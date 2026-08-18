@@ -69,9 +69,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
     });
   }
 
-  // Upstream capacity is the one bottleneck the map cannot show, because it
-  // sits off the edge of the city. Left unflagged, a player watches every site
-  // read healthy while satisfaction falls everywhere at once.
+  // The one bottleneck the map cannot draw.
   const transitCap = TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1);
   const peak = Math.max(state.stats.demandGbps, ...state.demandHistory.slice(-7));
   const transitUse = peak / Math.max(0.01, transitCap);
@@ -82,9 +80,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       id: 'transit-headroom',
       severity: over ? 'critical' : 'warning',
       title: over ? 'Upstream transit is saturated' : `Transit at ${Math.round(transitUse * 100)}% of capacity`,
-      // The panel clamps this to two lines, so both readings have to land
-      // inside it. The saturated one leads with the counterintuitive part,
-      // because that is the sentence a player needs and would lose first.
+      // The panel clamps this to two lines, so both readings must fit.
       detail: over
         ? `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps upstream. More sites will not help, only transit.`
         : `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps used. ${nextTransit.label} carries ${nextTransit.capacity} Gbps.`,

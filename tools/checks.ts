@@ -652,9 +652,7 @@ group('a tower with no fibre behind it');
 
 group('growing the network is not self-defeating');
 {
-  // Repairs used to be billed off the clock, and the clock carried a
-  // network-size penalty, so every new site quietly raised the price of every
-  // future call-out. Parts must be priced off the fault alone.
+  // A new site must not raise the price of every future call-out.
   const g = newGame(4242);
   const fault: Incident = {
     id: 'i1', kind: 'fiber_cut', title: 'Fibre Cut', description: '',
@@ -682,8 +680,6 @@ group('growing the network is not self-defeating');
 
 group('upstream transit is a signposted wall, not a hidden one');
 {
-  // The one bottleneck the map cannot draw. Before it was flagged, a player
-  // watched every site read healthy while satisfaction fell city-wide.
   let g = newGame(777);
   g = runDays(g, 60, repairAll);
   const cap = TRANSIT_TIERS[g.transitTier].capacity;
@@ -704,9 +700,7 @@ group('upstream transit is a signposted wall, not a hidden one');
     !operationsInsights(roomy).find((i) => i.id === 'transit-headroom'),
   );
 
-  // The panel clamps an insight's detail to two lines. Layout cannot be
-  // measured headlessly, so guard the input instead: both readings were checked
-  // in the browser at this length and a longer one lost its last sentence.
+  // Layout cannot be measured headlessly, so guard the input length instead.
   const detail = (d: number) => {
     const st = { ...g, transitTier: 0, stats: { ...g.stats, demandGbps: d }, demandHistory: [d] };
     return operationsInsights(st).find((i) => i.id === 'transit-headroom')?.detail ?? '';
@@ -726,8 +720,7 @@ group('upstream transit is a signposted wall, not a hidden one');
 
 group('automatic balancing earns its 900k');
 {
-  // ai_ops promised auto capacity balancing and set a flag nobody read. It now
-  // shares a district by what each node can actually deliver end to end.
+  // ai_ops set a flag nobody read.
   let g = newGame(999);
   const core = g.nodes.find((n) => n.kind === 'core')!;
   const home = g.districts[0];
@@ -757,7 +750,6 @@ group('automatic balancing earns its 900k');
   );
   check('the research actually sets the flag', researchModifiers(['ai_ops']).hasAutoBalance);
 
-  // An even network has nothing to rebalance, so nothing should change there.
   let e = newGame(999);
   e = { ...e, nodes: [core, pop('a', 2), pop('b', -2)], links: [span('la', 'a', 10), span('lb', 'b', 10)] };
   const er = computeRoutes(e);

@@ -113,10 +113,7 @@ export function loadNetwork(
   state: GameState,
   districtDemand: Record<string, number>,
   routes: Record<string, RouteInfo>,
-  // Automatic balancing shares a district's traffic by what each serving node
-  // can actually deliver end to end, rather than by the size of the box alone.
-  // A large POP sitting behind a thin span is not a large POP, and without this
-  // the network keeps pushing traffic at it.
+  // Share by what each node delivers end to end, not by the size of the box.
   autoBalance = false,
 ): LoadResult {
   const nodeTraffic: Record<string, number> = {};
@@ -153,8 +150,6 @@ export function loadNetwork(
       continue;
     }
 
-    // Weight is never above the node's own capacity, so with balancing off, or
-    // where the path is wider than the node, this is the old behaviour exactly.
     const weightOf = (n: NetNode) => {
       if (!autoBalance) return n.capacityGbps;
       const route = routes[n.id];

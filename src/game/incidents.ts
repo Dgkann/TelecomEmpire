@@ -199,9 +199,7 @@ export interface RepairOption {
   note: string;
 }
 
-// What a call-out costs. Priced off the fault itself, not off the clock: a big
-// network takes longer to reach a fault, but the parts do not get dearer, and
-// billing the size penalty twice made repairs the largest outgoing in the game.
+// Priced off the fault, not the clock - the size penalty is time, not parts.
 export function repairCost(incident: Incident, mode: RepairMode) {
   const base = incident.repairBaseMinutes ?? incident.repairTotalMinutes;
   const raw = mode === 'emergency' ? 800 + base * 9 : 200 + base * 2.2;

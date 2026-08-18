@@ -346,10 +346,7 @@ export function step(prev: GameState): GameState {
   const transit = TRANSIT_TIERS[s.transitTier];
   const transitCap = transit.capacity * (s.backupTransit ? 1.35 : 1);
   const transitRaw = load.totalDemand / Math.max(0.01, transitCap);
-  // Running out of upstream is meant to bite, but it is the one pressure no
-  // amount of local building can relieve, and it lands on every district at
-  // once. Past the line it is eased rather than applied raw, so a player who is
-  // slightly oversubscribed has time to notice and buy their way out.
+  // Eased past the line - no local build relieves it, and it hits every district.
   const transitPressure = transitRaw <= 1 ? transitRaw : 1 + (transitRaw - 1) * 0.45;
 
   s.nodes = s.nodes.map((n) => {
@@ -784,10 +781,7 @@ function tickIncidents(
   dt: number,
   rng: Rng,
 ) {
-  // Roughly one incident every few days, scaled by how much kit you own. The
-  // curve flattens on purpose: a large operator has crews and spares standing
-  // by, so doubling the network must not double the outage rate, otherwise
-  // every build makes the next one harder to afford.
+  // Roughly one incident every few days, flattened so growth is not self-punishing.
   const kit = s.nodes.length + s.links.length * 0.8;
   const exposure = (0.2 + Math.pow(Math.max(kit, 0), 0.58) * 0.165) * mods.incidentRateMul;
   // Worn equipment fails more often, which is what makes servicing worth doing.
@@ -803,7 +797,6 @@ function tickIncidents(
       // A fault on a large network takes longer to find and reach.
       const scale = 1 + Math.min(0.8, s.nodes.length / 30);
       inc.repairTotalMinutes = Math.round(inc.repairTotalMinutes * scale);
-      // repairBaseMinutes deliberately keeps the unscaled figure, see repairCost.
       s.incidents = [...s.incidents, inc];
       applyIncidentDown(s, inc, true);
       pushLog(s, `${inc.title} in ${s.districts.find((d) => d.id === inc.districtId)?.name ?? 'network'}`, 'bad');
