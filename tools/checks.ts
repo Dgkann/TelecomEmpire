@@ -3,7 +3,7 @@
 import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, SLA_PENALTY_CAP, TRANSIT_TIERS, linkCapacity, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
-import { computeRoutes, daysUntilFull, districtIsRedundant, forecastDemand, isRedundant, loadNetwork, servingCapacity } from '../src/game/network';
+import { computeRoutes, daysUntilFull, districtIsRedundant, districtRedundancy, forecastDemand, isRedundant, loadNetwork, servingCapacity } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
 import { pendingRegulations, regulationProgress } from '../src/game/regulator';
@@ -903,6 +903,32 @@ group('pricing is a lever the game points at');
 
   const high = operationsInsights(priced(rivalsAt(0.8), 60)).find((i) => i.id === 'pricing-high');
   check('it sends you to the pricing panel', high?.target.type === 'screen' && high.target.anchor === 'pricing');
+}
+
+
+group('redundancy progress is visible before it is complete');
+{
+  // Covering four of five sites used to look identical to covering none.
+  let g = newGame(12345);
+  g = runDays(g, 40, repairAll);
+  g = { ...g, nodes: g.nodes.map((n) => ({ ...n, down: false })), links: g.links.map((l) => ({ ...l, down: false })) };
+  const home = g.districts[0];
+  const core = g.nodes.find((n) => n.kind === 'core')!;
+  const before = districtRedundancy(g, home.id);
+  check('a chain starts with nothing covered', before.done === 0 && before.total > 0, JSON.stringify(before));
+
+  const serving = g.nodes.filter((n) => n.districtId === home.id && n.kind !== 'core');
+  const one = {
+    ...g,
+    links: [...g.links, {
+      id: 'alt1', aId: serving[0].id, bId: core.id, capacityGbps: linkCapacity(1),
+      trafficGbps: 0, down: false, tier: 1, length: 4, builtAt: 0,
+    }],
+  };
+  const after = districtRedundancy(one, home.id);
+  check('one span moves the count', after.done > before.done, `${before.done} -> ${after.done}`);
+  check('but does not finish it on its own', !after.complete || after.total === 1, JSON.stringify(after));
+  check('the boolean still agrees with the count', districtIsRedundant(one, home.id) === after.complete);
 }
 
 

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { fmtMoney } from '../game/economy';
 import { researchModifiers } from '../game/research';
-import { districtIsRedundant } from '../game/network';
+import { districtRedundancy } from '../game/network';
 import { operationsInsights } from '../game/operations';
 import { pendingRegulations, regulationProgress } from '../game/regulator';
 import { fmtClock, incidentLocation } from '../game/simulation';
@@ -42,12 +42,12 @@ export default function SidePanel() {
   // only recheck when the topology or the offers on the table actually change.
   const topology = `${game.nodes.length}:${game.links.length}:${game.nodes.filter((n) => n.down).map((n) => n.id).join(',')}:${game.links.filter((l) => l.down).map((l) => l.id).join(',')}`;
   const offerKey = game.offers.map((o) => o.id).join(',');
-  const redundantDistricts = useMemo(() => {
-    const ids = new Set<string>();
+  const redundancyBy = useMemo(() => {
+    const map = new Map<string, { done: number; total: number; complete: boolean }>();
     for (const o of game.offers) {
-      if (o.requiresRedundancy && districtIsRedundant(game, o.districtId)) ids.add(o.districtId);
+      if (o.requiresRedundancy && !map.has(o.districtId)) map.set(o.districtId, districtRedundancy(game, o.districtId));
     }
-    return ids;
+    return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topology, offerKey]);
 
@@ -206,7 +206,8 @@ export default function SidePanel() {
       <AnimatePresence>
         {game.offers.slice(0, 2).map((o) => {
           const d = game.districts.find((x) => x.id === o.districtId);
-          const ready = !o.requiresRedundancy || redundantDistricts.has(o.districtId);
+          const cover = redundancyBy.get(o.districtId);
+          const ready = !o.requiresRedundancy || !!cover?.complete;
           return (
             <motion.div
               key={o.id}
@@ -233,7 +234,7 @@ export default function SidePanel() {
                 <div className={`mt-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${ready ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}>
                   {ready
                     ? 'Second path in place, this client will sign.'
-                    : `Needs a second fibre path into ${d?.name}.`}
+                    : `Every site in ${d?.name} needs a second path: ${cover?.done ?? 0} of ${cover?.total ?? 0} covered.`}
                 </div>
               )}
               <div className="mt-2 flex gap-2">

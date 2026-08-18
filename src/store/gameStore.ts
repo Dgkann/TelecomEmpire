@@ -9,7 +9,7 @@ import {
   nodeUpgradeCost,
   towerCapacity,
 } from '../game/constants';
-import { districtIsRedundant } from '../game/network';
+import { districtRedundancy } from '../game/network';
 import { repairCost, type RepairMode } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
 import { clearSave, loadGame, saveGame } from '../game/save';
@@ -487,9 +487,10 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const offer = g.offers.find((o) => o.id === id);
     if (!offer) return;
-    if (offer.requiresRedundancy && !districtIsRedundant(g, offer.districtId)) {
+    const cover = offer.requiresRedundancy ? districtRedundancy(g, offer.districtId) : null;
+    if (cover && !cover.complete) {
       const name = g.districts.find((d) => d.id === offer.districtId)?.name ?? 'that district';
-      s.toast(`${offer.clientName} needs a second path into ${name}.`, 'bad');
+      s.toast(`${name}: ${cover.done} of ${cover.total} sites have a second path.`, 'bad');
       return;
     }
     withGame(set, (draft) => {

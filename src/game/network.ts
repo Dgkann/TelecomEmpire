@@ -90,11 +90,17 @@ export function isRedundant(state: GameState, nodeId: string, routes: Record<str
   return true;
 }
 
-// True when every site serving the district survives losing any single span.
-export function districtIsRedundant(state: GameState, districtId: string): boolean {
+// How many of the district's sites survive losing any single span. Reported as
+// a count because the all-or-nothing answer hides the progress you paid for.
+export function districtRedundancy(state: GameState, districtId: string) {
   const routes = computeRoutes(state);
   const serving = servingNodes(state, districtId).filter((n) => routes[n.id]);
-  return serving.length > 0 && serving.every((n) => isRedundant(state, n.id, routes));
+  const done = serving.filter((n) => isRedundant(state, n.id, routes)).length;
+  return { done, total: serving.length, complete: serving.length > 0 && done === serving.length };
+}
+
+export function districtIsRedundant(state: GameState, districtId: string): boolean {
+  return districtRedundancy(state, districtId).complete;
 }
 
 export function servingNodes(state: GameState, districtId: string): NetNode[] {
