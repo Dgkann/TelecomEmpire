@@ -879,6 +879,33 @@ group('a second path is worth building');
 }
 
 
+group('pricing is a lever the game points at');
+{
+  let g = newGame(8080);
+  g = runDays(g, 45, repairAll);
+  const rivalsAt = (index: number) => ({ ...g, competitors: g.competitors.map((c) => ({ ...c, priceIndex: index })) });
+  const priced = (s: GameState, price: number) => ({ ...s, packages: s.packages.map((p) => (p.segment === 'residential' ? { ...p, price } : p)) });
+  const idOf = (s: GameState) => operationsInsights(s).map((i) => i.id);
+
+  check('being well above the market is raised', idOf(priced(rivalsAt(0.8), 60)).includes('pricing-high'));
+  check('being well under it is raised', idOf(priced(rivalsAt(1.2), 18)).includes('pricing-low'));
+
+  const matched = priced(rivalsAt(1), 34);
+  check(
+    'sitting at the market is left alone',
+    !idOf(matched).some((id) => id.startsWith('pricing-')),
+    idOf(matched).join(','),
+  );
+
+  // Undercutting a full network is not an opportunity, it is a problem.
+  const busy = { ...priced(rivalsAt(1.2), 18), stats: { ...g.stats, demandGbps: 999 } };
+  check('cheap is not suggested when the network is full', !idOf(busy).includes('pricing-low'));
+
+  const high = operationsInsights(priced(rivalsAt(0.8), 60)).find((i) => i.id === 'pricing-high');
+  check('it sends you to the pricing panel', high?.target.type === 'screen' && high.target.anchor === 'pricing');
+}
+
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);

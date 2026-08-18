@@ -171,7 +171,7 @@ export default function CompanyScreen() {
           )}
         </div>
 
-        <div className="panel panel-tone-blue p-5 lg:col-span-2">
+        <div id="pricing" className="panel panel-tone-blue scroll-mt-6 p-5 lg:col-span-2">
           <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Internet packages</h2>
           <p className="mb-4 text-[11px] text-white/40">
             Cheap gigabit wins customers fast, and fills your network just as fast.

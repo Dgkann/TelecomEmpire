@@ -1,5 +1,6 @@
-import { TRANSIT_TIERS } from './constants';
-import { computeRoutes, isRedundant, linkUtil, nodeUtil } from './network';
+import { BASELINE_ARPU, TRANSIT_TIERS } from './constants';
+import { priceIndex } from './economy';
+import { computeRoutes, isRedundant, linkUtil, nodeUtil, servingCapacity } from './network';
 import type { EnterpriseContract, GameState } from './types';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity';
@@ -14,6 +15,9 @@ export interface OperationsInsight {
     | { type: 'node' | 'link' | 'district' | 'building'; id: string; gx: number; gy: number }
     | { type: 'screen'; id: 'network' | 'company'; anchor?: string };
 }
+
+// Shown as a price relative to the market reference, which reads better than an index.
+const fmtIndex = (i: number) => `$${Math.round(i * BASELINE_ARPU)}`;
 
 export function contractRisk(state: GameState, contract: EnterpriseContract) {
   const allowance = Math.max(1, 43200 * (1 - contract.slaPercent / 100));
@@ -87,6 +91,35 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       action: 'Open transit',
       target: { type: 'screen', id: 'network', anchor: 'transit' },
     });
+  }
+
+  // Price moves the rivals' pull as hard as coverage does, but nothing ever
+  // suggested touching it, so most operators never did.
+  const rivals = state.competitors;
+  if (rivals.length) {
+    const mine = priceIndex(state);
+    const market = rivals.reduce((sum, c) => sum + c.priceIndex, 0) / rivals.length;
+    const gap = mine / Math.max(0.01, market);
+    const load = state.stats.demandGbps / Math.max(0.01, servingCapacity(state.nodes));
+    if (gap > 1.18) {
+      insights.push({
+        id: 'pricing-high',
+        severity: 'warning',
+        title: `You are ${Math.round((gap - 1) * 100)}% above the market`,
+        detail: `Rivals average ${fmtIndex(market)} against your ${fmtIndex(mine)}. Every switcher weighs that.`,
+        action: 'Review pricing',
+        target: { type: 'screen', id: 'company', anchor: 'pricing' },
+      });
+    } else if (gap < 0.88 && load < 0.6) {
+      insights.push({
+        id: 'pricing-low',
+        severity: 'opportunity',
+        title: 'You are the cheapest operator in town',
+        detail: `Rivals average ${fmtIndex(market)} against your ${fmtIndex(mine)}, and the network is ${Math.round(load * 100)}% full.`,
+        action: 'Review pricing',
+        target: { type: 'screen', id: 'company', anchor: 'pricing' },
+      });
+    }
   }
 
   const risky = state.contracts
