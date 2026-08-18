@@ -1038,6 +1038,25 @@ function tickAuction(s: GameState, rng: Rng) {
   s.auction = settled;
   const result = settled.result!;
 
+  // The bid was sealed days ago and the cash behind it may have been spent
+  // since. Defaulting costs the lot and some standing, not a silent bankruptcy.
+  if (result.winnerId === 'player' && result.price > s.money) {
+    const next = result.bids.find((b) => b.bidderId !== 'player');
+    s.auction = {
+      ...settled,
+      result: next
+        ? { ...result, winnerId: next.bidderId, winnerName: next.bidderName, price: next.amount }
+        : { ...result, winnerId: 'none', winnerName: 'Nobody', price: 0 },
+    };
+    pushLog(
+      s,
+      `You could not cover your $${result.price.toLocaleString()} bid for ${SPECTRUM_BANDS[settled.band].label}. The lot went elsewhere.`,
+      'bad',
+    );
+    s.reputation = clamp(s.reputation - 4, 0, 100);
+    return;
+  }
+
   if (result.winnerId === 'player') {
     s.money -= result.price;
     const existing = s.spectrum.find((h) => h.band === settled.band);

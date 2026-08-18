@@ -814,6 +814,33 @@ group('an SLA breach cannot cost unbounded money');
 }
 
 
+group('a sealed bid you can no longer cover');
+{
+  // The bid is sealed days before it settles, so the cash behind it can be gone.
+  let g = newGame(2468);
+  g = runDays(g, 30, repairAll);
+  g = {
+    ...g,
+    researchDone: ['ftth', 'fiber10g', 'mobile_4g'],
+    // Far above anything a rival can raise, so the player is certainly top bid
+    // and the test cannot pass simply by losing the lot on merit.
+    auction: {
+      id: 'a1', band: '700', blocks: 2, reserve: 50000, closesAt: g.minutes + 60,
+      playerBid: 5000000, result: null,
+    },
+    money: 120000,
+  };
+  const before = g.money;
+  g = runDays(g, 2, repairAll);
+  const bids = g.auction?.result?.bids ?? [];
+  check('the player really was the top bid', bids[0]?.bidderId === 'player', JSON.stringify(bids.map((b) => b.bidderId)));
+  check('the lot is not awarded to them', g.auction?.result?.winnerId !== 'player', `${g.auction?.result?.winnerId}`);
+  check('they are not charged for it', g.money > before - 50000, `${Math.round(before)} -> ${Math.round(g.money)}`);
+  check('they do not receive the spectrum', !g.spectrum.some((h) => h.band === '700'), JSON.stringify(g.spectrum));
+  check('the default is not silent', g.log.some((l) => /could not cover/i.test(l.text)));
+}
+
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);

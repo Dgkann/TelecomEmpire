@@ -613,6 +613,10 @@ export const useGame = create<Store>((set, get) => ({
       s.toast('That is below the reserve price.', 'bad');
       return;
     }
+    if (amount > g.money) {
+      s.toast('You cannot bid more than you hold.', 'bad');
+      return;
+    }
     // Bids are sealed. Nothing is charged unless you win.
     withGame(set, (draft) => {
       if (draft.auction) draft.auction = { ...draft.auction, playerBid: amount };
