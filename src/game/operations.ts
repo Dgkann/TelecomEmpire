@@ -82,9 +82,12 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       id: 'transit-headroom',
       severity: over ? 'critical' : 'warning',
       title: over ? 'Upstream transit is saturated' : `Transit at ${Math.round(transitUse * 100)}% of capacity`,
+      // The panel clamps this to two lines, so both readings have to land
+      // inside it. The saturated one leads with the counterintuitive part,
+      // because that is the sentence a player needs and would lose first.
       detail: over
-        ? `Peak demand is ${peak.toFixed(1)} Gbps against ${transitCap.toFixed(0)} Gbps upstream. Every district is losing satisfaction, and no site upgrade can fix it.`
-        : `Peak demand is ${peak.toFixed(1)} Gbps of ${transitCap.toFixed(0)} Gbps. ${nextTransit.label} carries ${nextTransit.capacity} Gbps.`,
+        ? `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps upstream. More sites will not help, only transit.`
+        : `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps used. ${nextTransit.label} carries ${nextTransit.capacity} Gbps.`,
       action: 'Open transit',
       target: { type: 'screen', id: 'network' },
     });

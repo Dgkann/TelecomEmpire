@@ -704,6 +704,16 @@ group('upstream transit is a signposted wall, not a hidden one');
     !operationsInsights(roomy).find((i) => i.id === 'transit-headroom'),
   );
 
+  // The panel clamps an insight's detail to two lines. Layout cannot be
+  // measured headlessly, so guard the input instead: both readings were checked
+  // in the browser at this length and a longer one lost its last sentence.
+  const detail = (d: number) => {
+    const st = { ...g, transitTier: 0, stats: { ...g.stats, demandGbps: d }, demandHistory: [d] };
+    return operationsInsights(st).find((i) => i.id === 'transit-headroom')?.detail ?? '';
+  };
+  check('the saturated wording fits the panel', detail(cap * 1.4).length <= 70, `${detail(cap * 1.4).length} chars`);
+  check('the warning wording fits the panel', detail(cap * 0.85).length <= 70, `${detail(cap * 0.85).length} chars`);
+
   // The first step up used to treble the bill at the poorest moment.
   const steps = TRANSIT_TIERS.map((t) => t.monthly);
   check(
