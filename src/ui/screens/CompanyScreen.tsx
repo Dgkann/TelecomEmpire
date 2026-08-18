@@ -93,7 +93,7 @@ export default function CompanyScreen() {
               </div>
             </div>
             <div>
-              <div className="stat-label">Customers</div>
+              <div className="stat-label">Fixed lines</div>
               <div className="num text-2xl font-semibold">{fmtNum(subs)}</div>
             </div>
             <div>

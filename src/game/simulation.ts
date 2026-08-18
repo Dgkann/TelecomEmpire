@@ -24,7 +24,7 @@ import { createAuction, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
 import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
-import { checkPromotion, isTopRank } from './progression';
+import { checkPromotion, customerCount, isTopRank } from './progression';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
@@ -288,9 +288,8 @@ export function residentialSubs(state: GameState, districtId?: string) {
   );
 }
 
-export function totalCustomers(state: GameState) {
-  return Math.round(residentialSubs(state)) + Math.round(mobileSubs(state)) + state.contracts.length;
-}
+// One definition, shared with the rank ladder, so the two cannot drift apart.
+export const totalCustomers = (state: GameState) => Math.round(customerCount(state));
 
 // Keeps package subscriber counts consistent with what the map actually shows.
 export function redistributePackages(state: GameState) {
