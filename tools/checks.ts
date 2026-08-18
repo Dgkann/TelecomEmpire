@@ -1,9 +1,9 @@
 // Invariant checks, run headless. Exits non-zero on failure so CI can gate on it.
 // Run with: npm run check
-import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, SLA_PENALTY_CAP, TRANSIT_TIERS, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
+import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, SLA_PENALTY_CAP, TRANSIT_TIERS, linkCapacity, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
-import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, loadNetwork, servingCapacity } from '../src/game/network';
+import { computeRoutes, daysUntilFull, districtIsRedundant, forecastDemand, isRedundant, loadNetwork, servingCapacity } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
 import { pendingRegulations, regulationProgress } from '../src/game/regulator';
@@ -838,6 +838,44 @@ group('a sealed bid you can no longer cover');
   check('they are not charged for it', g.money > before - 50000, `${Math.round(before)} -> ${Math.round(g.money)}`);
   check('they do not receive the spectrum', !g.spectrum.some((h) => h.band === '700'), JSON.stringify(g.spectrum));
   check('the default is not silent', g.log.some((l) => /could not cover/i.test(l.text)));
+}
+
+
+group('a second path is worth building');
+{
+  // Redundancy used to cost money and buy nothing. The best clients now insist.
+  let g = newGame(31337);
+  g = runDays(g, 60, repairAll);
+  const home = g.districts[0];
+  check('a chain network is not redundant', !districtIsRedundant(g, home.id));
+
+  // Close the loop: every serving site gets a second way back to the core.
+  const core = g.nodes.find((n) => n.kind === 'core')!;
+  const serving = g.nodes.filter((n) => n.districtId === home.id && n.kind !== 'core');
+  // A genuine second span for every serving site, parallel to whatever it has.
+  const looped = {
+    ...g,
+    links: [
+      ...g.links,
+      ...serving.map((n) => ({
+        id: `loop-${n.id}`, aId: n.id, bId: core.id, capacityGbps: linkCapacity(2),
+        trafficGbps: 0, down: false, tier: 2, length: 3, builtAt: 0,
+      })),
+    ],
+  };
+  check('closing the loop makes it redundant', districtIsRedundant(looped, home.id));
+
+  // And the requirement is actually asked for by the offers that matter.
+  let seen = 0;
+  let demanding = 0;
+  let s2 = newGame(555);
+  for (let d = 0; d < 220; d++) {
+    for (let i = 0; i < MINUTES_PER_DAY / 5; i++) s2 = step(s2);
+    for (const o of s2.offers) { seen += 1; if (o.requiresRedundancy) demanding += 1; }
+    s2 = { ...s2, offers: [] };
+  }
+  check('some clients demand a second path', demanding > 0, `${demanding} of ${seen}`);
+  check('but not all of them do', demanding < seen, `${demanding} of ${seen}`);
 }
 
 

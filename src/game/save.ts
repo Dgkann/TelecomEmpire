@@ -105,6 +105,12 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
     const tier = (s.transitTier as number) ?? 0;
     return { ...s, transitTier: tier >= 1 ? tier + 1 : tier };
   },
+  // Contracts signed before redundancy mattered keep their terms.
+  12: (s) => ({
+    ...s,
+    contracts: ((s.contracts ?? []) as any[]).map((c: any) => ({ ...c, requiresRedundancy: c.requiresRedundancy ?? false })),
+    offers: ((s.offers ?? []) as any[]).map((o: any) => ({ ...o, requiresRedundancy: o.requiresRedundancy ?? false })),
+  }),
 };
 
 const DEFAULTS = {

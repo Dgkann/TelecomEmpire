@@ -9,6 +9,7 @@ import {
   nodeUpgradeCost,
   towerCapacity,
 } from '../game/constants';
+import { districtIsRedundant } from '../game/network';
 import { repairCost, type RepairMode } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
 import { clearSave, loadGame, saveGame } from '../game/save';
@@ -486,6 +487,11 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const offer = g.offers.find((o) => o.id === id);
     if (!offer) return;
+    if (offer.requiresRedundancy && !districtIsRedundant(g, offer.districtId)) {
+      const name = g.districts.find((d) => d.id === offer.districtId)?.name ?? 'that district';
+      s.toast(`${offer.clientName} needs a second path into ${name}.`, 'bad');
+      return;
+    }
     withGame(set, (draft) => {
       draft.offers = draft.offers.filter((o) => o.id !== id);
       draft.money += offer.signingBonus;
@@ -503,6 +509,7 @@ export const useGame = create<Store>((set, get) => ({
           penaltyPaid: 0,
           startedAt: draft.minutes,
           termMonths: offer.termMonths,
+          requiresRedundancy: offer.requiresRedundancy,
           segment: offer.segment,
         },
       ];

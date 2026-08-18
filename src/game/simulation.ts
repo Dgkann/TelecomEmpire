@@ -1013,6 +1013,7 @@ function makeOffer(s: GameState, mods: ResearchMods, rng: Rng) {
     slaPercent: sla,
     termMonths: randInt(rng, 12, 36),
     segment: (wantEnterprise ? 'enterprise' : 'business') as 'business' | 'enterprise',
+    requiresRedundancy: wantEnterprise || sla >= 99.9,
     expiresAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 2, 5),
     signingBonus: Math.round(monthlyRevenue * rand(rng, 0.5, 2)),
   };

@@ -90,6 +90,13 @@ export function isRedundant(state: GameState, nodeId: string, routes: Record<str
   return true;
 }
 
+// True when every site serving the district survives losing any single span.
+export function districtIsRedundant(state: GameState, districtId: string): boolean {
+  const routes = computeRoutes(state);
+  const serving = servingNodes(state, districtId).filter((n) => routes[n.id]);
+  return serving.length > 0 && serving.every((n) => isRedundant(state, n.id, routes));
+}
+
 export function servingNodes(state: GameState, districtId: string): NetNode[] {
   return state.nodes.filter(
     (n) => n.districtId === districtId && (n.kind === 'pop' || n.kind === 'access' || n.kind === 'tower') && !n.down,

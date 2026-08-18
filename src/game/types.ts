@@ -144,6 +144,8 @@ export interface EnterpriseContract {
   startedAt: number;
   termMonths: number;
   segment: 'business' | 'enterprise';
+  // Demanding clients will not sign onto a district with one way in.
+  requiresRedundancy: boolean;
 }
 
 export interface ContractOffer extends Omit<EnterpriseContract, 'downtimeMinutes' | 'penaltyPaid' | 'startedAt'> {

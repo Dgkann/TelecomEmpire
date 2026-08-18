@@ -161,7 +161,6 @@ export function researchModifiers(done: string[]) {
     hasAutoDispatch: done.includes('auto_dispatch'),
     hasEnterprise: done.includes('sla_desk'),
     hasMobile: done.includes('mobile_4g'),
-    hasDatacenter: done.includes('edge_compute'),
     hasAutoBalance: done.includes('ai_ops'),
   };
 }

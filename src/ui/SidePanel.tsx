@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { fmtMoney } from '../game/economy';
 import { researchModifiers } from '../game/research';
+import { districtIsRedundant } from '../game/network';
 import { operationsInsights } from '../game/operations';
 import { pendingRegulations, regulationProgress } from '../game/regulator';
 import { fmtClock, incidentLocation } from '../game/simulation';
@@ -35,6 +37,19 @@ export default function SidePanel() {
   const declineOffer = useGame((s) => s.declineOffer);
   const select = useGame((s) => s.select);
   const setScreen = useGame((s) => s.setScreen);
+
+  // Redundancy costs a Dijkstra per span, and this panel redraws every tick, so
+  // only recheck when the topology or the offers on the table actually change.
+  const topology = `${game.nodes.length}:${game.links.length}:${game.nodes.filter((n) => n.down).map((n) => n.id).join(',')}:${game.links.filter((l) => l.down).map((l) => l.id).join(',')}`;
+  const offerKey = game.offers.map((o) => o.id).join(',');
+  const redundantDistricts = useMemo(() => {
+    const ids = new Set<string>();
+    for (const o of game.offers) {
+      if (o.requiresRedundancy && districtIsRedundant(game, o.districtId)) ids.add(o.districtId);
+    }
+    return ids;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topology, offerKey]);
 
   const mods = researchModifiers(game.researchDone);
   const active = game.incidents.filter((i) => !i.resolved);
@@ -191,6 +206,7 @@ export default function SidePanel() {
       <AnimatePresence>
         {game.offers.slice(0, 2).map((o) => {
           const d = game.districts.find((x) => x.id === o.districtId);
+          const ready = !o.requiresRedundancy || redundantDistricts.has(o.districtId);
           return (
             <motion.div
               key={o.id}
@@ -213,8 +229,15 @@ export default function SidePanel() {
                 <span>District</span>
                 <span className="text-right text-white">{d?.name}</span>
               </div>
+              {o.requiresRedundancy && (
+                <div className={`mt-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${ready ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}>
+                  {ready
+                    ? 'Second path in place, this client will sign.'
+                    : `Needs a second fibre path into ${d?.name}.`}
+                </div>
+              )}
               <div className="mt-2 flex gap-2">
-                <button className="btn-primary flex-1 py-1 text-xs" onClick={() => acceptOffer(o.id)}>
+                <button className="btn-primary flex-1 py-1 text-xs" disabled={!ready} onClick={() => acceptOffer(o.id)}>
                   Sign
                 </button>
                 <button className="btn flex-1 py-1 text-xs" onClick={() => declineOffer(o.id)}>
