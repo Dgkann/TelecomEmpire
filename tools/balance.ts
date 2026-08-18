@@ -1,8 +1,9 @@
 // Plays a year with a rough sensible-player policy and prints the economy.
 import { createNewGame, step, residentialSubs, totalCustomers } from '../src/game/simulation';
-import { nodeCapacity, MINUTES_PER_DAY, NODE_SPECS, FIBER_COST_PER_UNIT, linkCapacity } from '../src/game/constants';
+import { nodeCapacity, MINUTES_PER_DAY, NODE_SPECS, FIBER_COST_PER_UNIT, TRANSIT_TIERS, linkCapacity } from '../src/game/constants';
 import { monthlyBreakdown } from '../src/game/economy';
-import { researchModifiers } from '../src/game/research';
+import { RESEARCH, researchModifiers } from '../src/game/research';
+import { operationsInsights } from '../src/game/operations';
 import type { GameState } from '../src/game/types';
 
 (globalThis as any).localStorage = {
@@ -106,7 +107,22 @@ for (let day = 0; day < DAYS; day++) {
     }
   }
   g.offers = [];
-  // 4. expand: unlock a district when rich, then build a POP where coverage is thin
+  // 4. buy upstream when the game says so. Without this the tool measured a
+  //    player pinned behind the transit wall rather than the game itself.
+  if (operationsInsights(g).some((i) => i.id === 'transit-headroom') && g.transitTier < TRANSIT_TIERS.length - 1) {
+    g.transitTier += 1;
+  }
+  // 5. research in order, which is what lifts the coverage ceiling off 75%
+  if (!g.researchActive) {
+    const next = RESEARCH.find(
+      (r) => !g.researchDone.includes(r.id) && r.requires.every((q) => g.researchDone.includes(q)),
+    );
+    if (next && g.money > next.cost * 2) {
+      g.money -= next.cost;
+      g.researchActive = { id: next.id, daysLeft: next.days };
+    }
+  }
+  // 6. expand: unlock a district when rich, then build a POP where coverage is thin
   const locked = g.districts.find((d) => !d.unlocked);
   if (locked && g.money > locked.entryCost * 3) {
     g.money -= locked.entryCost;
@@ -139,6 +155,8 @@ console.log(rows.join('\n'));
 console.log('\npeak pressure:', peakPressure.toFixed(2));
 console.log('total customers:', totalCustomers(g));
 console.log('districts unlocked:', g.districts.filter((d) => d.unlocked).length);
+console.log('transit:', TRANSIT_TIERS[g.transitTier].label, `(${TRANSIT_TIERS[g.transitTier].capacity}G)`);
+console.log('research done:', g.researchDone.join(', ') || 'none');
 console.log('coverage:', g.districts.map((d) => `${d.name} ${(d.coverage * 100).toFixed(0)}% sat ${d.satisfaction.toFixed(0)}`).join(' | '));
 console.log('incidents total seen:', g.incidents.length);
 console.log('posts:', g.posts.length, '| log:', g.log.length);
