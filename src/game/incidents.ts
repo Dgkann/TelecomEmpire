@@ -1,6 +1,8 @@
 import { uid, type Rng } from './rng';
 import type { GameState, Incident, IncidentKind } from './types';
 
+export type RepairMode = 'emergency' | 'normal';
+
 interface IncidentTemplate {
   kind: IncidentKind;
   title: string;
@@ -174,6 +176,7 @@ export function rollIncident(state: GameState, rng: Rng, mods: { incidentDuratio
     startedAt: state.minutes,
     repairMinutesLeft: null,
     repairTotalMinutes: total_minutes,
+    repairBaseMinutes: total_minutes,
     assignedTechId: null,
     affected,
     resolved: false,
@@ -189,11 +192,20 @@ export function estimateAffected(state: GameState, districtId: string) {
 }
 
 export interface RepairOption {
-  key: 'emergency' | 'normal';
+  key: RepairMode;
   label: string;
   cost: number;
   minutes: number;
   note: string;
+}
+
+// What a call-out costs. Priced off the fault itself, not off the clock: a big
+// network takes longer to reach a fault, but the parts do not get dearer, and
+// billing the size penalty twice made repairs the largest outgoing in the game.
+export function repairCost(incident: Incident, mode: RepairMode) {
+  const base = incident.repairBaseMinutes ?? incident.repairTotalMinutes;
+  const raw = mode === 'emergency' ? 800 + base * 9 : 200 + base * 2.2;
+  return Math.round(raw / 100) * 100;
 }
 
 export function repairOptions(incident: Incident, techSkill: number): RepairOption[] {
@@ -203,14 +215,14 @@ export function repairOptions(incident: Incident, techSkill: number): RepairOpti
     {
       key: 'emergency',
       label: 'Emergency Repair',
-      cost: Math.round((1200 + base * 22) / 100) * 100,
+      cost: repairCost(incident, 'emergency'),
       minutes: Math.max(30, Math.round(base * 0.28 * skillMul)),
       note: 'Overtime crew, parts flown in.',
     },
     {
       key: 'normal',
       label: 'Scheduled Repair',
-      cost: Math.round((300 + base * 5) / 100) * 100,
+      cost: repairCost(incident, 'normal'),
       minutes: Math.max(60, Math.round(base * skillMul)),
       note: 'Cheap, but customers wait.',
     },

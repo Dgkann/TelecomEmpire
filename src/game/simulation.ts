@@ -27,7 +27,7 @@ import { checkPromotion, isTopRank } from './progression';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
-import { rollIncident } from './incidents';
+import { repairCost, rollIncident, type RepairMode } from './incidents';
 import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
 import { computeRoutes, loadNetwork, servingNodes } from './network';
 import { researchModifiers, type ResearchMods } from './research';
@@ -794,6 +794,7 @@ function tickIncidents(
       // A fault on a large network takes longer to find and reach.
       const scale = 1 + Math.min(0.8, s.nodes.length / 30);
       inc.repairTotalMinutes = Math.round(inc.repairTotalMinutes * scale);
+      // repairBaseMinutes deliberately keeps the unscaled figure, see repairCost.
       s.incidents = [...s.incidents, inc];
       applyIncidentDown(s, inc, true);
       pushLog(s, `${inc.title} in ${s.districts.find((d) => d.id === inc.districtId)?.name ?? 'network'}`, 'bad');
@@ -844,7 +845,7 @@ export function dispatch(
   s: GameState,
   incidentId: string,
   techId: string,
-  mode: 'emergency' | 'normal',
+  mode: RepairMode,
   free = false,
 ) {
   const inc = s.incidents.find((i) => i.id === incidentId);
@@ -855,9 +856,7 @@ export function dispatch(
     30,
     Math.round(inc.repairTotalMinutes * (mode === 'emergency' ? 0.28 : 1) * skillMul),
   );
-  const cost = mode === 'emergency'
-    ? Math.round((1200 + inc.repairTotalMinutes * 22) / 100) * 100
-    : Math.round((300 + inc.repairTotalMinutes * 5) / 100) * 100;
+  const cost = repairCost(inc, mode);
   if (!free) s.money -= cost;
 
   s.incidents = s.incidents.map((i) =>

@@ -9,6 +9,7 @@ import {
   nodeUpgradeCost,
   towerCapacity,
 } from '../game/constants';
+import { repairCost, type RepairMode } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
 import { clearSave, loadGame, saveGame } from '../game/save';
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
@@ -97,7 +98,7 @@ interface Store extends UiState {
   startResearch: (id: string) => void;
   acceptOffer: (id: string) => void;
   declineOffer: (id: string) => void;
-  dispatchTech: (incidentId: string, mode: 'emergency' | 'normal') => void;
+  dispatchTech: (incidentId: string, mode: RepairMode) => void;
   hireTechnician: () => void;
   hireEmployee: (role: StaffRole) => void;
   fireStaff: (id: string) => void;
@@ -531,7 +532,7 @@ export const useGame = create<Store>((set, get) => ({
     // time, so it always goes ahead, otherwise a broke player is stuck with a
     // dead network and no way back.
     if (mode === 'emergency') {
-      const cost = Math.round((1200 + inc.repairTotalMinutes * 22) / 100) * 100;
+      const cost = repairCost(inc, 'emergency');
       if (g.money < cost) {
         s.toast('Not enough cash for an emergency call-out.', 'bad');
         return;

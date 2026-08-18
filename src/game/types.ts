@@ -175,6 +175,10 @@ export interface Incident {
   // Game minutes of repair work remaining; null while unassigned.
   repairMinutesLeft: number | null;
   repairTotalMinutes: number;
+  // The fault on its own, before the network-size penalty is applied to the
+  // clock. Parts and crew are billed against this, so owning more kit does not
+  // quietly raise the price of every call-out.
+  repairBaseMinutes: number;
   assignedTechId: string | null;
   affected: number;
   resolved: boolean;
