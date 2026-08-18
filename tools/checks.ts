@@ -3,7 +3,7 @@
 import { MINUTES_PER_DAY, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, TRANSIT_TIERS, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget } from '../src/game/competitors';
-import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, servingCapacity } from '../src/game/network';
+import { computeRoutes, daysUntilFull, forecastDemand, isRedundant, loadNetwork, servingCapacity } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
 import { pendingRegulations, regulationProgress } from '../src/game/regulator';
@@ -720,6 +720,52 @@ group('upstream transit is a signposted wall, not a hidden one');
     'no rung more than doubles the one below it until the top',
     steps.slice(1, 3).every((m, k) => m <= steps[k] * 2.2),
     steps.join(' / '),
+  );
+}
+
+
+group('automatic balancing earns its 900k');
+{
+  // ai_ops promised auto capacity balancing and set a flag nobody read. It now
+  // shares a district by what each node can actually deliver end to end.
+  let g = newGame(999);
+  const core = g.nodes.find((n) => n.kind === 'core')!;
+  const home = g.districts[0];
+  const pop = (id: string, dx: number): NetNode => ({
+    id, kind: 'pop', name: `POP ${id}`, gx: core.gx + dx, gy: core.gy + 1, districtId: home.id,
+    tier: 1, capacityGbps: nodeCapacity('pop', 1), trafficGbps: 0, health: 100, down: false, builtAt: 0, servicedAt: 0,
+  });
+  const span = (id: string, b: string, cap: number): NetLink =>
+    ({ id, aId: core.id, bId: b, capacityGbps: cap, trafficGbps: 0, down: false, tier: 1, length: 2, builtAt: 0 });
+  g = { ...g, nodes: [core, pop('wide', 2), pop('thin', -2)], links: [span('lw', 'wide', 10), span('lt', 'thin', 1)] };
+
+  const demand: Record<string, number> = {};
+  for (const d of g.districts) demand[d.id] = d.id === home.id ? 6 : 0;
+  const routes = computeRoutes(g);
+  const off = loadNetwork(g, demand, routes, false);
+  const on = loadNetwork(g, demand, routes, true);
+
+  check(
+    'balancing carries more of the same demand',
+    on.districtServed[home.id] > off.districtServed[home.id] * 1.5,
+    `${(off.districtServed[home.id] * 100).toFixed(0)}% -> ${(on.districtServed[home.id] * 100).toFixed(0)}%`,
+  );
+  check(
+    'it moves traffic off the starved path',
+    on.nodeTraffic['thin'] < off.nodeTraffic['thin'],
+    `${off.nodeTraffic['thin'].toFixed(2)} -> ${on.nodeTraffic['thin'].toFixed(2)}`,
+  );
+  check('the research actually sets the flag', researchModifiers(['ai_ops']).hasAutoBalance);
+
+  // An even network has nothing to rebalance, so nothing should change there.
+  let e = newGame(999);
+  e = { ...e, nodes: [core, pop('a', 2), pop('b', -2)], links: [span('la', 'a', 10), span('lb', 'b', 10)] };
+  const er = computeRoutes(e);
+  const evenOff = loadNetwork(e, demand, er, false);
+  const evenOn = loadNetwork(e, demand, er, true);
+  check(
+    'an even network is left alone',
+    Math.abs(evenOn.districtServed[home.id] - evenOff.districtServed[home.id]) < 1e-9,
   );
 }
 

@@ -113,6 +113,11 @@ export function loadNetwork(
   state: GameState,
   districtDemand: Record<string, number>,
   routes: Record<string, RouteInfo>,
+  // Automatic balancing shares a district's traffic by what each serving node
+  // can actually deliver end to end, rather than by the size of the box alone.
+  // A large POP sitting behind a thin span is not a large POP, and without this
+  // the network keeps pushing traffic at it.
+  autoBalance = false,
 ): LoadResult {
   const nodeTraffic: Record<string, number> = {};
   const linkTraffic: Record<string, number> = {};
@@ -148,12 +153,30 @@ export function loadNetwork(
       continue;
     }
 
-    const totalCap = serving.reduce((s, n) => s + n.capacityGbps, 0) || 1;
+    // Weight is never above the node's own capacity, so with balancing off, or
+    // where the path is wider than the node, this is the old behaviour exactly.
+    const weightOf = (n: NetNode) => {
+      if (!autoBalance) return n.capacityGbps;
+      const route = routes[n.id];
+      if (!route) return n.capacityGbps;
+      let cap = n.capacityGbps;
+      for (const linkId of route.path) {
+        const link = linkById[linkId];
+        if (link) cap = Math.min(cap, link.capacityGbps);
+      }
+      for (const hopId of route.hops) {
+        const hop = nodeById[hopId];
+        if (hop) cap = Math.min(cap, hop.capacityGbps);
+      }
+      return Math.max(cap, n.capacityGbps * 0.15);
+    };
+
+    const totalCap = serving.reduce((s, n) => s + weightOf(n), 0) || 1;
     let servedHere = 0;
     let worstPressure = 0;
 
     for (const node of serving) {
-      const share = (node.capacityGbps / totalCap) * demand;
+      const share = (weightOf(node) / totalCap) * demand;
       nodeTraffic[node.id] += share;
       const route = routes[node.id];
       for (const linkId of route.path) linkTraffic[linkId] += share;

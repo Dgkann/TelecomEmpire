@@ -341,7 +341,7 @@ export function step(prev: GameState): GameState {
 
   // 2. Route and load
   const routes = computeRoutes(s);
-  const load = loadNetwork(s, districtDemand, routes);
+  const load = loadNetwork(s, districtDemand, routes, mods.hasAutoBalance);
 
   const transit = TRANSIT_TIERS[s.transitTier];
   const transitCap = transit.capacity * (s.backupTransit ? 1.35 : 1);
