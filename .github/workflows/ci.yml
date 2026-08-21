@@ -18,6 +18,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Dependency audit
+        run: npm run audit
+
       - name: Typecheck
         run: npm run typecheck
 
