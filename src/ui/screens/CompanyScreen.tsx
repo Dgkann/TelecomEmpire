@@ -4,10 +4,12 @@ import { averagePrice, fmtMoney, fmtMoneyExact, fmtNum, monthlyBreakdown, packag
 import { researchModifiers } from '../../game/research';
 import { RANKS, cityShare, nextRank, rankOf } from '../../game/progression';
 import { creditLimit, daysUntilInsolvency, loanRate, monthlyDebtService, totalDebt } from '../../game/finance';
+import { currentMonthCashFlow } from '../../game/financeLedger';
 import { residentialSubs } from '../../game/simulation';
 import { contractRisk } from '../../game/operations';
+import { STAFF_ROLE_INFO, staffModifiers } from '../../game/staff';
 import { useGame } from '../../store/gameStore';
-import type { ChurnReason, StaffRole } from '../../game/types';
+import type { ChurnReason } from '../../game/types';
 import TrendChart from '../TrendChart';
 
 const CHURN_REASON: Record<ChurnReason, string> = {
@@ -17,14 +19,7 @@ const CHURN_REASON: Record<ChurnReason, string> = {
   support: 'poor support',
 };
 
-const ROLE_LABEL: Record<StaffRole, string> = {
-  network_engineer: 'Network Engineer',
-  noc_engineer: 'NOC Engineer',
-  field_tech: 'Field Technician',
-  support: 'Customer Support',
-  sales: 'Sales Manager',
-  security: 'Security Engineer',
-};
+const HIRE_ROLES = ['network_engineer', 'noc_engineer', 'support', 'sales', 'security'] as const;
 
 function Row({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
@@ -40,6 +35,8 @@ export default function CompanyScreen() {
   const updatePackage = useGame((s) => s.updatePackage);
   const setMarketing = useGame((s) => s.setMarketing);
   const setRetention = useGame((s) => s.setRetention);
+  const toggleWholesaleFixed = useGame((s) => s.toggleWholesaleFixed);
+  const toggleMvno = useGame((s) => s.toggleMvno);
   const hireTechnician = useGame((s) => s.hireTechnician);
   const hireEmployee = useGame((s) => s.hireEmployee);
   const fireStaff = useGame((s) => s.fireStaff);
@@ -51,7 +48,9 @@ export default function CompanyScreen() {
   const setOverlay = useGame((s) => s.setOverlay);
 
   const mods = researchModifiers(game.researchDone);
+  const staff = staffModifiers(game);
   const money = monthlyBreakdown(game, mods);
+  const cashFlow = currentMonthCashFlow(game);
   const mix = packageMix(game.packages);
   const mobileMix = packageMix(game.packages, 'mobile');
   const subs = residentialSubs(game);
@@ -78,7 +77,7 @@ export default function CompanyScreen() {
           </div>
         </div>
         <div className="panel p-5 lg:col-span-3">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
             <div>
               <div className="stat-label">Cash</div>
               <div className={`num text-2xl font-semibold ${game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'}`}>
@@ -86,10 +85,17 @@ export default function CompanyScreen() {
               </div>
             </div>
             <div>
-              <div className="stat-label">Monthly profit</div>
+              <div className="stat-label">Operating profit</div>
               <div className={`num text-2xl font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
                 {money.profit >= 0 ? '+' : ''}
                 {fmtMoney(money.profit)}
+              </div>
+            </div>
+            <div>
+              <div className="stat-label">Free cash flow MTD</div>
+              <div className={`num text-2xl font-semibold ${cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
+                {cashFlow.freeCashFlow >= 0 ? '+' : ''}
+                {fmtMoney(cashFlow.freeCashFlow)}
               </div>
             </div>
             <div>
@@ -169,6 +175,23 @@ export default function CompanyScreen() {
               Top of the ladder. Everything from here is your own high score.
             </p>
           )}
+        </div>
+
+        <div className="panel panel-tone-amber p-5 lg:col-span-3">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Wholesale partnerships</h2><p className="mt-1 text-[11px] text-white/40">Sell spare reach to partner brands. Revenue arrives immediately; their traffic competes at the lowest priority.</p></div>
+            <div className="text-right"><div className="stat-label">Wholesale revenue</div><div className="num text-lg font-semibold text-neon-lime">{fmtMoney(money.revenueWholesale)}/mo</div></div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-3 ${game.wholesaleFixed ? 'border-neon-amber/40 bg-neon-amber/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}>
+              <div><div className="text-sm font-semibold">Fixed network access</div><div className="mt-1 text-[10px] leading-relaxed text-white/40">Monetise covered homes through reseller ISPs. Adds roughly 18% to fixed traffic.</div></div>
+              <input type="checkbox" checked={game.wholesaleFixed} onChange={toggleWholesaleFixed} className="h-4 w-4 shrink-0 accent-[#f3b843]" />
+            </label>
+            <label className={`flex items-center justify-between gap-4 rounded-xl border p-3 ${game.mvnoEnabled ? 'border-neon-violet/40 bg-neon-violet/[0.07]' : 'border-white/10 bg-white/[0.03]'} ${mods.hasMobile && game.spectrum.length ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}>
+              <div><div className="text-sm font-semibold">MVNO radio access</div><div className="mt-1 text-[10px] leading-relaxed text-white/40">Host virtual mobile brands. Adds roughly 22% to mobile traffic and needs live spectrum.</div></div>
+              <input type="checkbox" disabled={!mods.hasMobile || !game.spectrum.length} checked={game.mvnoEnabled} onChange={toggleMvno} className="h-4 w-4 shrink-0 accent-[#a78bfa]" />
+            </label>
+          </div>
         </div>
 
         <div id="pricing" className="panel panel-tone-blue scroll-mt-6 p-5 lg:col-span-2">
@@ -315,7 +338,7 @@ export default function CompanyScreen() {
         </div>
 
         <div className="panel panel-tone-green p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Monthly finances</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Monthly operating finances</h2>
           <div className="divide-y divide-white/5">
             <div className="pb-2">
               <div className="stat-label mb-1">Income</div>
@@ -325,6 +348,9 @@ export default function CompanyScreen() {
               )}
               {money.revenueHosting > 0 && (
                 <Row label="Hosting" value={fmtMoneyExact(money.revenueHosting)} tone="text-neon-lime" />
+              )}
+              {money.revenueWholesale > 0 && (
+                <Row label="Wholesale" value={fmtMoneyExact(money.revenueWholesale)} tone="text-neon-lime" />
               )}
               <Row label="Business" value={fmtMoneyExact(money.revenueBusiness)} tone="text-neon-lime" />
               <Row label="Enterprise" value={fmtMoneyExact(money.revenueEnterprise)} tone="text-neon-lime" />
@@ -336,16 +362,44 @@ export default function CompanyScreen() {
               <Row label="Maintenance" value={fmtMoneyExact(-money.costMaintenance)} tone="text-white/70" />
               <Row label="Transit" value={fmtMoneyExact(-money.costTransit)} tone="text-white/70" />
               <Row label="Marketing" value={fmtMoneyExact(-money.costMarketing)} tone="text-white/70" />
+              <Row label="Retention" value={fmtMoneyExact(-money.costRetention)} tone="text-white/70" />
+              {game.finance.costLoanPayments > 0 && (
+                <Row label="Last loan payment" value={fmtMoneyExact(-game.finance.costLoanPayments)} tone="text-white/70" />
+              )}
               {game.finance.penalties > 0 && (
                 <Row label="SLA penalties (MTD)" value={fmtMoneyExact(-game.finance.penalties)} tone="text-neon-red" />
               )}
             </div>
             <div className="pt-2">
               <Row
-                label="Net"
+                label="Operating profit"
                 value={`${money.profit >= 0 ? '+' : ''}${fmtMoneyExact(money.profit)}`}
                 tone={money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}
               />
+            </div>
+          </div>
+
+          <div className="mt-4 border-t border-white/[0.07] pt-4">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div>
+                <div className="stat-label">Cash bridge · month to date</div>
+                <div className="mt-1 text-[10px] leading-snug text-white/35">Projects, licences, research, repairs, hiring, bonuses, and asset sales are included below.</div>
+              </div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-neon-cyan">Actual cash</span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                <Row label="Operating cash MTD" value={`${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.operatingCash)}`} tone={cashFlow.operatingCash >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
+                <Row label="Capital projects MTD" value={fmtMoneyExact(-cashFlow.capitalSpend)} tone="text-neon-amber" />
+                <Row label="Other one-offs MTD" value={`${cashFlow.otherOneOffNet >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.otherOneOffNet)}`} tone={cashFlow.otherOneOffNet >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
+              </div>
+              <div className="rounded-lg border border-neon-cyan/15 bg-neon-cyan/[0.035] p-3">
+                <Row label="Free cash flow MTD" value={`${cashFlow.freeCashFlow >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.freeCashFlow)}`} tone={cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
+                <Row label="Loan financing MTD" value={`${cashFlow.financing >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.financing)}`} tone={cashFlow.financing >= 0 ? 'text-neon-cyan' : 'text-neon-red'} />
+                <div className="mt-1 border-t border-white/[0.07] pt-1">
+                  <Row label="Net cash movement MTD" value={`${cashFlow.netCashMovement >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.netCashMovement)}`} tone={cashFlow.netCashMovement >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -374,6 +428,26 @@ export default function CompanyScreen() {
                   />
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+
+        <div className="panel panel-tone-green p-5 lg:col-span-2">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Finance ledger</h2><p className="mt-1 text-[11px] text-white/35">Operating income, network projects, service work, licences, research, staffing, spectrum, and financing in one place.</p></div>
+            <span className="num text-[10px] text-white/35">{game.ledger.length} entries</span>
+          </div>
+          {game.ledger.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/10 p-4 text-center text-[11px] text-white/40">The first completed month or cash transaction will appear here.</div>
+          ) : (
+            <div className="scroll-thin max-h-[310px] overflow-y-auto rounded-lg border border-white/[0.07]">
+              {game.ledger.slice(0, 40).map((entry) => (
+                <div key={entry.id} className="grid grid-cols-[58px_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.06] px-3 py-2 last:border-0">
+                  <span className="num text-[9px] uppercase text-white/30">Day {Math.floor(entry.at / 1440) + 1}</span>
+                  <div className="min-w-0"><div className="truncate text-[12px] text-white/75">{entry.label}</div><div className="text-[9px] uppercase tracking-wider text-white/30">{entry.category.replace(/_/g, ' ')}</div></div>
+                  <span className={`num text-[12px] font-semibold ${entry.amount >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>{entry.amount >= 0 ? '+' : ''}{fmtMoneyExact(entry.amount)}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -414,7 +488,7 @@ export default function CompanyScreen() {
                     <div className="mt-2">
                       <div className="flex justify-between text-[10px]"><span className="text-white/40">SLA allowance used</span><span className="num" style={{ color: riskTone }}>{Math.round(risk.usage * 100)}%</span></div>
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${Math.min(100, risk.usage * 100)}%`, background: riskTone }} /></div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2"><span className="text-[10px] text-white/38">{risk.districtOut ? 'District outage active' : risk.fragile ? 'Single-path exposure' : `${Math.round(risk.allowance)}m monthly allowance`}</span>{building && <button className="text-[9px] font-semibold uppercase tracking-wider text-neon-cyan" onClick={() => { setOverlay('customers'); focus(building.gx, building.gy); select({ type: 'building', id: building.id }); }}>Show on map →</button>}</div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2"><span className="text-[10px] text-white/[0.38]">{risk.districtOut ? 'District outage active' : risk.fragile ? 'Single-path exposure' : `${Math.round(risk.allowance)}m monthly allowance`}</span>{building && <button className="text-[9px] font-semibold uppercase tracking-wider text-neon-cyan" onClick={() => { setOverlay('customers'); focus(building.gx, building.gy); select({ type: 'building', id: building.id }); }}>Show on map →</button>}</div>
                     </div>
                   </div>
                 );
@@ -534,13 +608,20 @@ export default function CompanyScreen() {
         <div className="panel panel-tone-blue p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Staff</h2>
 
+          <div className="mb-3 grid grid-cols-2 gap-2 text-[10px]">
+            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Maintenance saving</div><div className="num text-neon-lime">{Math.round((1 - staff.maintenanceCostMul) * 100)}%</div></div>
+            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Incident reduction</div><div className="num text-neon-lime">{Math.round((1 - staff.incidentRateMul) * 100)}%</div></div>
+            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Support bonus</div><div className="num text-neon-cyan">+{staff.supportSatisfaction.toFixed(1)}</div></div>
+            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Research per day</div><div className="num text-neon-cyan">+{staff.researchPointsPerDay} RP</div></div>
+          </div>
+
           <div className="mb-3 flex flex-col gap-1.5">
             {game.technicians.map((t) => (
               <div key={t.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2">
                 <div>
                   <div className="text-sm">{t.name}</div>
                   <div className="num text-[10px] text-white/40">
-                    Field crew · skill {t.skill} · {t.state}
+                    Field crew · skill {t.skill} · {t.experience} XP · {t.state}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -552,12 +633,13 @@ export default function CompanyScreen() {
               </div>
             ))}
             {game.employees.map((e) => (
-              <div key={e.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2">
+              <div key={e.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2" title={STAFF_ROLE_INFO[e.role].effect}>
                 <div>
                   <div className="text-sm">{e.name}</div>
                   <div className="num text-[10px] text-white/40">
-                    {ROLE_LABEL[e.role]} · skill {e.skill}
+                    {STAFF_ROLE_INFO[e.role].label} · skill {e.skill} · {e.experience} XP
                   </div>
+                  <div className="mt-0.5 max-w-[230px] text-[10px] leading-snug text-white/30">{STAFF_ROLE_INFO[e.role].effect}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="num text-[11px] text-white/50">{fmtMoney(e.salary)}</span>
@@ -573,15 +655,14 @@ export default function CompanyScreen() {
             <button className="btn-primary text-xs" onClick={hireTechnician}>
               Hire field crew · $4k
             </button>
-            <button className="btn text-xs" onClick={() => hireEmployee('support')}>
-              Hire support · $6k
-            </button>
-            <button className="btn text-xs" onClick={() => hireEmployee('network_engineer')}>
-              Hire engineer · $6k
-            </button>
+            {HIRE_ROLES.map((role) => (
+              <button key={role} className="btn text-xs" title={STAFF_ROLE_INFO[role].effect} onClick={() => hireEmployee(role)}>
+                Hire {STAFF_ROLE_INFO[role].label.toLowerCase()} · $6k
+              </button>
+            ))}
           </div>
           <p className="mt-2 text-[11px] leading-snug text-white/35">
-            Field crews repair faults. Support staff lift customer satisfaction.
+            Skills improve through experience, and every role changes the metric described above.
           </p>
         </div>
       </div>

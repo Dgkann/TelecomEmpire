@@ -11,8 +11,17 @@ import { fmtMoney, fmtNum, monthlyBreakdown } from '../../game/economy';
 import { computeRoutes, daysUntilFull, forecastDemand, linkUtil, nodeUtil, servingCapacity } from '../../game/network';
 import { researchModifiers } from '../../game/research';
 import { cacheRatio, mobileSubs, residentialSubs } from '../../game/simulation';
+import { rivalPosture } from '../../game/competitors';
+import { networkResilience } from '../../game/regulator';
+import {
+  DATA_CENTER_MODE_CONFIG,
+  INTERCONNECT_CONFIG,
+  TRAFFIC_POLICY_CONFIG,
+  dataCenterMode,
+} from '../../game/strategy';
+import type { DataCenterMode, InterconnectPlan, TrafficPolicy } from '../../game/types';
 import { useGame } from '../../store/gameStore';
-import SiteIcon from '../SiteIcon';
+import SiteIcon, { TierBadge } from '../SiteIcon';
 import TrendChart from '../TrendChart';
 
 function Meter({ v, label, right }: { v: number; label: string; right: string }) {
@@ -36,6 +45,9 @@ export default function NetworkScreen() {
   const setTransitTier = useGame((s) => s.setTransitTier);
   const toggleBackup = useGame((s) => s.toggleBackupTransit);
   const toggleAuto = useGame((s) => s.toggleAutoDispatch);
+  const setTrafficPolicy = useGame((s) => s.setTrafficPolicy);
+  const setInterconnectPlan = useGame((s) => s.setInterconnectPlan);
+  const setDataCenterMode = useGame((s) => s.setDataCenterMode);
 
   // Routing is a Dijkstra per core, so only redo it when the topology moves.
   const topology = `${game.nodes.length}:${game.links.length}:${game.nodes.filter((n) => n.down).map((n) => n.id).join(',')}:${game.links.filter((l) => l.down).map((l) => l.id).join(',')}`;
@@ -55,11 +67,15 @@ export default function NetworkScreen() {
   const accessCapacity = servingCapacity(game.nodes);
   const daysLeft = daysUntilFull(forecast, accessCapacity);
   const transit = TRANSIT_TIERS[game.transitTier];
-  const transitUse = game.stats.demandGbps / (transit.capacity * (game.backupTransit ? 1.35 : 1));
+  const interconnect = INTERCONNECT_CONFIG[game.interconnectPlan];
+  const transitCapacity = transit.capacity * (game.backupTransit ? 1.35 : 1) + interconnect.capacityBonus;
+  const transitUse = game.stats.transitGbps / transitCapacity;
   const demandSeries = [...game.demandHistory.slice(-29), Math.max(game.dayPeakDemand, game.stats.demandGbps)];
   const dayTelemetry = game.telemetry.slice(-24);
   const dataCenters = game.nodes.filter((n) => n.kind === 'datacenter');
   const finance = monthlyBreakdown(game, mods);
+  const resilience = networkResilience(game);
+  const openMaintenance = game.maintenanceOrders.filter((order) => order.status !== 'completed');
 
   return (
     <div className="screen-shell">
@@ -97,13 +113,14 @@ export default function NetworkScreen() {
           )}
         </div>
         <div className="panel p-5 lg:col-span-2">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
             {[
               { label: 'Network health', value: `${Math.round(game.stats.health)}%`, tone: game.stats.health > 80 ? 'text-neon-lime' : 'text-neon-amber' },
               { label: 'Demand', value: `${game.stats.demandGbps.toFixed(1)} Gbps` },
               { label: 'Carried', value: `${game.stats.servedGbps.toFixed(1)} Gbps` },
               { label: 'Packet loss', value: `${(game.stats.packetLoss * 100).toFixed(1)}%`, tone: game.stats.packetLoss > 0.02 ? 'text-neon-red' : 'text-neon-lime' },
               { label: 'Latency', value: `${Math.round(game.stats.latencyMs)} ms`, tone: game.stats.latencyMs > 40 ? 'text-neon-amber' : undefined },
+              { label: 'Resilient sites', value: `${Math.round(resilience * 100)}%`, tone: resilience >= 0.7 ? 'text-neon-lime' : 'text-neon-amber' },
             ].map((s) => (
               <div key={s.label} className="kpi border-0 bg-transparent px-0 py-0">
                 <div className="stat-label">{s.label}</div>
@@ -116,16 +133,85 @@ export default function NetworkScreen() {
               <div><div className="stat-label">Live delivery path</div><div className="text-[12px] text-white/40">Traffic accepted by the network at this instant</div></div>
               <div className="num text-[12px] text-white/55"><span className="text-neon-cyan">{game.stats.servedGbps.toFixed(2)}G carried</span> / {game.stats.demandGbps.toFixed(2)}G requested</div>
             </div>
-            <div className="relative h-2 overflow-hidden rounded-full bg-neon-red/18">
+            <div className="relative h-2 overflow-hidden rounded-full bg-neon-red/[0.18]">
               <motion.div className="h-full rounded-full bg-neon-cyan" animate={{ width: `${Math.min(100, (game.stats.servedGbps / Math.max(0.01, game.stats.demandGbps)) * 100)}%` }} />
               <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
               <div className="absolute inset-y-0 left-3/4 w-px bg-white/20" />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]">
+              <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Fixed access</div><div className="num text-neon-blue">{game.stats.fixedDemandGbps.toFixed(2)} Gbps</div></div>
+              <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Mobile radio</div><div className="num text-neon-violet">{game.stats.mobileDemandGbps.toFixed(2)} Gbps</div></div>
+              <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Offered upstream</div><div className="num text-neon-cyan">{game.stats.transitGbps.toFixed(2)} Gbps</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel panel-tone-violet p-5 lg:col-span-2">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Traffic engineering</h2>
+              <p className="mt-1 text-[11px] text-white/40">Choose who keeps moving under congestion, then decide where internet traffic exits.</p>
+            </div>
+            <div className="chip border-neon-violet/30 text-[10px] text-neon-violet">GAIN ↔ OPERATING COST</div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <div className="stat-label mb-2">Service policy</div>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.entries(TRAFFIC_POLICY_CONFIG) as Array<[TrafficPolicy, (typeof TRAFFIC_POLICY_CONFIG)[TrafficPolicy]]>).map(([id, policy]) => {
+                  const locked = (id !== 'balanced' && !game.researchDone.includes('noc')) || (id === 'mobile' && !game.researchDone.includes('mobile_5g'));
+                  return (
+                    <button
+                      key={id}
+                      disabled={locked}
+                      onClick={() => setTrafficPolicy(id)}
+                      className={`rounded-lg border p-2.5 text-left transition-colors ${game.trafficPolicy === id ? 'border-neon-violet/50 bg-neon-violet/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.08]'} disabled:cursor-not-allowed disabled:opacity-35`}
+                    >
+                      <div className="text-xs font-semibold">{policy.label}</div>
+                      <div className="mt-1 text-[10px] leading-relaxed text-white/40">{locked ? id === 'mobile' ? 'Requires 5G Standalone.' : 'Requires a NOC.' : policy.description}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="stat-label mb-2">Interconnection</div>
+              <div className="flex flex-col gap-2">
+                {(Object.entries(INTERCONNECT_CONFIG) as Array<[InterconnectPlan, (typeof INTERCONNECT_CONFIG)[InterconnectPlan]]>).map(([id, plan]) => {
+                  const locked = plan.requiresDataCenter && !dataCenters.some((node) => !node.down && routes[node.id]);
+                  return (
+                    <button
+                      key={id}
+                      disabled={locked}
+                      onClick={() => setInterconnectPlan(id)}
+                      className={`flex items-center justify-between gap-3 rounded-lg border p-2.5 text-left transition-colors ${game.interconnectPlan === id ? 'border-neon-cyan/50 bg-neon-cyan/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.08]'} disabled:cursor-not-allowed disabled:opacity-35`}
+                    >
+                      <div>
+                        <div className="text-xs font-semibold">{plan.label}</div>
+                        <div className="mt-0.5 text-[10px] leading-relaxed text-white/40">{locked ? 'Bring an online data centre onto the network.' : plan.description}</div>
+                      </div>
+                      <div className="num shrink-0 text-right text-[10px] text-white/55">
+                        <div>{plan.monthly ? `${fmtMoney(plan.monthly)}/mo` : 'NO FEE'}</div>
+                        {plan.capacityBonus > 0 && <div className="text-neon-cyan">+{plan.capacityBonus}G</div>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
         <div className="panel panel-tone-green p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Sites</h2>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Sites</h2>
+              <p className="mt-1 text-[11px] text-white/40">A larger T-number means a larger equipment stack and more capacity.</p>
+            </div>
+            <div className="flex items-center gap-1" aria-label="Tier scale">
+              {[1, 2, 3, 4, 5].map((tier) => <TierBadge key={tier} tier={tier} maxTier={5} compact />)}
+            </div>
+          </div>
           <div className="flex flex-col gap-2">
             {game.nodes.map((n) => (
               <button
@@ -137,7 +223,7 @@ export default function NetworkScreen() {
                 className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.08]"
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/[0.07] bg-black/15">
-                  <SiteIcon kind={n.kind} className="h-7 w-7" title={`${n.kind} site`} />
+                  <SiteIcon kind={n.kind} tier={n.tier} className="h-8 w-8" title={`${n.kind} site, Tier ${n.tier}`} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -146,7 +232,7 @@ export default function NetworkScreen() {
                   </div>
                   <Meter
                     v={nodeUtil(n)}
-                    label={`Tier ${n.tier}`}
+                    label={`T${n.tier} equipment`}
                     right={`${n.trafficGbps.toFixed(1)}/${n.capacityGbps.toFixed(0)} Gbps`}
                   />
                 </div>
@@ -190,6 +276,26 @@ export default function NetworkScreen() {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        <div className="panel panel-tone-amber p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Maintenance board</h2><p className="mt-1 text-[11px] text-white/40">Planned interventions wait for a free field crew.</p></div>
+            <span className="chip border-neon-amber/30 text-[10px] text-neon-amber">{openMaintenance.length} OPEN</span>
+          </div>
+          <div className="mt-4 flex flex-col gap-2">
+            {openMaintenance.length ? openMaintenance.map((order) => {
+              const node = game.nodes.find((entry) => entry.id === order.nodeId);
+              const technician = game.technicians.find((entry) => entry.id === order.technicianId);
+              const waitDays = Math.max(0, Math.ceil((order.scheduledAt - game.minutes) / 1440));
+              return (
+                <button key={order.id} onClick={() => node && (focus(node.gx, node.gy), select({ type: 'node', id: node.id }))} className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.07]">
+                  <div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-semibold">{node?.name ?? 'Removed site'}</span><span className={`chip text-[9px] ${order.status === 'active' ? 'border-neon-amber/40 text-neon-amber' : 'border-white/15 text-white/45'}`}>{order.status.toUpperCase()}</span></div>
+                  <div className="num mt-1 text-[10px] text-white/40">{order.mode.toUpperCase()} · {order.status === 'active' ? `${Math.ceil(order.minutesLeft)} MIN · ${technician?.name ?? 'CREW'}` : waitDays ? `IN ${waitDays}D` : 'AWAITING CREW'}</div>
+                </button>
+              );
+            }) : <div className="rounded-lg border border-dashed border-white/10 p-4 text-center text-[11px] text-white/35">No work orders. Select a site on the map to book maintenance.</div>}
           </div>
         </div>
 
@@ -296,10 +402,22 @@ export default function NetworkScreen() {
                 <div className="chip py-2"><div className="stat-label">Hosting</div><div className="num text-sm text-neon-lime">{fmtMoney(finance.revenueHosting)}</div></div>
               </div>
               <div className="mt-3 flex flex-col gap-1.5">{dataCenters.map((n) => (
-                <button key={n.id} className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-left hover:bg-white/[0.07]" onClick={() => { focus(n.gx, n.gy); select({ type: 'node', id: n.id }); }}>
-                  <SiteIcon kind="datacenter" className="h-6 w-6" /><span className="min-w-0 flex-1 truncate text-xs font-medium">{n.name}</span><span className="num text-[10px] text-white/40">T{n.tier} · {Math.round(nodeUtil(n) * 100)}%</span>
-                </button>
+                <div key={n.id} className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-2">
+                  <button className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-neon-cyan" onClick={() => { focus(n.gx, n.gy); select({ type: 'node', id: n.id }); }}>
+                    <SiteIcon kind="datacenter" tier={n.tier} className="h-7 w-7" />
+                    <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{n.name}</span><span className="num block text-[9px] text-white/35">T{n.tier} · {Math.round(nodeUtil(n) * 100)}% LOAD</span></span>
+                  </button>
+                  <select
+                    aria-label={`${n.name} workload`}
+                    value={dataCenterMode(game, n.id)}
+                    onChange={(event) => setDataCenterMode(n.id, event.target.value as DataCenterMode)}
+                    className="max-w-[132px] rounded-md border border-white/10 bg-[#101827] px-2 py-1.5 text-[10px] text-white/70"
+                  >
+                    {(Object.entries(DATA_CENTER_MODE_CONFIG) as Array<[DataCenterMode, (typeof DATA_CENTER_MODE_CONFIG)[DataCenterMode]]>).map(([id, mode]) => <option key={id} value={id}>{mode.label}</option>)}
+                  </select>
+                </div>
               ))}</div>
+              <div className="mt-2 text-[10px] leading-relaxed text-white/35">Mode changes trade hosting income for cache offload, SLA protection, power draw and network load.</div>
             </>
           ) : (
             <div className="mt-4 rounded-lg border border-dashed border-white/10 p-4 text-center"><div className="text-sm text-white/55">No edge infrastructure yet</div><div className="mt-1 text-[11px] text-white/35">Research Edge Compute, then place a data centre to reduce transit load.</div><button className="btn mt-3" onClick={() => { setScreen('map'); setTool('datacenter'); }}>Open build tools</button></div>
@@ -311,9 +429,13 @@ export default function NetworkScreen() {
           <div className="mt-4 flex flex-col gap-2">{game.competitors.map((rival) => {
             const strongest = [...game.districts].sort((a, b) => (rival.share[b.id] ?? 0) - (rival.share[a.id] ?? 0))[0];
             const avgCoverage = game.districts.reduce((sum, d) => sum + (rival.coverage[d.id] ?? 0), 0) / Math.max(1, game.districts.length);
+            const rivalSpectrum = rival.spectrum.map((holding) => `${SPECTRUM_BANDS[holding.band].label} ×${holding.blocks}`).join(', ');
+            const posture = rivalPosture(game, rival);
             return <button key={rival.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.07]" onClick={() => strongest && focus(strongest.center.gx, strongest.center.gy)}>
               <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold"><i className="h-2 w-2 rounded-full" style={{ background: rival.color }} />{rival.name}</span><span className="num text-[10px] text-white/45">PRICE {rival.priceIndex.toFixed(2)}×</span></div>
-              <div className="mt-1 grid grid-cols-3 text-[10px] text-white/42"><span>{Math.round(avgCoverage * 100)}% cover</span><span className="text-center">Tech {Math.round(rival.tech * 100)}</span><span className="truncate text-right">Lead: {strongest?.name}</span></div>
+              <div className="mt-1 flex items-center gap-2 text-[10px]"><span className="rounded border px-1.5 py-0.5 font-semibold" style={{ borderColor: `${rival.color}66`, color: rival.color }}>{posture.label}</span><span className="truncate text-white/35">{posture.detail}</span></div>
+              <div className="mt-1 grid grid-cols-3 text-[10px] text-white/[0.42]"><span>{Math.round(avgCoverage * 100)}% cover</span><span className="text-center">Tech {Math.round(rival.tech * 100)}</span><span className="truncate text-right">Lead: {strongest?.name}</span></div>
+              <div className="mt-1 truncate text-[10px] text-white/35">Spectrum: {rivalSpectrum || 'none'}</div>
               {rival.lastMove && <div className="mt-1 truncate text-[10px]" style={{ color: rival.color }}>{rival.lastMove}</div>}
             </button>;
           })}</div>
@@ -395,7 +517,7 @@ export default function NetworkScreen() {
           <Meter
             v={transitUse}
             label="Transit usage"
-            right={`${game.stats.demandGbps.toFixed(1)}/${(transit.capacity * (game.backupTransit ? 1.35 : 1)).toFixed(0)} Gbps`}
+            right={`${game.stats.transitGbps.toFixed(1)}/${transitCapacity.toFixed(0)} Gbps`}
           />
           <div className="mt-3 flex flex-col gap-2">
             {TRANSIT_TIERS.map((t, i) => (

@@ -26,6 +26,7 @@ export default function ResearchScreen() {
             <p className="mt-1 max-w-xl text-[13px] text-white/45">Follow each branch from field infrastructure to city-scale capability. Cross-branch requirements are named on locked nodes.</p>
           </div>
           <div className="flex gap-2">
+            <div className="kpi min-w-[110px]"><div className="stat-label">Research points</div><div className="num text-lg text-neon-cyan">{game.researchPoints}</div></div>
             <div className="kpi min-w-[110px]"><div className="stat-label">Completed</div><div className="num text-lg text-neon-lime">{completed} / {RESEARCH.length}</div></div>
             <div className="kpi min-w-[120px]"><div className="stat-label">Lab status</div><div className={`text-sm font-semibold ${activeNode ? 'text-neon-cyan' : 'text-white/55'}`}>{activeNode ? 'Researching' : 'Available'}</div></div>
           </div>
@@ -64,7 +65,9 @@ export default function ResearchScreen() {
                     const done = game.researchDone.includes(r.id);
                     const available = isAvailable(r, game.researchDone);
                     const busy = !!game.researchActive;
-                    const affordable = game.money >= r.cost;
+                    const affordableMoney = game.money >= r.cost;
+                    const affordablePoints = game.researchPoints >= r.points;
+                    const affordable = affordableMoney && affordablePoints;
                     const activeHere = active?.id === r.id;
                     const requirements = r.requires.map((q) => RESEARCH.find((x) => x.id === q)?.name).filter(Boolean).join(', ');
                     const status = done ? 'ONLINE' : activeHere ? 'RUNNING' : available ? 'READY' : 'LOCKED';
@@ -81,7 +84,7 @@ export default function ResearchScreen() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-2"><h3 className={`text-sm font-semibold ${available || done || activeHere ? 'text-white/90' : 'text-white/[0.48]'}`}>{r.name}</h3><span className={`font-display text-[9px] font-semibold tracking-[0.12em] ${statusClass}`}>{status}</span></div>
-                              <div className="num mt-0.5 text-[10px] text-white/35">{fmtMoneyExact(r.cost)} / {r.days} days</div>
+                              <div className="num mt-0.5 text-[10px] text-white/35">{fmtMoneyExact(r.cost)} · {r.points} RP · {r.days} days</div>
                             </div>
                           </div>
                           <p className={`mt-2 text-[12px] leading-snug ${available || done || activeHere ? 'text-white/50' : 'text-white/[0.36]'}`}>{r.description}</p>
@@ -89,7 +92,13 @@ export default function ResearchScreen() {
                           {!done && !activeHere && (
                             available ? (
                               <button className="btn-primary mt-3 w-full py-2 text-[12px]" disabled={busy || !affordable} onClick={() => startResearch(r.id)}>
-                                {busy ? 'Research slot occupied' : !affordable ? `Need ${fmtMoneyExact(r.cost)}` : 'Start programme'}
+                                {busy
+                                  ? 'Research slot occupied'
+                                  : !affordableMoney
+                                    ? `Need ${fmtMoneyExact(r.cost)}`
+                                    : !affordablePoints
+                                      ? `Need ${r.points} research points`
+                                      : 'Start programme'}
                               </button>
                             ) : (
                               <div className="mt-3 rounded-md border border-white/[0.055] bg-black/20 px-2.5 py-2 text-[10px] leading-snug text-white/[0.34]">
