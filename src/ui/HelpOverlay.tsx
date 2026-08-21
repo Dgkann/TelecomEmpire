@@ -49,7 +49,7 @@ export default function HelpOverlay() {
           onClick={() => setShow(false)}
         >
           <motion.div
-            className="panel max-h-[80vh] w-[560px] overflow-y-auto p-6"
+            className="panel max-h-[calc(100dvh-2rem)] w-[560px] max-w-[calc(100%-2rem)] overflow-y-auto p-4 sm:p-6"
             initial={{ scale: 0.95, y: 10 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.97, opacity: 0 }}

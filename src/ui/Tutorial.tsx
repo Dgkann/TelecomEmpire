@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { residentialSubs } from '../game/simulation';
+import { computeRoutes, isRedundant } from '../game/network';
 import { useGame } from '../store/gameStore';
 import type { GameState } from '../game/types';
 
@@ -13,12 +14,12 @@ interface TutorialStep {
 const STEPS: TutorialStep[] = [
   {
     title: 'Place a second POP',
-    body: 'Pick POP from the bottom toolbar and drop it on a tile in your home district. POPs are what bring customers onto your network.',
+    body: 'Pick POP and move over the city until the preview turns green, then place the new T1 site inside your licensed district.',
     done: (g) => g.nodes.filter((n) => n.kind === 'pop').length >= 2,
   },
   {
     title: 'Light the fibre',
-    body: 'Choose Fibre, click your new POP, then click the core router. Nothing sells until the site has a path home.',
+    body: 'Choose Fibre, click the new POP, then click the core router; eligible endpoints glow cyan and the route shows its price before you build.',
     done: (g) => g.links.length >= 2,
   },
   {
@@ -28,12 +29,21 @@ const STEPS: TutorialStep[] = [
   },
   {
     title: 'Watch the evening peak',
-    body: 'Traffic roughly doubles between 18:00 and 23:00. Click a POP and upgrade it before the fibre turns orange.',
+    body: 'Traffic roughly doubles between 18:00 and 23:00; upgrade a POP from T1 to T2 and watch its map badge and capacity change.',
     done: (g) => g.nodes.some((n) => n.tier >= 2),
   },
   {
+    title: 'Protect a customer site',
+    body: 'Add a second fibre route to a POP or access site so one cut cannot isolate it; protected sites qualify for stricter contracts and audits.',
+    done: (g) => {
+      const sites = g.nodes.filter((node) => node.kind === 'pop' || node.kind === 'access');
+      const routes = computeRoutes(g);
+      return sites.some((site) => isRedundant(g, site.id, routes));
+    },
+  },
+  {
     title: 'Expand to a new district',
-    body: 'Click a greyed-out district and buy its licence, then repeat: POP, fibre, capacity. That is the whole game.',
+    body: 'Click a greyed-out district and buy its licence, then plan coverage, capacity and a resilient path back to the core.',
     done: (g) => g.districts.filter((d) => d.unlocked).length >= 2,
   },
 ];
@@ -46,9 +56,7 @@ export default function Tutorial() {
   const stepIndex = game.tutorialStep;
   const step = STEPS[stepIndex];
 
-  // Advance as soon as the goal is met. This deliberately does not use a
-  // timeout: the effect re-runs on every simulation tick, so a pending timer
-  // would be cleared before it could ever fire.
+  // Advance as soon as the goal is met.
   useEffect(() => {
     if (step && step.done(game)) advance(stepIndex);
   }, [game, step, stepIndex, advance]);

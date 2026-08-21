@@ -5,8 +5,7 @@ import { cityShare, customerCount, rankOf } from '../game/progression';
 import { fmtDate } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 
-// Reaching the top rung is the win. The game keeps running afterwards, so this
-// is a moment rather than an ending.
+// Reaching the top rung is the win.
 export default function VictoryOverlay() {
   const game = useGame((s) => s.game)!;
   const [dismissed, setDismissed] = useState(false);

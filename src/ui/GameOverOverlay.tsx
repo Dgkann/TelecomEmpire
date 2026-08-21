@@ -19,7 +19,7 @@ export default function GameOverOverlay() {
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="panel w-[440px] overflow-hidden border-neon-red/40"
+            className="panel max-h-[calc(100dvh-2rem)] w-[440px] max-w-[calc(100%-2rem)] overflow-y-auto border-neon-red/40"
             initial={{ scale: 0.94, y: 14 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}

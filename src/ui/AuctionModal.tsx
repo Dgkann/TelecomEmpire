@@ -39,7 +39,7 @@ export default function AuctionModal() {
         exit={{ opacity: 0 }}
       >
         <motion.div
-          className="panel w-[470px] overflow-hidden"
+          className="panel max-h-[calc(100dvh-2rem)] w-[470px] max-w-[calc(100%-2rem)] overflow-y-auto"
           initial={{ scale: 0.94, y: 14 }}
           animate={{ scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 330, damping: 28 }}

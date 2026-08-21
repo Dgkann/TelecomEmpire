@@ -62,7 +62,7 @@ function useHotkeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (target.isContentEditable || target.closest('input, textarea, select, button, a, [role="button"]')) return;
       const g = useGame.getState().game;
       if (!g) return;
       if (e.code === 'Space') {
@@ -106,6 +106,7 @@ function CornerToasts() {
 
 function GameShell() {
   const screen = useGame((s) => s.screen);
+  const persistenceError = useGame((s) => s.persistenceError);
   useGameClock();
   useHotkeys();
   useIncidentSound();
@@ -114,6 +115,11 @@ function GameShell() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
+      {persistenceError && (
+        <div className="z-50 border-b border-neon-red/40 bg-[#35151d] px-3 py-2 text-center text-xs font-medium text-neon-red" role="alert">
+          {persistenceError}
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         <NavigationRail />
         <div className="relative min-w-0 flex-1">

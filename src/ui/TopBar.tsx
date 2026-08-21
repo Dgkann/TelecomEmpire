@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { fmtMoney, fmtNum } from '../game/economy';
+import { currentMonthCashFlow } from '../game/financeLedger';
 import { rankOf } from '../game/progression';
 import { fmtClock, fmtDate, totalCustomers } from '../game/simulation';
 import { useGame } from '../store/gameStore';
@@ -41,7 +42,7 @@ export default function TopBar() {
   const setScreen = useGame((s) => s.setScreen);
   const customers = totalCustomers(game);
   const health = game.stats.health;
-  const profit = game.monthAccumulator.revenue - game.monthAccumulator.expense;
+  const cashFlow = currentMonthCashFlow(game);
   const incidents = game.incidents.filter((i) => !i.resolved).length;
 
   return (
@@ -61,7 +62,15 @@ export default function TopBar() {
 
       <div className="flex min-w-0 flex-1 items-stretch px-1">
         <Stat label="Cash" value={fmtMoney(game.money)} tone={game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'} />
-        <div className="hidden min-w-0 flex-1 lg:flex"><Stat label="Monthly P/L" shortLabel="P/L" value={`${profit >= 0 ? '+' : ''}${fmtMoney(profit)}`} tone={profit >= 0 ? 'text-neon-lime' : 'text-neon-red'} /></div>
+        <div className="hidden min-w-0 flex-1 lg:flex">
+          <Stat
+            label="Free cash flow MTD"
+            shortLabel="Cash flow"
+            value={`${cashFlow.freeCashFlow >= 0 ? '+' : ''}${fmtMoney(cashFlow.freeCashFlow)}`}
+            tone={cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}
+            secondary={`op ${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoney(cashFlow.operatingCash)}`}
+          />
+        </div>
         <Stat label="Customers" shortLabel="Subs" value={fmtNum(customers)} secondary={`rep ${Math.round(game.reputation)}`} />
         <Stat label="Network" shortLabel="Health" value={`${Math.round(health)}%`} tone={health > 80 ? 'text-neon-lime' : health > 55 ? 'text-neon-amber' : 'text-neon-red'} bar={health / 100} />
         <div className="hidden min-w-0 flex-1 xl:flex"><Stat label="Traffic" value={`${game.stats.demandGbps.toFixed(1)}G`} secondary="Gbps" /></div>

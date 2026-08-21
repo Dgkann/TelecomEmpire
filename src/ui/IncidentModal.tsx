@@ -28,7 +28,7 @@ export default function IncidentModal() {
           onClick={() => close(null)}
         >
           <motion.div
-            className="panel w-[440px] overflow-hidden"
+            className="panel max-h-[calc(100dvh-2rem)] w-[440px] max-w-[calc(100%-2rem)] overflow-y-auto"
             initial={{ scale: 0.94, y: 12 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0 }}
