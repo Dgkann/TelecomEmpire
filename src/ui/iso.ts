@@ -33,9 +33,7 @@ export function tileDiamond(gx: number, gy: number, inset = 0.06) {
 
 export const depth = (gx: number, gy: number) => gx + gy;
 
-// Accepts both #hex and the rgb() strings these helpers return, so results can
-// be fed back in. Passing an rgb() string to a hex-only parser silently yields
-// NaN, which the browser paints as black.
+// Accepts both #hex and the rgb() strings these helpers return, so results can be fed back in.
 function parseColor(color: string): [number, number, number] {
   if (color.startsWith('rgb')) {
     const parts = color.match(/\d+/g);

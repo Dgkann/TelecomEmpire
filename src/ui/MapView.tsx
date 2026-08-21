@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { NODE_SPECS, utilColor, FIBER_COST_PER_UNIT, towerRadius } from '../game/constants';
+import { utilColor, towerRadius } from '../game/constants';
 import { isRoad } from '../game/cityGen';
 import { leaderOf } from '../game/competitors';
 import { computeRoutes, linkUtil, nodeUtil } from '../game/network';
+import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
 import { daylight, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 import type { Building, District, GameState, NetLink, NetNode, SpectrumHolding, Technician } from '../game/types';
@@ -11,6 +12,11 @@ import { FLOOR_H, TILE_H, TILE_W, isoX, isoY, mix, shade, tileDiamond, unIso } f
 import SiteIcon, { SITE_SIZE, SITE_VISUAL, SitePlate } from './SiteIcon';
 
 const COMPANY = '#2dd4bf';
+const PLACEMENT_BLOCKER = '[data-map-placement-blocker="true"]';
+
+function isMapBackgroundTarget(target: EventTarget | null, map: Element) {
+  return target instanceof Element && map.contains(target) && target.closest(PLACEMENT_BLOCKER) === null;
+}
 
 const MAP = {
   ground: '#16253a',
@@ -20,8 +26,7 @@ const MAP = {
   locked: '#0a121d',
 };
 
-// Buildings sit on a single cool ramp. Only their value changes, so a tinted
-// building reads as "mine" instantly rather than competing with six other hues.
+// Buildings sit on a single cool ramp.
 const SLATE = ['#3c4d63', '#47596f', '#53667d', '#5f7288', '#6b7f95'];
 
 const GroundLayer = memo(function GroundLayer({
@@ -36,8 +41,7 @@ const GroundLayer = memo(function GroundLayer({
   const junctions: JSX.Element[] = [];
 
   districts.forEach((d, di) => {
-    // Alternating value, not hue, so five districts read apart without turning
-    // the city into a colour chart.
+    // Alternating value, not hue, so five districts read apart without turning the city into a colour chart.
     const plate = mix(mix(di % 2 === 0 ? MAP.ground : MAP.groundAlt, d.color, 0.1), '#000000', night * 0.3);
     const surface = d.unlocked ? plate : mix(MAP.locked, '#000000', night * 0.3);
     const road = mix(MAP.road, '#000000', night * 0.3);
@@ -78,8 +82,7 @@ const GroundLayer = memo(function GroundLayer({
     }
   });
 
-  // Boundaries carry the district colour, drawn as the shared edge between two
-  // districts rather than a ring around every border tile.
+  // Boundaries carry the district colour, drawn as the shared edge between two districts rather than a ring around every border tile.
   const outlines = districts.map((d) => {
     const set = new Set(d.cells.map((c) => `${c.gx},${c.gy}`));
     const segments: Array<[number, number, number, number]> = [];
@@ -244,7 +247,7 @@ const BuildingsLayer = memo(function BuildingsLayer({
 }) {
   const sorted = useMemo(() => [...buildings].sort((a, b) => a.gx + a.gy - (b.gx + b.gy)), [buildings]);
   return (
-    <g>
+    <g style={{ pointerEvents: 'none' }}>
       {sorted.map((b) => (
         <MemoBuilding key={b.id} b={b} night={night} dim={dim} justConnected={minutes - b.lastConnectedAt < 25} />
       ))}
@@ -260,8 +263,7 @@ const COVERAGE_RADIUS: Record<NetNode['kind'], number> = {
   datacenter: 2,
 };
 
-// Tints each district by whoever currently leads it, so a rival creeping into
-// your city is visible without opening a screen.
+// Tints each district by whoever currently leads it.
 const RivalsLayer = memo(function RivalsLayer({ game }: { game: GameState }) {
   return (
     <g>
@@ -420,7 +422,7 @@ function LinkGlyph({
   const dur = Math.max(0.6, 5 - util * 4.2);
 
   return (
-    <g onClick={(e) => (e.stopPropagation(), onSelect())} style={{ cursor: 'pointer' }}>
+    <g data-map-placement-blocker="true" onClick={(e) => (e.stopPropagation(), onSelect())} style={{ cursor: 'pointer' }}>
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={12} />
       <line
         x1={x1}
@@ -473,39 +475,38 @@ function LinkGlyph({
   );
 }
 
-// Shape identifies the site type, its own accent identifies its family, and the
-// outer arc reports load. These channels stay independent, so a busy POP never
-// becomes visually interchangeable with a busy core.
+// Shape identifies the site type, its own accent identifies its family, and the outer arc reports load.
 function NodeGlyph({
   node,
   selected,
   onSelect,
   hasIncident,
-  linking,
+  fiberState,
 }: {
   node: NetNode;
   selected: boolean;
   onSelect: () => void;
   hasIncident: boolean;
-  linking: boolean;
+  fiberState: 'source' | 'eligible' | 'blocked' | null;
 }) {
   const cx = isoX(node.gx, node.gy);
   const cy = isoY(node.gx, node.gy);
   const util = Math.min(1, nodeUtil(node));
   const statusColor = node.down ? '#ff6577' : utilColor(util);
   const visual = SITE_VISUAL[node.kind];
+  const linking = fiberState === 'source';
 
-  const r = SITE_SIZE[node.kind];
+  // Capacity is the whole point of a tier, so the site simply gets bigger.
+  const r = SITE_SIZE[node.kind] * (1 + (node.tier - 1) * 0.15);
   const mast = node.kind === 'tower' ? 26 + node.tier * 3 : 0;
   const my = cy - (mast ? mast * 0.5 : 10);
 
-  // Utilisation arc around the plate. Drawn as a dashed circle so no path maths
-  // is needed and it animates cleanly.
+  // Utilisation arc around the plate.
   const ringR = r + 3.5;
   const circumference = 2 * Math.PI * ringR;
 
   return (
-    <g onClick={(e) => (e.stopPropagation(), onSelect())} style={{ cursor: 'pointer' }}>
+    <g data-map-placement-blocker="true" onClick={(e) => (e.stopPropagation(), onSelect())} style={{ cursor: 'pointer' }}>
       <title>{`${node.name} · ${visual.label} · Tier ${node.tier} · ${Math.round(util * 100)}% load`}</title>
       {node.kind === 'tower' && (
         <>
@@ -521,7 +522,26 @@ function NodeGlyph({
       <line x1={cx} y1={cy} x2={cx} y2={my + r * 0.7} stroke={visual.accent} strokeWidth={0.8} strokeOpacity={0.42} />
 
       {/* The plate itself */}
-      <circle cx={cx} cy={my} r={r + 7} fill={visual.accent} opacity={selected || linking ? 0.17 : 0.08} className="pulse-soft" />
+      <circle
+        cx={cx}
+        cy={my}
+        r={r + 7}
+        fill={visual.accent}
+        opacity={(selected || linking ? 0.17 : 0.08) + (node.tier - 1) * 0.022}
+        className="pulse-soft"
+      />
+      {fiberState && (
+        <circle
+          cx={cx}
+          cy={my}
+          r={r + 9.5}
+          fill="none"
+          stroke={fiberState === 'blocked' ? '#ff6577' : COMPANY}
+          strokeWidth={fiberState === 'source' ? 2.2 : 1.2}
+          strokeDasharray={fiberState === 'source' ? undefined : '3 3'}
+          opacity={fiberState === 'blocked' ? 0.34 : fiberState === 'source' ? 0.95 : 0.58}
+        />
+      )}
       <SitePlate kind={node.kind} cx={cx} cy={my} size={r} fill={node.down ? '#32131b' : mix('#0c1726', visual.accent, 0.1)} stroke={node.down ? '#ff6577' : visual.accent} />
 
       <circle cx={cx} cy={my} r={ringR} fill="none" stroke="#1d2c40" strokeWidth={2.4} opacity={0.9} />
@@ -552,14 +572,14 @@ function NodeGlyph({
         {visual.code}
       </text>
 
-      {/* Tier pips, so an upgraded site is readable without opening a panel. */}
-      {node.tier > 1 && (
-        <g>
-          {Array.from({ length: Math.min(4, node.tier - 1) }, (_, i) => (
-            <circle key={i} cx={cx - 4.5 + i * 3} cy={my + r + 4.5} r={1.1} fill={visual.accent} opacity={0.9} />
-          ))}
-        </g>
-      )}
+      <g transform={`translate(${cx + r * 0.42} ${my + r * 0.48})`} style={{ pointerEvents: 'none' }}>
+        <rect width={17} height={9} rx={2.4} fill="#050b14" stroke={visual.accent} strokeWidth={0.8} />
+        <text x={8.5} y={6.4} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontSize={5.7} fontWeight={800} fill={visual.accent}>
+          T{node.tier}
+        </text>
+      </g>
+
+
 
       {(selected || linking) && (
         <>
@@ -567,7 +587,7 @@ function NodeGlyph({
           <g transform={`translate(${cx} ${my - r - 18})`} style={{ pointerEvents: 'none' }}>
             <rect x={-33} y={-8} width={66} height={15} rx={3} fill="#07111d" stroke={visual.accent} strokeWidth={0.7} strokeOpacity={0.78} />
             <text y={2.5} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontSize={6.8} fontWeight={700} letterSpacing={0.5} fill="#e8eef7">
-              {visual.label.toUpperCase()}
+              {visual.label.toUpperCase()} · T{node.tier}
             </text>
           </g>
         </>
@@ -588,7 +608,7 @@ function TechnicianGlyph({ t }: { t: Technician }) {
   const cx = isoX(t.gx, t.gy);
   const cy = isoY(t.gx, t.gy);
   return (
-    <g>
+    <g data-map-placement-blocker="true">
       <ellipse cx={cx} cy={cy + 3} rx={7} ry={3} fill="#000" opacity={0.35} />
       <rect x={cx - 7} y={cy - 9} width={14} height={8} rx={2} fill="#ffc857" />
       <rect x={cx - 7} y={cy - 12} width={8} height={4} rx={1.5} fill="#ffdc8f" />
@@ -624,7 +644,15 @@ export default function MapView() {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState<Camera>({ x: 0, y: -60, zoom: 1 });
   const [hover, setHover] = useState<{ gx: number; gy: number } | null>(null);
-  const drag = useRef<{ x: number; y: number; camX: number; camY: number; moved: boolean } | null>(null);
+  const drag = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    camX: number;
+    camY: number;
+    moved: boolean;
+    startedOnBackground: boolean;
+  } | null>(null);
   const didInitialFit = useRef(false);
 
   const worldBounds = useMemo(() => {
@@ -682,9 +710,7 @@ export default function MapView() {
       }
     };
 
-    // Measure before the first paint, then keep it in step. The observer alone
-    // was not enough: any layout change it missed left the map centred on the
-    // wrong point, which is what made zooming and clicking feel off.
+    // Measure before the first paint, then keep it in step.
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -707,13 +733,18 @@ export default function MapView() {
     setCam((c) => ({ ...c, x: -isoX(focusOn.gx, focusOn.gy), y: -isoY(focusOn.gx, focusOn.gy), zoom: Math.max(c.zoom, 1.1) }));
   }, [focusOn]);
 
-  // Quantised so the day/night value only changes a few dozen times per game
-  // day, otherwise every building in the city re-renders on every tick.
+  // Quantised so the day/night value only changes a few dozen times per game day.
   const night = Math.round((1 - daylight(game.minutes)) * 16) / 16;
   const nodeById = useMemo(() => {
     const m: Record<string, NetNode> = {};
     for (const n of game.nodes) m[n.id] = n;
     return m;
+  }, [game.nodes]);
+
+  const nodeGrid = useMemo(() => {
+    const map = new Map<string, NetNode>();
+    for (const node of game.nodes) map.set(`${node.gx},${node.gy}`, node);
+    return map;
   }, [game.nodes]);
 
   const districtGrid = useMemo(() => {
@@ -757,20 +788,31 @@ export default function MapView() {
   );
 
   const onPointerDown = (e: React.PointerEvent) => {
-    try {
-      (e.target as Element).setPointerCapture?.(e.pointerId);
-    } catch {
-      // Pointer capture is a nicety for smooth dragging, never a requirement.
-    }
-    drag.current = { x: e.clientX, y: e.clientY, camX: cam.x, camY: cam.y, moved: false };
+    if (!e.isPrimary || e.button !== 0) return;
+    drag.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      camX: cam.x,
+      camY: cam.y,
+      moved: false,
+      startedOnBackground: isMapBackgroundTarget(e.target, e.currentTarget),
+    };
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
-    if (d) {
+    if (d?.pointerId === e.pointerId) {
       const dx = e.clientX - d.x;
       const dy = e.clientY - d.y;
       if (Math.abs(dx) + Math.abs(dy) > 4) {
+        if (!d.moved) {
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // Pointer capture improves dragging but is never required for a click.
+          }
+        }
         d.moved = true;
         setCam((c) => ({ ...c, x: d.camX + dx / c.zoom, y: d.camY + dy / c.zoom }));
       }
@@ -782,11 +824,13 @@ export default function MapView() {
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
-    if (!d || d.moved) return;
+    if (!d || d.pointerId !== e.pointerId || d.moved) return;
     const cell = toGrid(e.clientX, e.clientY);
     if (!cell) return;
 
     if (tool && tool !== 'fiber') {
+      const releaseTarget = document.elementFromPoint(e.clientX, e.clientY);
+      if (!d.startedOnBackground || !isMapBackgroundTarget(releaseTarget, e.currentTarget)) return;
       placeNode(tool, cell.gx, cell.gy);
       return;
     }
@@ -794,6 +838,11 @@ export default function MapView() {
 
     const district = districtGrid.get(`${cell.gx},${cell.gy}`);
     if (district) select({ type: 'district', id: district.id });
+  };
+
+  const cancelPointerGesture = (e: React.PointerEvent) => {
+    if (drag.current?.pointerId === e.pointerId) drag.current = null;
+    setHover(null);
   };
 
   const onWheel = (e: React.WheelEvent) => {
@@ -813,12 +862,14 @@ export default function MapView() {
     });
   };
 
-  const ghostCost = useMemo(() => {
-    if (!tool || tool === 'fiber') return null;
-    return NODE_SPECS[tool].baseCost;
-  }, [tool]);
-
   const linkFromNode = linkFrom ? nodeById[linkFrom] : null;
+  const hoveredNode = hover ? nodeGrid.get(`${hover.gx},${hover.gy}`) ?? null : null;
+  const placementIssue = tool && tool !== 'fiber' && hover ? nodePlacementIssue(game, tool, hover.gx, hover.gy) : null;
+  const placementCost = tool && tool !== 'fiber' ? nodePlacementCost(game, tool) : null;
+  const placementColor = placementIssue ? '#ff6577' : COMPANY;
+  const fibreIssue = linkFromNode && hoveredNode ? fibreConnectionIssue(game, linkFromNode.id, hoveredNode.id) : null;
+  const fibreCost = linkFromNode && hoveredNode ? fibreConnectionCost(game, linkFromNode.id, hoveredNode.id) : 0;
+  const fibreColor = hoveredNode && !fibreIssue ? COMPANY : '#ff6577';
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-ink-900">
@@ -838,7 +889,11 @@ export default function MapView() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={() => (drag.current = null)}
+        onPointerCancel={cancelPointerGesture}
+        onLostPointerCapture={cancelPointerGesture}
+        onPointerLeave={(e) => {
+          if (!e.currentTarget.hasPointerCapture(e.pointerId)) cancelPointerGesture(e);
+        }}
         onWheel={onWheel}
       >
         <defs>
@@ -865,18 +920,29 @@ export default function MapView() {
           {overlay === 'customers' && <CustomersLayer game={game} />}
 
           {tool && tool !== 'fiber' && hover && (
-            <g opacity={0.85} style={{ pointerEvents: 'none' }}>
-              <polygon points={tileDiamond(hover.gx, hover.gy, 0)} fill={COMPANY} opacity={0.25} />
-              <circle cx={isoX(hover.gx, hover.gy)} cy={isoY(hover.gx, hover.gy) - 8} r={11} fill="#0f1622" stroke={COMPANY} strokeWidth={2} />
+            <g opacity={0.92} style={{ pointerEvents: 'none' }}>
+              <polygon points={tileDiamond(hover.gx, hover.gy, 0)} fill={placementColor} opacity={0.3} />
+              <circle cx={isoX(hover.gx, hover.gy)} cy={isoY(hover.gx, hover.gy) - 8} r={11} fill="#0f1622" stroke={placementColor} strokeWidth={2} />
+              <rect
+                x={isoX(hover.gx, hover.gy) - 76}
+                y={isoY(hover.gx, hover.gy) - 49}
+                width={152}
+                height={16}
+                rx={4}
+                fill="#050b14"
+                stroke={placementColor}
+                strokeWidth={0.8}
+              />
               <text
                 x={isoX(hover.gx, hover.gy)}
-                y={isoY(hover.gx, hover.gy) - 26}
+                y={isoY(hover.gx, hover.gy) - 38}
                 textAnchor="middle"
-                fontSize={11}
-                fill={COMPANY}
+                fontSize={7.3}
+                fontWeight={700}
+                fill={placementColor}
                 className="num"
               >
-                ${ghostCost?.toLocaleString()}
+                {placementIssue ?? `READY · $${placementCost?.toLocaleString()}`}
               </text>
             </g>
           )}
@@ -886,25 +952,33 @@ export default function MapView() {
               <line
                 x1={isoX(linkFromNode.gx, linkFromNode.gy)}
                 y1={isoY(linkFromNode.gx, linkFromNode.gy) - 6}
-                x2={isoX(hover.gx, hover.gy)}
-                y2={isoY(hover.gx, hover.gy) - 6}
-                stroke={COMPANY}
+                x2={isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)}
+                y2={isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy) - 6}
+                stroke={fibreColor}
                 strokeWidth={2}
                 strokeDasharray="6 4"
                 opacity={0.8}
               />
+              <rect
+                x={(isoX(linkFromNode.gx, linkFromNode.gy) + isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2 - 64}
+                y={(isoY(linkFromNode.gx, linkFromNode.gy) + isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2 - 29}
+                width={128}
+                height={16}
+                rx={4}
+                fill="#050b14"
+                stroke={fibreColor}
+                strokeWidth={0.8}
+              />
               <text
-                x={(isoX(linkFromNode.gx, linkFromNode.gy) + isoX(hover.gx, hover.gy)) / 2}
-                y={(isoY(linkFromNode.gx, linkFromNode.gy) + isoY(hover.gx, hover.gy)) / 2 - 14}
+                x={(isoX(linkFromNode.gx, linkFromNode.gy) + isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2}
+                y={(isoY(linkFromNode.gx, linkFromNode.gy) + isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2 - 18}
                 textAnchor="middle"
-                fontSize={11}
-                fill={COMPANY}
+                fontSize={7.3}
+                fontWeight={700}
+                fill={fibreColor}
                 className="num"
               >
-                $
-                {Math.round(
-                  Math.hypot(linkFromNode.gx - hover.gx, linkFromNode.gy - hover.gy) * FIBER_COST_PER_UNIT,
-                ).toLocaleString()}
+                {hoveredNode ? fibreIssue ?? `READY · $${fibreCost.toLocaleString()}` : 'CHOOSE A DESTINATION SITE'}
               </text>
             </g>
           )}
@@ -937,7 +1011,15 @@ export default function MapView() {
                 key={n.id}
                 node={n}
                 selected={selection?.type === 'node' && selection.id === n.id}
-                linking={tool === 'fiber' && linkFrom === n.id}
+                fiberState={
+                  tool !== 'fiber'
+                    ? null
+                    : linkFrom === n.id
+                      ? 'source'
+                      : linkFrom && fibreConnectionIssue(game, linkFrom, n.id)
+                        ? 'blocked'
+                        : 'eligible'
+                }
                 hasIncident={!!incidentByTarget[n.id]}
                 onSelect={() => {
                   if (tool === 'fiber') clickNodeForLink(n.id);
@@ -958,6 +1040,7 @@ export default function MapView() {
               return (
                 <g
                   key={i.id}
+                  data-map-placement-blocker="true"
                   className="alert-blink"
                   onClick={(e) => (e.stopPropagation(), openIncident(i.id))}
                   style={{ cursor: 'pointer' }}
