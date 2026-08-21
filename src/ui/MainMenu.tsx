@@ -11,9 +11,20 @@ const CITIES = [
   { name: 'Karadeniz', blurb: 'Spread out and cheaper to license. Fibre runs get long.' },
 ];
 
+type SaveMeta = NonNullable<ReturnType<typeof listSaveMeta>[number]>;
+type ImportStatus = { tone: 'good' | 'bad' | 'info'; text: string };
+
+function saveContext(slot: number, meta: SaveMeta) {
+  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} customers\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+}
+
+const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) =>
+  a?.savedAt === b?.savedAt && a?.company === b?.company;
+
 export default function MainMenu() {
   const newGame = useGame((s) => s.newGame);
   const continueGame = useGame((s) => s.continueGame);
+  const persistenceError = useGame((s) => s.persistenceError);
   const [metas, setMetas] = useState(() => listSaveMeta());
   const [newSlot, setNewSlot] = useState(() => {
     const empty = listSaveMeta().findIndex((m) => !m);
@@ -24,6 +35,30 @@ export default function MainMenu() {
   const [logo, setLogo] = useState(LOGOS[0]);
   const [difficulty, setDifficulty] = useState<Difficulty>('standard');
   const [city, setCity] = useState(CITIES[0].name);
+  const [importSlot, setImportSlot] = useState(() => {
+    const empty = listSaveMeta().findIndex((m) => !m);
+    return empty < 0 ? 0 : empty;
+  });
+  const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
+
+  const deleteSlot = (slot: number, meta: SaveMeta) => {
+    if (!window.confirm(`Delete this saved network?\n\n${saveContext(slot, meta)}\n\nThis cannot be undone.`)) return;
+    if (!clearSave(slot)) {
+      setImportStatus({ tone: 'bad', text: `Slot ${slot + 1} could not be deleted. Check browser storage and try again.` });
+      return;
+    }
+    setMetas(listSaveMeta());
+    setImportStatus({ tone: 'good', text: `Slot ${slot + 1} was deleted.` });
+  };
+
+  const startNewGame = () => {
+    const existing = metas[newSlot];
+    if (
+      existing &&
+      !window.confirm(`Start a new network and overwrite this save?\n\n${saveContext(newSlot, existing)}\n\nThis cannot be undone.`)
+    ) return;
+    newGame({ companyName: name.trim() || 'CoreLink', logo, difficulty, cityName: city }, newSlot);
+  };
 
   return (
     <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#0b1218]">
@@ -70,26 +105,94 @@ export default function MainMenu() {
             </div>
             {metas.map((meta, slot) => meta && (
               <div key={slot} className="flex gap-2 rounded-lg border border-neon-cyan/25 bg-neon-cyan/[0.06] p-3">
-                <button className="min-w-0 flex-1 text-left" onClick={() => continueGame(slot)}>
+                <button className="min-w-0 flex-1 text-left" onClick={() => {
+                  if (continueGame(slot)) return;
+                  setMetas(listSaveMeta());
+                  setImportStatus({ tone: 'bad', text: `Slot ${slot + 1} is no longer readable. It may have changed in another tab.` });
+                }}>
                   <div className="text-sm font-semibold text-neon-cyan">Continue · Slot {slot + 1}</div>
                   <div className="num truncate text-[10px] text-white/45">{meta.company} · {meta.city} · {meta.customers.toLocaleString()} customers · {new Date(meta.savedAt).toLocaleString()}</div>
                 </button>
-                <button className="icon-button text-neon-red" aria-label={`Delete slot ${slot + 1}`} onClick={() => { clearSave(slot); setMetas(listSaveMeta()); }}>×</button>
+                <button className="icon-button text-neon-red" aria-label={`Delete ${meta.company} from slot ${slot + 1}`} onClick={() => deleteSlot(slot, meta)}>×</button>
               </div>
             ))}
             <button className="btn py-3 text-left" onClick={() => setSetup(true)}>
               <span className="text-sm font-semibold">Commission new network</span>
             </button>
-            <label className="btn cursor-pointer py-3 text-left text-white/50">
-              <span className="text-sm">Import save file</span>
-              <input className="hidden" type="file" accept="application/json,.json" onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const empty = metas.findIndex((m) => !m);
-                importSave(await file.text(), empty < 0 ? 0 : empty);
-                setMetas(listSaveMeta());
-              }} />
-            </label>
+            <div className="mt-1 rounded-lg border border-white/[0.08] bg-black/10 p-3">
+              <label htmlFor="menu-import-slot" className="stat-label">Import destination</label>
+              <div className="mt-1.5 flex gap-2">
+                <select
+                  id="menu-import-slot"
+                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-800 px-2 py-2 text-xs"
+                  value={importSlot}
+                  onChange={(e) => { setImportSlot(Number(e.target.value)); setImportStatus(null); }}
+                >
+                  {Array.from({ length: SAVE_SLOT_COUNT }, (_, slot) => (
+                    <option key={slot} value={slot}>Slot {slot + 1} — {metas[slot]?.company ?? 'empty'}</option>
+                  ))}
+                </select>
+                <label className="btn cursor-pointer py-2 text-white/60">
+                  <span className="text-xs font-semibold">Choose file</span>
+                  <input className="hidden" type="file" accept="application/json,.json" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setImportStatus(null);
+                    const destination = importSlot;
+                    let raw: string;
+                    try {
+                      raw = await file.text();
+                    } catch {
+                      setImportStatus({ tone: 'bad', text: 'That save file could not be read. No save was changed.' });
+                      e.target.value = '';
+                      return;
+                    }
+                    // Re-check before import so an asynchronous file read cannot overwrite a newly started game.
+                    if (useGame.getState().started) {
+                      e.target.value = '';
+                      return;
+                    }
+                    const latestMetas = listSaveMeta();
+                    setMetas(latestMetas);
+                    const existing = latestMetas[destination];
+                    if (
+                      existing &&
+                      !window.confirm(`Import and overwrite this save?\n\n${saveContext(destination, existing)}\n\nThis cannot be undone.`)
+                    ) {
+                      setImportStatus({ tone: 'info', text: 'Import cancelled; no save was changed.' });
+                      e.target.value = '';
+                      return;
+                    }
+                    const finalMeta = listSaveMeta()[destination];
+                    if (useGame.getState().started || !sameSnapshot(existing, finalMeta)) {
+                      setMetas(listSaveMeta());
+                      setImportStatus({ tone: 'bad', text: `Slot ${destination + 1} changed while the file was being checked. Review it and try again.` });
+                      e.target.value = '';
+                      return;
+                    }
+                    try {
+                      const state = importSave(raw, destination);
+                      setMetas(listSaveMeta());
+                      setImportStatus(state
+                        ? { tone: 'good', text: `${state.companyName} imported into slot ${destination + 1}.` }
+                        : { tone: 'bad', text: 'That save file could not be read. No save was changed.' });
+                    } catch {
+                      setImportStatus({ tone: 'bad', text: 'That save file could not be read. No save was changed.' });
+                    } finally {
+                      e.target.value = '';
+                    }
+                  }} />
+                </label>
+              </div>
+              {importStatus && (
+                <div
+                  role={importStatus.tone === 'bad' ? 'alert' : 'status'}
+                  className={`mt-2 text-[11px] ${importStatus.tone === 'good' ? 'text-neon-lime' : importStatus.tone === 'bad' ? 'text-neon-red' : 'text-white/55'}`}
+                >
+                  {importStatus.text}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="panel flex flex-col gap-5 border-white/[0.12] p-5">
@@ -178,11 +281,12 @@ export default function MainMenu() {
               </button>
               <button
                 className="btn-primary flex-[2]"
-                onClick={() => newGame({ companyName: name.trim() || 'CoreLink', logo, difficulty, cityName: city }, newSlot)}
+                onClick={startNewGame}
               >
                 Start building
               </button>
             </div>
+            {persistenceError && <p className="text-[11px] text-neon-red" role="alert">{persistenceError}</p>}
           </div>
         )}
       </motion.div>
