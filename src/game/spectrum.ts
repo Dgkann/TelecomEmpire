@@ -42,11 +42,11 @@ function rivalBid(state: GameState, auction: Auction, aggression: number, rng: R
 }
 
 export function settleAuction(state: GameState, auction: Auction, rng: Rng): Auction {
-  // A rival that cannot justify the reserve simply sits the lot out, which
-  // keeps bids from piling up on the floor price.
+  // A rival that cannot justify the reserve simply sits the lot out.
   const bids: AuctionBid[] = [];
   for (const c of state.competitors) {
-    const amount = rivalBid(state, auction, c.aggression, rng);
+    const willingness = rivalBid(state, auction, c.aggression, rng);
+    const amount = Math.min(willingness, Math.floor(Math.max(0, c.cash) / 1000) * 1000);
     if (amount >= auction.reserve) bids.push({ bidderId: c.id, bidderName: c.name, amount });
   }
 
