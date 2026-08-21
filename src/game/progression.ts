@@ -2,8 +2,7 @@ import { playerShareTarget } from './competitors';
 import { clamp } from './util';
 import type { GameState } from './types';
 
-// The company ladder. Losing is possible, so there has to be something to aim
-// at as well. Each rung is a visible goal with visible progress.
+// The company ladder.
 
 export interface RankRequirement {
   label: string;
@@ -21,8 +20,7 @@ export interface Rank {
   creditMultiplier: number;
 }
 
-// Counted locally rather than imported, because simulation.ts calls into this
-// module and a cycle between the two would be fragile.
+// Counted locally rather than imported.
 export function customerCount(s: GameState) {
   const fixed = s.buildings.reduce(
     (sum, b) => (b.segment === 'residential' ? sum + b.households * b.connected : sum),

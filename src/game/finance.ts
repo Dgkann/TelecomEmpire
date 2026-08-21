@@ -6,8 +6,7 @@ import { uid } from './rng';
 import { clamp } from './util';
 import type { GameState, Loan } from './types';
 
-// Debt turns cash from a score into a constraint. You can borrow against what
-// you earn and what you have built, and you lose if you cannot service it.
+// Debt turns cash from a score into a constraint.
 
 // How long you may sit past the credit limit before the banks pull the plug.
 export const GRACE_DAYS = 45;
@@ -31,7 +30,9 @@ export function creditLimit(s: GameState) {
   const money = monthlyBreakdown(s, researchModifiers(s.researchDone));
   const owed = s.loans.reduce((sum, l) => sum + l.remaining, 0);
   const raw = (money.totalRevenue * 5 + assetValue(s) * 0.4) * rankOf(s).creditMultiplier;
-  return Math.max(40000, Math.round(raw - owed));
+  // Apply the facility floor before subtracting debt so it cannot become renewable headroom.
+  const facility = Math.max(40000, Math.round(raw));
+  return Math.max(0, Math.round(facility - owed));
 }
 
 export const totalDebt = (s: GameState) => s.loans.reduce((sum, l) => sum + l.remaining, 0);
