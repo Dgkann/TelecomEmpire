@@ -9,29 +9,42 @@ import {
   SLA_PENALTY_CAP,
   MOBILE_AVG_SPEED,
   MOBILE_MARKET_SHARE,
-  DATACENTER_CACHE_CAP,
-  DATACENTER_CACHE_PER_TIER,
   MOBILE_OVERSUBSCRIPTION,
   OVERSUBSCRIPTION,
+  SAVE_VERSION,
   SPECTRUM_BANDS,
   START_DATE,
   TRANSIT_TIERS,
   nodeCapacity,
-  towerCapacity,
   towerRadius,
 } from './constants';
+import { effectiveNodeCapacity } from './capacity';
 import { createAuction, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
+import { recordLedger, recordOperatingMonth } from './financeLedger';
 import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
 import { checkPromotion, customerCount, isTopRank } from './progression';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
 import { repairCost, rollIncident, type RepairMode } from './incidents';
+import { contractProfile } from './contracts';
 import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
-import { computeRoutes, loadNetwork, servingNodes } from './network';
+import { computeRoutes, loadServices, servingNodes, type TrafficService } from './network';
 import { researchModifiers, type ResearchMods } from './research';
+import { staffModifiers, trainEmployee, trainTechnician } from './staff';
+import {
+  DATA_CENTER_MODE_CONFIG,
+  INTERCONNECT_CONFIG,
+  TRAFFIC_POLICY_CONFIG,
+  activeCampaign,
+  dataCenterMode,
+  wholesaleDemand,
+  maintenanceCost,
+  maintenanceStart,
+  MAINTENANCE_CONFIG,
+} from './strategy';
 import { makeRng, pick, rand, randInt, uid, type Rng } from './rng';
 import type { Building, ChurnReason, Difficulty, District, GameState, Incident, NetNode, Technician } from './types';
 
@@ -133,7 +146,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
   };
 
   const state: GameState = {
-    version: 1,
+    version: SAVE_VERSION,
     companyName: opts.companyName,
     logo: opts.logo,
     difficulty: opts.difficulty,
@@ -160,6 +173,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     contracts: [],
     offers: [],
     incidents: [],
+    maintenanceOrders: [],
     technicians: [makeTechnician(rng, popGx, popGy), makeTechnician(rng, popGx, popGy)],
     employees: [
       { id: uid('e'), name: personName(rng), role: 'network_engineer', salary: 4200, skill: 3, experience: 0 },
@@ -168,14 +182,17 @@ export function createNewGame(opts: NewGameOptions): GameState {
     researchDone: [],
     researchActive: null,
     competitors: [
-      { id: 'novatel', name: 'NovaTel', color: '#ff9f43', aggression: 0.9, share: {}, priceIndex: 1, cash: 250000, coverage: {}, mobileCoverage: {}, tech: 0.2, lastMove: null },
-      { id: 'hypernet', name: 'HyperNet', color: '#a78bfa', aggression: 1.1, share: {}, priceIndex: 0.92, cash: 250000, coverage: {}, mobileCoverage: {}, tech: 0.2, lastMove: null },
-      { id: 'telestar', name: 'Telestar', color: '#7ee787', aggression: 0.7, share: {}, priceIndex: 1.12, cash: 250000, coverage: {}, mobileCoverage: {}, tech: 0.2, lastMove: null },
+      { id: 'novatel', name: 'NovaTel', color: '#ff9f43', aggression: 0.9, share: {}, priceIndex: 1, cash: 250000, coverage: {}, mobileCoverage: {}, spectrum: [], tech: 0.2, lastMove: null },
+      { id: 'hypernet', name: 'HyperNet', color: '#a78bfa', aggression: 1.1, share: {}, priceIndex: 0.92, cash: 250000, coverage: {}, mobileCoverage: {}, spectrum: [], tech: 0.2, lastMove: null },
+      { id: 'telestar', name: 'Telestar', color: '#7ee787', aggression: 0.7, share: {}, priceIndex: 1.12, cash: 250000, coverage: {}, mobileCoverage: {}, spectrum: [], tech: 0.2, lastMove: null },
     ],
     posts: [],
     log: [{ id: uid('log'), at: 8 * 60, text: `${opts.companyName} is licensed to operate in ${home.name}.`, tone: 'info' }],
     stats: {
       demandGbps: 0,
+      fixedDemandGbps: 0,
+      mobileDemandGbps: 0,
+      transitGbps: 0,
       servedGbps: 0,
       coreUtilization: 0,
       packetLoss: 0,
@@ -185,20 +202,32 @@ export function createNewGame(opts: NewGameOptions): GameState {
     },
     finance: {
       revenueResidential: 0,
+      revenueMobile: 0,
       revenueBusiness: 0,
       revenueEnterprise: 0,
+      revenueHosting: 0,
+      revenueWholesale: 0,
       costSalaries: 0,
       costPower: 0,
       costMaintenance: 0,
       costTransit: 0,
       costMarketing: 0,
+      costRetention: 0,
+      costLoanPayments: 0,
       penalties: 0,
     },
+    ledger: [],
     history: [],
     monthAccumulator: { revenue: 0, expense: 0 },
     marketingBudget: 2000,
     retentionBudget: 0,
+    campaigns: [],
     churn: [],
+    trafficPolicy: 'balanced',
+    interconnectPlan: 'transit',
+    wholesaleFixed: false,
+    mvnoEnabled: false,
+    dataCenterModes: {},
     demandHistory: [],
     dayPeakDemand: 0,
     telemetry: [],
@@ -248,6 +277,7 @@ function makeTechnician(rng: Rng, gx: number, gy: number): Technician {
     salary: 2200 + randInt(rng, 0, 600),
     experience: 0,
     incidentId: null,
+    maintenanceId: null,
     gx,
     gy,
     homeGx: gx,
@@ -272,12 +302,12 @@ function seedStartingCustomers(state: GameState, count: number, districtId: stri
   redistributePackages(state);
 }
 
-// Fraction of all traffic served straight out of your own data centres.
+// Fraction of popular traffic served locally by connected data centres and partners.
 export function cacheRatio(s: GameState) {
-  const total = s.nodes
+  const local = s.nodes
     .filter((n) => n.kind === 'datacenter' && !n.down)
-    .reduce((sum, n) => sum + DATACENTER_CACHE_PER_TIER * n.tier, 0);
-  return Math.min(DATACENTER_CACHE_CAP, total);
+    .reduce((sum, n) => sum + DATA_CENTER_MODE_CONFIG[dataCenterMode(s, n.id)].cachePerTier * n.tier, 0);
+  return Math.min(0.3, local + INTERCONNECT_CONFIG[s.interconnectPlan].cacheOffload);
 }
 
 export function residentialSubs(state: GameState, districtId?: string) {
@@ -295,15 +325,36 @@ export const totalCustomers = (state: GameState) => Math.round(customerCount(sta
 export function redistributePackages(state: GameState) {
   const total = residentialSubs(state);
   const mix = packageMix(state.packages, 'residential');
-  for (const p of state.packages) if (p.segment === 'residential') p.subscribers = 0;
-  for (const m of mix) m.pkg.subscribers = Math.round(total * m.share);
+  const shares = new Map(mix.map((m) => [m.pkg.id, m.share]));
+  state.packages = state.packages.map((p) =>
+    p.segment === 'residential' ? { ...p, subscribers: Math.round(total * (shares.get(p.id) ?? 0)) } : p,
+  );
+}
+
+// Restore the busiest or first tariff when a segment has none active before calculating revenue and demand.
+function ensureActiveTariffs(s: GameState) {
+  const restore = (segment: 'residential' | 'mobile', label: string) => {
+    const plans = s.packages.filter((p) => p.segment === segment);
+    if (!plans.length || plans.some((p) => p.active)) return false;
+    const fallback = plans.reduce((best, p) => (p.subscribers > best.subscribers ? p : best), plans[0]);
+    s.packages = s.packages.map((p) => (p.id === fallback.id ? { ...p, active: true } : p));
+    pushLog(s, `${fallback.name} was kept active; ${label} service needs at least one tariff.`, 'info');
+    return true;
+  };
+
+  const fixedRestored = restore('residential', 'fixed');
+  const mobileRestored = restore('mobile', 'mobile');
+  if (fixedRestored) redistributePackages(s);
+  if (mobileRestored) redistributeMobilePackages(s);
 }
 
 export function step(prev: GameState): GameState {
   if (prev.gameOver) return prev;
   const s: GameState = { ...prev };
+  ensureActiveTariffs(s);
   const rng = makeRng((s.minutes * 2654435761 + s.rngSeed) >>> 0);
   const mods = researchModifiers(s.researchDone);
+  const staff = staffModifiers(s);
   const diff = DIFFICULTY[s.difficulty];
   const dt = MINUTES_PER_STEP;
   const dayFrac = dt / MINUTES_PER_DAY;
@@ -315,6 +366,17 @@ export function step(prev: GameState): GameState {
   const newDay = Math.floor(s.minutes / MINUTES_PER_DAY) > prevDay;
   const newMonth = Math.floor(s.minutes / MINUTES_PER_MONTH) > prevMonth;
 
+  const expiredCampaigns = s.campaigns.filter((campaign) => campaign.endsAt <= s.minutes);
+  if (expiredCampaigns.length) {
+    for (const campaign of expiredCampaigns) {
+      const district = s.districts.find((entry) => entry.id === campaign.districtId);
+      pushLog(s, `${district?.name ?? 'District'} campaign completed.`, 'info');
+    }
+    s.campaigns = s.campaigns.filter((campaign) => campaign.endsAt > s.minutes);
+  }
+  autoScheduleMaintenance(s, mods);
+  tickMaintenance(s, dt);
+
   // 1. Demand
   const eventMul = s.activeEvent && s.minutes < s.activeEvent.endsAt ? s.activeEvent.mul : 1;
   if (s.activeEvent && s.minutes >= s.activeEvent.endsAt) {
@@ -325,45 +387,115 @@ export function step(prev: GameState): GameState {
   const avgSpeed = averageSpeed(s.packages);
 
   // Edge caches serve popular traffic locally, so it never touches the network.
-  // This is what makes a data centre worth its running costs.
+  const routes = computeRoutes(s);
   const cacheOffload = cacheRatio(s);
 
-  const districtDemand: Record<string, number> = {};
+  const residentialDemand: Record<string, number> = {};
+  const businessDemand: Record<string, number> = {};
+  const mobileDemand: Record<string, number> = {};
+  const wholesaleFixedDemand: Record<string, number> = {};
+  const wholesaleMobileDemand: Record<string, number> = {};
   for (const d of s.districts) {
     const subs = residentialSubs(s, d.id);
     const resDemand = (subs * avgSpeed * OVERSUBSCRIPTION * curve) / 1000; // Gbps
     const bizDemand = s.contracts
       .filter((c) => c.districtId === d.id)
       .reduce((sum, c) => sum + c.bandwidthGbps * CONTRACT_CONTENTION * (0.45 + 0.55 * curve), 0);
-    const mobDemand = (d.mobileSubs * MOBILE_AVG_SPEED * MOBILE_OVERSUBSCRIPTION * curve) / 1000;
-    districtDemand[d.id] = (resDemand + bizDemand + mobDemand) * (1 - cacheOffload);
+    const mobile = (d.mobileSubs * MOBILE_AVG_SPEED * MOBILE_OVERSUBSCRIPTION * curve) / 1000;
+    const wholesale = wholesaleDemand(s, resDemand, mobile);
+    residentialDemand[d.id] = resDemand * (1 - cacheOffload);
+    businessDemand[d.id] = bizDemand;
+    mobileDemand[d.id] = mobile * (1 - cacheOffload);
+    wholesaleFixedDemand[d.id] = wholesale.fixed * (1 - cacheOffload);
+    wholesaleMobileDemand[d.id] = wholesale.mobile * (1 - cacheOffload);
   }
 
   // 2. Route and load
-  const routes = computeRoutes(s);
-  const load = loadNetwork(s, districtDemand, routes, mods.hasAutoBalance);
+  const liveTowers = s.nodes.filter((node) => node.kind === 'tower' && !node.down && routes[node.id]);
+  const priorities = TRAFFIC_POLICY_CONFIG[s.trafficPolicy].priorities;
+  const services: TrafficService[] = s.districts.flatMap((district) => {
+    const fixedNodes = servingNodes(s, district.id).map((node) => node.id);
+    const towers = mobileServingTowers(s, district, liveTowers).map((node) => node.id);
+    return [
+      {
+        id: `residential:${district.id}`,
+        districtId: district.id,
+        demandGbps: residentialDemand[district.id] ?? 0,
+        servingNodeIds: fixedNodes,
+        priority: priorities.residential,
+      },
+      {
+        id: `business:${district.id}`,
+        districtId: district.id,
+        demandGbps: businessDemand[district.id] ?? 0,
+        servingNodeIds: fixedNodes,
+        priority: priorities.business,
+      },
+      {
+        id: `mobile:${district.id}`,
+        districtId: district.id,
+        demandGbps: mobileDemand[district.id] ?? 0,
+        servingNodeIds: towers,
+        priority: priorities.mobile,
+      },
+      {
+        id: `wholesale-fixed:${district.id}`,
+        districtId: district.id,
+        demandGbps: wholesaleFixedDemand[district.id] ?? 0,
+        servingNodeIds: fixedNodes,
+        priority: priorities.wholesale,
+      },
+      {
+        id: `wholesale-mobile:${district.id}`,
+        districtId: district.id,
+        demandGbps: wholesaleMobileDemand[district.id] ?? 0,
+        servingNodeIds: towers,
+        priority: priorities.wholesale,
+      },
+    ];
+  });
+  for (const node of s.nodes.filter(
+    (entry) =>
+      entry.kind === 'datacenter' &&
+      !entry.down &&
+      routes[entry.id] &&
+      Object.prototype.hasOwnProperty.call(s.dataCenterModes, entry.id),
+  )) {
+    const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(s, node.id)];
+    services.push({
+      id: `workload:${node.id}`,
+      districtId: node.districtId,
+      demandGbps: mode.workloadPerTier * node.tier * (0.45 + 0.55 * curve),
+      servingNodeIds: [node.id],
+      priority: priorities.workload,
+    });
+  }
+  const load = loadServices(s, services, routes, mods.hasAutoBalance);
 
   const transit = TRANSIT_TIERS[s.transitTier];
-  const transitCap = transit.capacity * (s.backupTransit ? 1.35 : 1);
-  const transitRaw = load.totalDemand / Math.max(0.01, transitCap);
+  const transitCap =
+    transit.capacity * (s.backupTransit ? 1.35 : 1) + INTERCONNECT_CONFIG[s.interconnectPlan].capacityBonus;
+  const transitRaw = load.totalServed / Math.max(0.01, transitCap);
+  const transitServedFraction = transitRaw > 1 ? 1 / transitRaw : 1;
   // Eased past the line - no local build relieves it, and it hits every district.
   const transitPressure = transitRaw <= 1 ? transitRaw : 1 + (transitRaw - 1) * 0.45;
 
   s.nodes = s.nodes.map((n) => {
     const traffic = load.nodeTraffic[n.id] ?? 0;
     // DDoS and overheating chew capacity instead of killing the box outright.
-    const degraded = s.incidents.some((i) => !i.resolved && i.degrade && i.targetId === n.id);
+    const degradation = s.incidents.find((i) => !i.resolved && i.degrade && i.targetId === n.id);
     // A tower is only worth as much as the spectrum you are allowed to run on it.
-    const rated = n.kind === 'tower' ? towerCapacity(s.spectrum, n.tier) : nodeCapacity(n.kind, n.tier);
-    const effCap = degraded ? rated * (0.35 + 0.3 * (1 - mods.ddosMul)) : rated;
+    const rated = effectiveNodeCapacity(n.kind, n.tier, s.spectrum, s.researchDone);
+    const ddosMul = mods.ddosMul * staff.ddosImpactMul;
+    const effCap = degradation
+      ? rated * (degradation.kind === 'ddos' ? 0.35 + 0.3 * (1 - ddosMul) : 0.35)
+      : rated;
     const util = traffic / Math.max(0.01, effCap);
-    // Kit does not stay new. Idle equipment recovers, but only up to a ceiling
-    // that falls the longer it has gone without a crew looking at it, so a big
-    // old network needs ongoing maintenance rather than none.
+    // Kit does not stay new.
     const yearsSinceService = (s.minutes - (n.servicedAt ?? n.builtAt)) / (MINUTES_PER_DAY * 365);
     const ceiling = clamp(100 - yearsSinceService * 14, 45, 100);
     const wear = util > 0.92 ? -0.05 : util < 0.7 ? 0.02 : 0;
-    const health = clamp(Math.min(n.health + wear, ceiling), 20, 100);
+    const health = clamp(Math.min(n.health + wear + staff.healthRecoveryPerStep, ceiling), 20, 100);
     return { ...n, trafficGbps: traffic, capacityGbps: effCap, health };
   });
   s.links = s.links.map((l) => ({ ...l, trafficGbps: load.linkTraffic[l.id] ?? 0 }));
@@ -372,26 +504,51 @@ export function step(prev: GameState): GameState {
   let weightedPressure = 0;
   let weightTotal = 0;
   const outages: Record<string, boolean> = {};
+  const contractImpaired: Record<string, boolean> = {};
   for (const d of s.districts) {
-    // Mobile subscribers feel outages too, so they carry weight here.
-    const subs = residentialSubs(s, d.id) + d.mobileSubs;
-    if (subs <= 0 && !s.contracts.some((c) => c.districtId === d.id)) continue;
-    const pressure = Math.max(load.districtPressure[d.id] ?? 0, transitPressure);
-    const outage = load.districtOutage[d.id] ?? false;
-    outages[d.id] = outage;
-    weightedPressure += (outage ? 2.5 : pressure) * Math.max(1, subs);
-    weightTotal += Math.max(1, subs);
+    const fixedCustomers = residentialSubs(s, d.id);
+    const fixedKey = `residential:${d.id}`;
+    const businessKey = `business:${d.id}`;
+    const mobileKey = `mobile:${d.id}`;
+    const fixedOutage = fixedCustomers > 0 && (load.serviceOutage[fixedKey] ?? false);
+    const mobileOutage = d.mobileSubs > 0 && (load.serviceOutage[mobileKey] ?? false);
+    outages[d.id] = fixedOutage;
+    contractImpaired[d.id] =
+      (businessDemand[d.id] ?? 0) > 0 &&
+      ((load.serviceOutage[businessKey] ?? false) ||
+        (load.serviceServed[businessKey] ?? 1) * transitServedFraction < 0.995);
+    if (fixedCustomers > 0) {
+      const fixedPressure = Math.max(load.servicePressure[fixedKey] ?? 0, transitPressure);
+      weightedPressure += (fixedOutage ? 2.5 : fixedPressure) * fixedCustomers;
+      weightTotal += fixedCustomers;
+    }
+    if (d.mobileSubs > 0) {
+      const mobilePressure = Math.max(load.servicePressure[mobileKey] ?? 0, transitPressure);
+      weightedPressure += (mobileOutage ? 2.5 : mobilePressure) * d.mobileSubs;
+      weightTotal += d.mobileSubs;
+    }
   }
   const pressure = weightTotal > 0 ? weightedPressure / weightTotal : 0;
   const packetLoss = clamp((pressure - 1) * 0.35, 0, 0.85) * mods.lossImpactMul;
-  const latency = 9 + Math.pow(Math.max(0, pressure - 0.7), 2) * 90;
+  const latency = Math.max(
+    4,
+    9 + Math.pow(Math.max(0, pressure - 0.7), 2) * 90 + INTERCONNECT_CONFIG[s.interconnectPlan].latencyDelta,
+  );
   const avgNodeHealth = s.nodes.length ? s.nodes.reduce((a, n) => a + (n.down ? 0 : n.health), 0) / s.nodes.length : 100;
   const health = clamp(avgNodeHealth * (1 - packetLoss * 0.8) - Object.values(outages).filter(Boolean).length * 6, 0, 100);
 
   s.dayPeakDemand = Math.max(s.dayPeakDemand, load.totalDemand);
   s.stats = {
     demandGbps: load.totalDemand,
-    servedGbps: load.totalServed,
+    fixedDemandGbps:
+      Object.values(residentialDemand).reduce((sum, demand) => sum + demand, 0) +
+      Object.values(businessDemand).reduce((sum, demand) => sum + demand, 0) +
+      Object.values(wholesaleFixedDemand).reduce((sum, demand) => sum + demand, 0),
+    mobileDemandGbps:
+      Object.values(mobileDemand).reduce((sum, demand) => sum + demand, 0) +
+      Object.values(wholesaleMobileDemand).reduce((sum, demand) => sum + demand, 0),
+    transitGbps: load.totalServed,
+    servedGbps: load.totalServed * transitServedFraction,
     coreUtilization: pressure,
     packetLoss,
     latencyMs: latency,
@@ -400,20 +557,22 @@ export function step(prev: GameState): GameState {
   };
 
   // 4. Coverage, satisfaction and customers
-  const liveTowers = s.nodes.filter((n) => n.kind === 'tower' && !n.down && routes[n.id]);
-
   s.districts = s.districts.map((d) => {
     if (!d.unlocked) return d;
     const serving = servingNodes(s, d.id).filter((n) => routes[n.id]);
     let coverageTarget = 0;
     for (const n of serving) {
-      const per = n.kind === 'pop' ? 0.32 : n.kind === 'tower' ? 0.26 : 0.13;
+      const per = n.kind === 'pop' ? 0.32 : 0.13;
       coverageTarget += per * (1 + (n.tier - 1) * 0.18);
     }
     coverageTarget = Math.min(mods.coverageCeiling, coverageTarget);
     const coverage = approach(d.coverage, coverageTarget, 0.035 * dayFrac * MINUTES_PER_DAY * 0.02 + 0.03 * dayFrac);
 
-    const dPressure = Math.max(load.districtPressure[d.id] ?? 0, transitPressure);
+    const dPressure = Math.max(
+      load.servicePressure[`residential:${d.id}`] ?? 0,
+      load.servicePressure[`mobile:${d.id}`] ?? 0,
+      transitPressure,
+    );
     const outage = outages[d.id];
     const pIndex = priceIndex(s);
     let satTarget = 92;
@@ -422,7 +581,8 @@ export function step(prev: GameState): GameState {
       satTarget -= clamp((dPressure - 0.85) * 110, 0, 70);
       satTarget -= clamp((pIndex - 1) * 55, -12, 30);
       satTarget += (s.reputation - 50) * 0.12;
-      satTarget += s.employees.filter((e) => e.role === 'support').length * 1.5;
+      satTarget += staff.supportSatisfaction;
+      if (activeCampaign(s, d.id, 'retention')) satTarget += 6;
     }
     const satisfaction = approach(d.satisfaction, clamp(satTarget, 0, 100), outage ? 0.5 * dayFrac * 24 : 1.6 * dayFrac);
 
@@ -444,19 +604,23 @@ export function step(prev: GameState): GameState {
     expense: s.monthAccumulator.expense + costTick,
   };
   s.finance = {
-    revenueResidential: money.revenueResidential + money.revenueMobile,
+    revenueResidential: money.revenueResidential,
+    revenueMobile: money.revenueMobile,
     revenueBusiness: money.revenueBusiness,
     revenueEnterprise: money.revenueEnterprise,
+    revenueHosting: money.revenueHosting,
+    revenueWholesale: money.revenueWholesale,
     costSalaries: money.costSalaries,
     costPower: money.costPower,
     costMaintenance: money.costMaintenance,
     costTransit: money.costTransit,
     costMarketing: money.costMarketing,
+    costRetention: money.costRetention,
+    costLoanPayments: s.finance.costLoanPayments,
     penalties: s.finance.penalties,
   };
 
-  // One compact sample per in-game hour. This stays small enough for local saves
-  // while giving the NOC a useful day/night history.
+  // One compact sample per in-game hour.
   if (Math.floor(prev.minutes / 60) < Math.floor(s.minutes / 60)) {
     s.telemetry = [
       ...(s.telemetry ?? []),
@@ -482,13 +646,13 @@ export function step(prev: GameState): GameState {
   s.reputation = approach(s.reputation, repTarget, 1.2 * dayFrac);
 
   // 7. Incidents, technicians, contracts
-  tickIncidents(s, mods, diff, dt, rng);
+  tickIncidents(s, mods, diff, dt, rng, staff);
   tickTechnicians(s, dt, mods);
-  tickContracts(s, mods, dt, rng, outages);
+  tickContracts(s, mods, dt, rng, contractImpaired);
 
   // 8. Research
   if (s.researchActive) {
-    const daysLeft = s.researchActive.daysLeft - dayFrac;
+    const daysLeft = s.researchActive.daysLeft - dayFrac * staff.researchSpeedMul;
     if (daysLeft <= 0) {
       const doneId = s.researchActive.id;
       s.researchDone = [...s.researchDone, doneId];
@@ -496,8 +660,7 @@ export function step(prev: GameState): GameState {
       pushLog(s, `Research complete: ${doneId.replace(/_/g, ' ')}.`, 'good');
 
       if (doneId === 'mobile_4g') {
-        // The regulator hands every new entrant a starter block, otherwise a
-        // lost auction would leave your towers with nothing to transmit on.
+        // The regulator hands every new entrant a starter block.
         s.spectrum = [{ band: '1800', blocks: 1, wonAt: s.minutes, paid: 0 }];
         s.nextAuctionAt = s.minutes + MINUTES_PER_DAY * 12;
         pushLog(s, 'Regulator granted a starter block at 1800 MHz. Towers can go live.', 'good');
@@ -523,6 +686,9 @@ export function step(prev: GameState): GameState {
     s.demandHistory = [...s.demandHistory, s.dayPeakDemand].slice(-45);
     s.dayPeakDemand = 0;
     tickRegulator(s, rng);
+    s.employees = s.employees.map((employee) =>
+      trainEmployee(employee, s.researchActive && (employee.role === 'network_engineer' || employee.role === 'noc_engineer') ? 2 : 1),
+    );
 
     const promoted = checkPromotion(s);
     if (promoted) {
@@ -533,9 +699,12 @@ export function step(prev: GameState): GameState {
     }
     if (s.minutes > s.nextEventAt) startCityEvent(s, rng);
     if (s.minutes > s.nextGrowthAt) growCity(s, rng);
-    s.researchPoints += Math.max(0, Math.round(residentialSubs(s) / 500));
+    s.researchPoints += staff.researchPointsPerDay + Math.max(0, Math.round(totalCustomers(s) / 2500));
   }
   if (newMonth) {
+    const completedRevenue = s.monthAccumulator.revenue;
+    const completedExpense = s.monthAccumulator.expense;
+    const completedPenalties = s.finance.penalties;
     s.history = [
       ...s.history.slice(-23),
       {
@@ -545,11 +714,12 @@ export function step(prev: GameState): GameState {
         customers: totalCustomers(s),
       },
     ];
-    s.monthAccumulator = { revenue: 0, expense: 0 };
     const debtPaid = chargeLoans(s);
+    recordOperatingMonth(s, money, completedRevenue, completedExpense, completedPenalties, debtPaid);
+    s.monthAccumulator = { revenue: 0, expense: 0 };
     if (debtPaid > 0) pushLog(s, `Loan repayments of $${Math.round(debtPaid).toLocaleString()} went out.`, 'info');
     for (const c of s.contracts) c.downtimeMinutes = 0;
-    s.finance = { ...s.finance, penalties: 0 };
+    s.finance = { ...s.finance, penalties: 0, costLoanPayments: debtPaid };
   }
 
   return s;
@@ -557,7 +727,8 @@ export function step(prev: GameState): GameState {
 
 function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac: number, rng: Rng) {
   const pIndex = priceIndex(s);
-  const marketingBoost = 1 + Math.min(1.2, s.marketingBudget / 25000);
+  const staff = staffModifiers(s);
+  const marketingBoost = (1 + Math.min(1.2, s.marketingBudget / 25000)) * staff.customerGrowthMul;
   const changed = new Map<string, Building>();
 
   for (const d of s.districts) {
@@ -569,18 +740,20 @@ function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayF
       clamp(1.35 - pIndex * 0.55, 0.25, 1.9) *
       clamp(d.satisfaction / 65, 0.15, 1.5) *
       clamp(0.6 + s.reputation / 110, 0.4, 1.6) *
+      (0.8 + d.demandFactor * 0.4) *
       marketingBoost *
       diff.growthMul;
 
     const gap = addressable - current;
-    const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1);
-    // Two different ways to lose people. The market shrinking under you as
-    // rivals build out, and your own customers walking because they are unhappy.
+    const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
+    const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention;
+    // Two different ways to lose people.
     const marketLoss = gap < 0 ? -gap * 0.05 * dayFrac * retention : 0;
     const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul * retention;
     const unhappyLoss = current * churnRate * dayFrac;
 
-    let delta = gap > 0 ? gap * 0.09 * appeal * dayFrac : -marketLoss;
+    const acquisition = activeCampaign(s, d.id, 'acquisition') ? 1.45 : 1;
+    let delta = gap > 0 ? gap * 0.09 * appeal * acquisition * dayFrac : -marketLoss;
     delta -= unhappyLoss;
 
     const lost = marketLoss + unhappyLoss;
@@ -637,6 +810,15 @@ function applyDelta(s: GameState, districtId: string, delta: number, rng: Rng, c
   }
 }
 
+export function mobileServingTowers(s: GameState, d: District, liveTowers?: NetNode[]) {
+  const towers = liveTowers ?? s.nodes.filter((node) => node.kind === 'tower' && !node.down);
+  if (!s.spectrum.length) return [];
+  return towers.filter((tower) => {
+    const radius = towerRadius(s.spectrum, tower.tier);
+    return d.cells.some((cell) => Math.hypot(tower.gx - cell.gx, tower.gy - cell.gy) <= radius);
+  });
+}
+
 // Share of a district's tiles sitting inside the footprint of a live tower.
 export function mobileCoverageTarget(s: GameState, d: District, liveTowers?: NetNode[]) {
   // Callers that know the routing table pass in only towers that reach a core.
@@ -688,8 +870,11 @@ function growMobile(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac
       diff.growthMul;
 
     const gap = addressable - d.mobileSubs;
-    let delta = gap > 0 ? gap * 0.11 * appeal * dayFrac : gap * 0.06 * dayFrac;
-    delta -= d.mobileSubs * clamp((62 - d.satisfaction) / 62, 0, 1) * 0.2 * diff.churnMul * dayFrac;
+    const mobileCampaign = activeCampaign(s, d.id, 'mobile') ? 1.5 : 1;
+    const retention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
+    let delta = gap > 0 ? gap * 0.11 * appeal * mobileCampaign * dayFrac : gap * 0.06 * dayFrac;
+    delta -=
+      d.mobileSubs * clamp((62 - d.satisfaction) / 62, 0, 1) * 0.2 * diff.churnMul * retention * dayFrac;
 
     if (Math.abs(delta) < 0.01) return d;
     changed = true;
@@ -709,14 +894,15 @@ export function mobileSubs(s: GameState) {
 export function redistributeMobilePackages(s: GameState) {
   const total = mobileSubs(s);
   const mix = packageMix(s.packages, 'mobile');
-  for (const p of s.packages) if (p.segment === 'mobile') p.subscribers = 0;
-  for (const m of mix) m.pkg.subscribers = Math.round(total * m.share);
+  const shares = new Map(mix.map((m) => [m.pkg.id, m.share]));
+  s.packages = s.packages.map((p) =>
+    p.segment === 'mobile' ? { ...p, subscribers: Math.round(total * (shares.get(p.id) ?? 0)) } : p,
+  );
 }
 
 // ---------------------------------------------------------------------------
 
-// Customers leaving is more useful to a player as "who took them and why" than
-// as a falling number, so each loss is attributed to a rival and a cause.
+// Customers leaving is more useful to a player as "who took them and why" than as a falling number.
 function recordChurn(s: GameState, d: District, count: number, pIndex: number, rng: Rng, toMarket: boolean) {
   const outage = s.stats.outages[d.id];
   const pressure = s.stats.packetLoss > 0.02;
@@ -731,12 +917,10 @@ function recordChurn(s: GameState, d: District, count: number, pIndex: number, r
           : 'price';
 
   const rival = strongestRival(s, d.id);
-  // Losing ground to the market means somebody picked them up. Losing your own
-  // unhappy customers usually means they just went quiet.
+  // Losing ground to the market means somebody picked them up.
   const poached = rival && rng() < (toMarket ? 0.9 : 0.45);
 
-  // Losses arrive a fraction at a time, so same-day losses of the same kind in
-  // the same district roll into one entry rather than flooding the list.
+  // Losses arrive a fraction at a time.
   const openIndex = s.churn.findIndex(
     (c) => c.districtId === d.id && c.reason === reason && s.minutes - c.at < MINUTES_PER_DAY,
   );
@@ -774,16 +958,130 @@ function averageSatisfaction(s: GameState) {
   return weighted / total;
 }
 
+export const INCIDENT_LOAD_FLOOR = 0.45;
+
+export function boundedIncidentMultipliers(rateMul: number, durationMul: number) {
+  const rawRate = clamp(rateMul, 0.01, 1);
+  const rawDuration = clamp(durationMul, 0.01, 1);
+  const rawLoad = rawRate * rawDuration;
+  if (rawLoad >= INCIDENT_LOAD_FLOOR) return { rate: rawRate, duration: rawDuration, load: rawLoad };
+
+  const scale = Math.sqrt(INCIDENT_LOAD_FLOOR / rawLoad);
+  let rate = Math.min(1, rawRate * scale);
+  let duration = Math.min(1, rawDuration * scale);
+  if (rate * duration < INCIDENT_LOAD_FLOOR) {
+    if (rate < 1) rate = Math.min(1, INCIDENT_LOAD_FLOOR / duration);
+    else duration = Math.min(1, INCIDENT_LOAD_FLOOR / rate);
+  }
+  return { rate, duration, load: rate * duration };
+}
+
+export // Telemetry books the cheap window itself once a site starts drifting.
+function autoScheduleMaintenance(s: GameState, mods: ResearchMods) {
+  if (!mods.hasMaintenanceForecast) return;
+  for (const node of s.nodes) {
+    if (node.down || node.health > 72) continue;
+    if (s.incidents.some((incident) => !incident.resolved && incident.targetId === node.id)) continue;
+    if (s.maintenanceOrders.some((order) => order.nodeId === node.id && order.status !== 'completed')) continue;
+    const cost = maintenanceCost(node, 'overnight');
+    if (s.money < cost * 3) continue;
+    s.money -= cost;
+    recordLedger(s, 'network_service', `Predicted service: ${node.name}`, -cost);
+    s.maintenanceOrders = [
+      ...s.maintenanceOrders,
+      {
+        id: uid('maint'),
+        nodeId: node.id,
+        mode: 'overnight' as const,
+        status: 'scheduled' as const,
+        scheduledAt: maintenanceStart(s.minutes, 'overnight'),
+        startedAt: null,
+        minutesLeft: MAINTENANCE_CONFIG.overnight.durationMinutes,
+        technicianId: null,
+        cost,
+      },
+    ];
+    pushLog(s, `Telemetry booked overnight work for ${node.name} before it fails.`, 'info');
+    return;
+  }
+}
+
+export function tickMaintenance(s: GameState, dt: number) {
+  const unavailableNodes = new Set(
+    s.incidents.filter((incident) => !incident.resolved && incident.targetType === 'node').map((incident) => incident.targetId),
+  );
+
+  for (const order of s.maintenanceOrders) {
+    if (order.status !== 'scheduled' || order.scheduledAt > s.minutes || unavailableNodes.has(order.nodeId)) continue;
+    const technician = s.technicians.find(
+      (entry) => entry.state === 'idle' && entry.incidentId === null && entry.maintenanceId === null,
+    );
+    const node = s.nodes.find((entry) => entry.id === order.nodeId && !entry.down);
+    if (!technician || !node) continue;
+    s.maintenanceOrders = s.maintenanceOrders.map((entry) =>
+      entry.id === order.id
+        ? { ...entry, status: 'active', startedAt: s.minutes, technicianId: technician.id }
+        : entry,
+    );
+    s.technicians = s.technicians.map((entry) =>
+      entry.id === technician.id
+        ? { ...entry, maintenanceId: order.id, state: 'driving' as const }
+        : entry,
+    );
+    pushLog(s, `${technician.name} dispatched for planned work at ${node.name}.`, 'info');
+  }
+
+  for (const order of s.maintenanceOrders) {
+    if (order.status !== 'active' || !order.technicianId) continue;
+    const technician = s.technicians.find((entry) => entry.id === order.technicianId);
+    const node = s.nodes.find((entry) => entry.id === order.nodeId);
+    if (!technician || !node || technician.maintenanceId !== order.id || technician.state !== 'working') continue;
+
+    const minutesLeft = order.minutesLeft - dt;
+    if (minutesLeft > 0) {
+      s.nodes = s.nodes.map((entry) => (entry.id === node.id ? { ...entry, down: true } : entry));
+      s.maintenanceOrders = s.maintenanceOrders.map((entry) =>
+        entry.id === order.id ? { ...entry, minutesLeft } : entry,
+      );
+      continue;
+    }
+
+    s.nodes = s.nodes.map((entry) =>
+      entry.id === node.id ? { ...entry, down: false, health: 100, servicedAt: s.minutes } : entry,
+    );
+    s.maintenanceOrders = s.maintenanceOrders.map((entry) =>
+      entry.id === order.id ? { ...entry, status: 'completed', minutesLeft: 0, technicianId: null } : entry,
+    );
+    s.technicians = s.technicians.map((entry) =>
+      entry.id === technician.id
+        ? { ...trainTechnician(entry), maintenanceId: null, incidentId: null, state: 'returning' as const }
+        : entry,
+    );
+    pushLog(s, `Planned work at ${node.name} completed. Equipment health restored.`, 'good');
+  }
+
+  if (s.maintenanceOrders.length > 20) {
+    s.maintenanceOrders = s.maintenanceOrders.filter(
+      (order) => order.status !== 'completed' || s.minutes - (order.startedAt ?? order.scheduledAt) < MINUTES_PER_DAY * 14,
+    );
+  }
+}
+
 function tickIncidents(
   s: GameState,
   mods: ResearchMods,
   diff: (typeof DIFFICULTY)[Difficulty],
   dt: number,
   rng: Rng,
+  staff: ReturnType<typeof staffModifiers>,
 ) {
+  const incidentCurve = boundedIncidentMultipliers(
+    mods.incidentRateMul * staff.incidentRateMul,
+    mods.incidentDurationMul * staff.incidentDurationMul,
+  );
   // Roughly one incident every few days, flattened so growth is not self-punishing.
   const kit = s.nodes.length + s.links.length * 0.8;
-  const exposure = (0.2 + Math.pow(Math.max(kit, 0), 0.58) * 0.165) * mods.incidentRateMul;
+  const exposure = (0.2 + Math.pow(Math.max(kit, 0), 0.58) * 0.165) * incidentCurve.rate;
   // Worn equipment fails more often, which is what makes servicing worth doing.
   const avgHealth = s.nodes.length ? s.nodes.reduce((a, n) => a + n.health, 0) / s.nodes.length : 100;
   const condition = 1 + clamp((90 - avgHealth) / 60, 0, 1.2);
@@ -792,7 +1090,10 @@ function tickIncidents(
   const unresolved = s.incidents.filter((i) => !i.resolved);
 
   if (rng() < chance && unresolved.length < 4) {
-    const inc = rollIncident(s, rng, mods);
+    const inc = rollIncident(s, rng, {
+      incidentDurationMul: incidentCurve.duration,
+      ddosRateMul: staff.ddosRateMul,
+    });
     if (inc) {
       // A fault on a large network takes longer to find and reach.
       const scale = 1 + Math.min(0.8, s.nodes.length / 30);
@@ -809,7 +1110,7 @@ function tickIncidents(
     if (inc.resolved || inc.repairMinutesLeft === null) return inc;
     const tech = s.technicians.find((t) => t.id === inc.assignedTechId);
     // Work only progresses once the crew is on site.
-    if (tech && tech.state !== 'working') return inc;
+    if (!tech || tech.state !== 'working' || tech.incidentId !== inc.id) return inc;
     const left = inc.repairMinutesLeft - dt;
     touched = true;
     if (left <= 0) {
@@ -824,7 +1125,7 @@ function tickIncidents(
   if (s.autoDispatch && mods.hasAutoDispatch) {
     for (const inc of s.incidents) {
       if (inc.resolved || inc.assignedTechId) continue;
-      const free = s.technicians.find((t) => t.state === 'idle');
+      const free = s.technicians.find((t) => t.state === 'idle' && t.maintenanceId === null);
       if (!free) break;
       dispatch(s, inc.id, free.id, 'normal', true);
     }
@@ -852,14 +1153,29 @@ export function dispatch(
 ) {
   const inc = s.incidents.find((i) => i.id === incidentId);
   const tech = s.technicians.find((t) => t.id === techId);
-  if (!inc || !tech) return;
+  if (
+    !inc ||
+    inc.resolved ||
+    inc.assignedTechId !== null ||
+    inc.repairMinutesLeft !== null ||
+    !tech ||
+    tech.state !== 'idle' ||
+    tech.incidentId !== null ||
+    tech.maintenanceId !== null
+  ) {
+    return false;
+  }
   const skillMul = 1 - (tech.skill - 1) * 0.12;
   const minutes = Math.max(
     30,
     Math.round(inc.repairTotalMinutes * (mode === 'emergency' ? 0.28 : 1) * skillMul),
   );
   const cost = repairCost(inc, mode);
-  if (!free) s.money -= cost;
+  if (!free && mode === 'emergency' && s.money < cost) return false;
+  if (!free) {
+    s.money -= cost;
+    recordLedger(s, 'incident_response', `${mode === 'emergency' ? 'Emergency' : 'Scheduled'} repair: ${inc.title}`, -cost);
+  }
 
   s.incidents = s.incidents.map((i) =>
     i.id === incidentId ? { ...i, repairMinutesLeft: minutes, assignedTechId: techId } : i,
@@ -868,6 +1184,7 @@ export function dispatch(
   s.technicians = s.technicians.map((t) =>
     t.id === techId ? { ...t, incidentId, state: 'driving' as const, homeGx: target.gx, homeGy: target.gy } : t,
   );
+  return true;
 }
 
 export function incidentLocation(s: GameState, inc: Incident): { gx: number; gy: number } {
@@ -892,10 +1209,18 @@ function tickTechnicians(s: GameState, dt: number, _mods: ResearchMods) {
   const next = s.technicians.map((t) => {
     if (t.state === 'idle') return t;
     const inc = s.incidents.find((i) => i.id === t.incidentId);
+    const maintenance = s.maintenanceOrders.find((order) => order.id === t.maintenanceId && order.status === 'active');
 
     if (t.state === 'driving') {
-      if (!inc) return { ...t, state: 'idle' as const, incidentId: null };
-      const target = incidentLocation(s, inc);
+      if (!inc && !maintenance) {
+        return { ...t, state: 'idle' as const, incidentId: null, maintenanceId: null };
+      }
+      const target = inc
+        ? incidentLocation(s, inc)
+        : (() => {
+            const node = s.nodes.find((entry) => entry.id === maintenance!.nodeId);
+            return node ? { gx: node.gx, gy: node.gy } : { gx: t.gx, gy: t.gy };
+          })();
       const moved = moveToward(t, target, speed);
       changed = true;
       if (moved.arrived) return { ...t, gx: target.gx, gy: target.gy, state: 'working' as const };
@@ -903,11 +1228,17 @@ function tickTechnicians(s: GameState, dt: number, _mods: ResearchMods) {
     }
 
     if (t.state === 'working') {
+      if (inc && !inc.resolved) return t;
+      if (maintenance) return t;
       if (!inc || inc.resolved) {
         changed = true;
-        return { ...t, state: 'returning' as const, incidentId: null, experience: t.experience + 1 };
+        return {
+          ...trainTechnician(t),
+          state: 'returning' as const,
+          incidentId: null,
+          maintenanceId: null,
+        };
       }
-      return t;
     }
 
     // returning
@@ -948,14 +1279,18 @@ function tickContracts(
   mods: ResearchMods,
   dt: number,
   rng: Rng,
-  outages: Record<string, boolean>,
+  impaired: Record<string, boolean>,
 ) {
+  const recoverySites = s.nodes.filter(
+    (node) => node.kind === 'datacenter' && !node.down && dataCenterMode(s, node.id) === 'recovery',
+  ).length;
+  const recoveryMultiplier = Math.max(0.5, Math.pow(0.75, recoverySites));
   if (s.contracts.length) {
     let penalties = 0;
     s.contracts = s.contracts.map((c) => {
-      const out = outages[c.districtId];
+      const out = impaired[c.districtId];
       if (!out) return c;
-      const downtimeMinutes = c.downtimeMinutes + dt;
+      const downtimeMinutes = c.downtimeMinutes + dt * recoveryMultiplier;
       const allowed = MINUTES_PER_MONTH * (1 - c.slaPercent / 100);
       // Owed so far this month, capped, so a bad month cannot cost unbounded money.
       const owed = (mins: number) =>
@@ -973,11 +1308,72 @@ function tickContracts(
     }
   }
 
+  // At expiry, healthy accounts renew while breached or unhappy accounts leave and release their building.
+  if (s.contracts.length) {
+    const endedBuildings = new Set<string>();
+    const nextContracts: typeof s.contracts = [];
+    for (const contract of s.contracts) {
+      const endsAt = contract.startedAt + contract.termMonths * MINUTES_PER_MONTH;
+      if (s.minutes < endsAt) {
+        nextContracts.push(contract);
+        continue;
+      }
+
+      const district = s.districts.find((d) => d.id === contract.districtId);
+      const allowance = MINUTES_PER_MONTH * (1 - contract.slaPercent / 100);
+      const slaMet = contract.downtimeMinutes <= allowance;
+      const satisfaction = (district?.satisfaction ?? 50) / 100;
+      const renewalChance = clamp(0.25 + satisfaction * 0.45 + (s.reputation / 100) * 0.2, 0.15, 0.9);
+
+      if (slaMet && rng() < renewalChance) {
+        const termMonths = randInt(rng, 12, 36);
+        const monthlyRevenue = Math.round((contract.monthlyRevenue * rand(rng, 1.01, 1.06)) / 50) * 50;
+        nextContracts.push({
+          ...contract,
+          monthlyRevenue,
+          termMonths,
+          startedAt: s.minutes,
+          downtimeMinutes: 0,
+          penaltyPaid: 0,
+        });
+        pushLog(
+          s,
+          `${contract.clientName} renewed for ${termMonths} months at $${monthlyRevenue.toLocaleString()}/mo.`,
+          'good',
+        );
+      } else {
+        endedBuildings.add(contract.buildingId);
+        pushLog(
+          s,
+          slaMet
+            ? `${contract.clientName} completed its contract and moved on.`
+            : `${contract.clientName} declined to renew after missed SLA targets.`,
+          slaMet ? 'info' : 'bad',
+        );
+      }
+    }
+    s.contracts = nextContracts;
+
+    if (endedBuildings.size) {
+      const stillContracted = new Set(s.contracts.map((c) => c.buildingId));
+      s.buildings = s.buildings.map((b) =>
+        endedBuildings.has(b.id) && !stillContracted.has(b.id) ? { ...b, connected: 0 } : b,
+      );
+    }
+  }
+
   const live = s.offers.filter((o) => o.expiresAt > s.minutes);
   if (live.length !== s.offers.length) s.offers = live;
 
-  const maxOffers = mods.hasEnterprise ? 3 : 2;
-  const chance = 0.35 * (dt / MINUTES_PER_DAY) * (1 + s.reputation / 90);
+  const staff = staffModifiers(s);
+  const maxOffers = (mods.hasEnterprise ? 3 : 2) + (mods.hasPrivate5g ? 1 : 0);
+  const businessCampaignBoost = s.campaigns.some(
+    (campaign) => campaign.kind === 'business' && campaign.endsAt > s.minutes,
+  )
+    ? 1.75
+    : 1;
+  const chance =
+    0.35 * (dt / MINUTES_PER_DAY) * (1 + s.reputation / 90) * staff.offerRateMul * businessCampaignBoost;
   if (s.offers.length < maxOffers && rng() < chance) {
     const offer = makeOffer(s, mods, rng);
     if (offer) s.offers = [...s.offers, offer];
@@ -987,21 +1383,34 @@ function tickContracts(
 function makeOffer(s: GameState, mods: ResearchMods, rng: Rng) {
   const eligible = s.districts.filter((d) => d.unlocked && d.coverage > 0.12);
   if (!eligible.length) return null;
-  const d = pick(rng, eligible);
+  const promoted = eligible.filter((district) => activeCampaign(s, district.id, 'business'));
+  const d = pick(rng, promoted.length && rng() < 0.8 ? promoted : eligible);
   const wantEnterprise = mods.hasEnterprise && rng() < 0.4;
+  const reservedBuildings = new Set([
+    ...s.contracts.map((c) => c.buildingId),
+    ...s.offers.filter((o) => o.expiresAt > s.minutes).map((o) => o.buildingId),
+  ]);
   // Parks fall through segmentOf into 'business' and have nobody in them.
   const pool = s.buildings.filter(
-    (b) => b.districtId === d.id && b.kind !== 'park' && (wantEnterprise ? b.segment === 'enterprise' : b.segment === 'business'),
+    (b) =>
+      b.districtId === d.id &&
+      b.kind !== 'park' &&
+      !reservedBuildings.has(b.id) &&
+      (wantEnterprise ? b.segment === 'enterprise' : b.segment === 'business'),
   );
   if (!pool.length) return null;
   const building = pick(rng, pool);
-  if (s.contracts.some((c) => c.buildingId === building.id)) return null;
+  const profile = contractProfile(building.kind);
 
-  const bandwidth = wantEnterprise ? Math.round(rand(rng, 4, 12)) : Math.round(rand(rng, 0.5, 2) * 10) / 10;
+  const baseBandwidth = wantEnterprise ? rand(rng, 4, 12) : rand(rng, 0.5, 2);
+  const bandwidth = wantEnterprise
+    ? Math.max(1, Math.round(baseBandwidth * profile.bandwidthMul))
+    : Math.max(0.2, Math.round(baseBandwidth * profile.bandwidthMul * 10) / 10);
   // Priced per Gbps of headline bandwidth. Enterprise pays a premium for the SLA.
   const rate = wantEnterprise ? rand(rng, 1000, 1600) : rand(rng, 450, 700);
-  const monthlyRevenue = Math.round((bandwidth * rate) / 50) * 50;
-  const sla = wantEnterprise ? pick(rng, [99.9, 99.95, 99.99]) : pick(rng, [99, 99.5, 99.9]);
+  const monthlyRevenue = Math.round((bandwidth * rate * profile.revenueMul * mods.contractRevenueMul) / 50) * 50;
+  const sampledSla = wantEnterprise ? pick(rng, [99.9, 99.95, 99.99]) : pick(rng, [99, 99.5, 99.9]);
+  const sla = Math.max(sampledSla, profile.slaFloor);
 
   return {
     id: uid('off'),
@@ -1013,9 +1422,9 @@ function makeOffer(s: GameState, mods: ResearchMods, rng: Rng) {
     slaPercent: sla,
     termMonths: randInt(rng, 12, 36),
     segment: (wantEnterprise ? 'enterprise' : 'business') as 'business' | 'enterprise',
-    requiresRedundancy: wantEnterprise || sla >= 99.9,
+    requiresRedundancy: wantEnterprise || profile.requiresRedundancy || (building.kind !== 'shop' && sla >= 99.9),
     expiresAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 2, 5),
-    signingBonus: Math.round(monthlyRevenue * rand(rng, 0.5, 2)),
+    signingBonus: Math.round(monthlyRevenue * rand(rng, 0.5, 2) * staffModifiers(s).signingBonusMul),
   };
 }
 
@@ -1037,10 +1446,10 @@ function tickAuction(s: GameState, rng: Rng) {
 
   const settled = settleAuction(s, s.auction, rng);
   s.auction = settled;
-  const result = settled.result!;
+  let result = settled.result!;
+  let playerDefaulted = false;
 
-  // The bid was sealed days ago and the cash behind it may have been spent
-  // since. Defaulting costs the lot and some standing, not a silent bankruptcy.
+  // The bid was sealed days ago and the cash behind it may have been spent since.
   if (result.winnerId === 'player' && result.price > s.money) {
     const next = result.bids.find((b) => b.bidderId !== 'player');
     s.auction = {
@@ -1049,17 +1458,19 @@ function tickAuction(s: GameState, rng: Rng) {
         ? { ...result, winnerId: next.bidderId, winnerName: next.bidderName, price: next.amount }
         : { ...result, winnerId: 'none', winnerName: 'Nobody', price: 0 },
     };
+    result = s.auction.result!;
+    playerDefaulted = true;
     pushLog(
       s,
       `You could not cover your $${result.price.toLocaleString()} bid for ${SPECTRUM_BANDS[settled.band].label}. The lot went elsewhere.`,
       'bad',
     );
     s.reputation = clamp(s.reputation - 4, 0, 100);
-    return;
   }
 
   if (result.winnerId === 'player') {
     s.money -= result.price;
+    recordLedger(s, 'spectrum', `${SPECTRUM_BANDS[settled.band].label} spectrum`, -result.price);
     const existing = s.spectrum.find((h) => h.band === settled.band);
     if (existing) {
       s.spectrum = s.spectrum.map((h) =>
@@ -1080,7 +1491,36 @@ function tickAuction(s: GameState, rng: Rng) {
   } else if (result.winnerId === 'none') {
     pushLog(s, `The ${SPECTRUM_BANDS[settled.band].label} lot went unsold.`, 'info');
   } else {
-    pushLog(s, `${result.winnerName} took the ${SPECTRUM_BANDS[settled.band].label} lot.`, 'bad');
+    const winner = s.competitors.find((competitor) => competitor.id === result.winnerId);
+    if (!winner || winner.cash < result.price) {
+      s.auction = {
+        ...settled,
+        result: { ...result, winnerId: 'none', winnerName: 'Nobody', price: 0 },
+      };
+      pushLog(s, `The ${SPECTRUM_BANDS[settled.band].label} lot went unsold after the winner defaulted.`, 'info');
+      return;
+    }
+    s.competitors = s.competitors.map((competitor) => {
+      if (competitor.id !== winner.id) return competitor;
+      const holding = competitor.spectrum.find((entry) => entry.band === settled.band);
+      const spectrum = holding
+        ? competitor.spectrum.map((entry) =>
+            entry.band === settled.band
+              ? { ...entry, blocks: entry.blocks + settled.blocks, paid: entry.paid + result.price }
+              : entry,
+          )
+        : [
+            ...competitor.spectrum,
+            { band: settled.band, blocks: settled.blocks, wonAt: s.minutes, paid: result.price },
+          ];
+      return {
+        ...competitor,
+        cash: competitor.cash - result.price,
+        spectrum,
+        lastMove: `won ${SPECTRUM_BANDS[settled.band].label} spectrum`,
+      };
+    });
+    if (!playerDefaulted) pushLog(s, `${result.winnerName} took the ${SPECTRUM_BANDS[settled.band].label} lot.`, 'bad');
   }
 }
 
@@ -1106,8 +1546,7 @@ function maybeSocialPost(s: GameState, rng: Rng, packetLoss: number, outages: nu
 }
 
 
-// The regulator only turns up once you are big enough to be worth regulating,
-// and it keeps turning up as you grow.
+// The regulator only turns up once you are big enough to be worth regulating.
 function tickRegulator(s: GameState, rng: Rng) {
   for (const outcome of settleRegulations(s)) {
     if (outcome.met) {
@@ -1115,6 +1554,7 @@ function tickRegulator(s: GameState, rng: Rng) {
       pushLog(s, `${outcome.regulation.title} met.`, 'good');
     } else {
       s.money -= outcome.regulation.fine;
+      recordLedger(s, 'regulatory_fine', outcome.regulation.title, -outcome.regulation.fine);
       s.reputation = clamp(s.reputation - 8, 0, 100);
       pushLog(s, `${outcome.regulation.title} missed. Fined $${outcome.regulation.fine.toLocaleString()}.`, 'bad');
     }

@@ -5,19 +5,27 @@ import {
   MINUTES_PER_DAY,
   NODE_SPECS,
   linkCapacity,
-  nodeCapacity,
   nodeUpgradeCost,
-  towerCapacity,
 } from '../game/constants';
-import { districtRedundancy } from '../game/network';
+import { effectiveNodeCapacity } from '../game/capacity';
+import { resolveNegotiation, type NegotiationMode } from '../game/contracts';
+import { computeRoutes, districtRedundancy } from '../game/network';
 import { repairCost, type RepairMode } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
-import { clearSave, loadGame, saveGame } from '../game/save';
+import { recordLedger } from '../game/financeLedger';
+import {
+  fibreConnectionCost,
+  fibreConnectionIssue,
+  nodePlacementCost,
+  nodePlacementIssue,
+} from '../game/placement';
+import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/save';
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
 import {
   createNewGame,
   dispatch as dispatchTechnician,
   pushLog,
+  redistributeMobilePackages,
   redistributePackages,
   step,
   type NewGameOptions,
@@ -25,7 +33,27 @@ import {
 import { uid } from '../game/rng';
 import { personName } from '../game/names';
 import { makeRng } from '../game/rng';
-import type { GameState, NodeKind, OverlayMode, Screen, Speed, StaffRole } from '../game/types';
+import {
+  CAMPAIGN_CONFIG,
+  DATA_CENTER_MODE_CONFIG,
+  INTERCONNECT_CONFIG,
+  MAINTENANCE_CONFIG,
+  maintenanceCost,
+  maintenanceStart,
+} from '../game/strategy';
+import type {
+  CampaignKind,
+  DataCenterMode,
+  GameState,
+  InterconnectPlan,
+  MaintenanceMode,
+  NodeKind,
+  OverlayMode,
+  Screen,
+  Speed,
+  StaffRole,
+  TrafficPolicy,
+} from '../game/types';
 
 export type BuildTool = NodeKind | 'fiber' | null;
 
@@ -57,17 +85,18 @@ interface UiState {
   showHelp: boolean;
   showSaveManager: boolean;
   activeSaveSlot: number;
+  persistenceError: string | null;
 }
 
 interface Store extends UiState {
   game: GameState | null;
   started: boolean;
 
-  newGame: (opts: NewGameOptions, slot?: number) => void;
+  newGame: (opts: NewGameOptions, slot?: number) => boolean;
   continueGame: (slot?: number) => boolean;
   resetSave: () => void;
-  save: () => void;
-  quitToMenu: () => void;
+  save: () => boolean;
+  quitToMenu: () => boolean;
 
   tick: () => void;
   setSpeed: (speed: Speed) => void;
@@ -83,13 +112,15 @@ interface Store extends UiState {
   toggleSound: () => void;
   setShowHelp: (v: boolean) => void;
   setShowSaveManager: (v: boolean) => void;
-  saveToSlot: (slot: number) => void;
+  saveToSlot: (slot: number) => boolean;
 
   placeNode: (kind: NodeKind, gx: number, gy: number) => void;
   clickNodeForLink: (nodeId: string) => void;
   cancelBuild: () => void;
   upgradeNode: (id: string) => void;
   repairNode: (id: string) => void;
+  scheduleMaintenance: (id: string, mode: MaintenanceMode) => void;
+  cancelMaintenance: (orderId: string) => void;
   sellNode: (id: string) => void;
   upgradeLink: (id: string) => void;
   sellLink: (id: string) => void;
@@ -97,7 +128,7 @@ interface Store extends UiState {
   unlockDistrict: (id: string) => void;
   updatePackage: (id: string, patch: { price?: number; speedMbps?: number; active?: boolean; name?: string }) => void;
   startResearch: (id: string) => void;
-  acceptOffer: (id: string) => void;
+  acceptOffer: (id: string, mode?: NegotiationMode) => void;
   declineOffer: (id: string) => void;
   dispatchTech: (incidentId: string, mode: RepairMode) => void;
   hireTechnician: () => void;
@@ -107,6 +138,12 @@ interface Store extends UiState {
   dismissAuction: () => void;
   setMarketing: (value: number) => void;
   setRetention: (value: number) => void;
+  startCampaign: (districtId: string, kind: CampaignKind) => void;
+  setTrafficPolicy: (policy: TrafficPolicy) => void;
+  setInterconnectPlan: (plan: InterconnectPlan) => void;
+  toggleWholesaleFixed: () => void;
+  toggleMvno: () => void;
+  setDataCenterMode: (nodeId: string, mode: DataCenterMode) => void;
   takeLoan: (principal: number, termMonths: number) => void;
   repayLoan: (id: string) => void;
   setTransitTier: (tier: number) => void;
@@ -129,6 +166,7 @@ const initialUi: UiState = {
   showHelp: false,
   showSaveManager: false,
   activeSaveSlot: 0,
+  persistenceError: null,
 };
 
 function withGame(set: (fn: (s: Store) => Partial<Store>) => void, mutate: (g: GameState) => void) {
@@ -140,18 +178,29 @@ function withGame(set: (fn: (s: Store) => Partial<Store>) => void, mutate: (g: G
   });
 }
 
+const isSaveSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot < SAVE_SLOT_COUNT;
+
 export const useGame = create<Store>((set, get) => ({
   ...initialUi,
   game: null,
   started: false,
 
   newGame: (opts, slot = 0) => {
+    if (!isSaveSlot(slot)) {
+      set({ persistenceError: 'Choose a valid save slot.' });
+      return false;
+    }
     const game = createNewGame(opts);
-    saveGame(game, slot);
+    if (!saveGame(game, slot)) {
+      set({ persistenceError: 'The new game could not be saved. Check browser storage and try again.' });
+      return false;
+    }
     set({ ...initialUi, activeSaveSlot: slot, game, started: true });
+    return true;
   },
 
   continueGame: (slot = 0) => {
+    if (!isSaveSlot(slot)) return false;
     const game = loadGame(slot);
     if (!game) return false;
     set({ ...initialUi, activeSaveSlot: slot, game: { ...game, speed: 0 }, started: true });
@@ -159,22 +208,39 @@ export const useGame = create<Store>((set, get) => ({
   },
 
   resetSave: () => {
-    clearSave(get().activeSaveSlot);
-    set({ game: null, started: false });
+    if (!clearSave(get().activeSaveSlot)) {
+      const message = 'The active save could not be deleted.';
+      set({ persistenceError: message });
+      get().toast(message, 'bad');
+      return;
+    }
+    set({ game: null, started: false, persistenceError: null });
   },
 
   save: () => {
     const g = get().game;
-    if (g) {
-      saveGame(g, get().activeSaveSlot);
-      get().toast('Game saved.', 'good');
+    if (!g) return false;
+    if (!saveGame(g, get().activeSaveSlot)) {
+      const message = 'Saving failed. Progress is still in memory; do not close this tab.';
+      set({ persistenceError: message });
+      get().toast(message, 'bad');
+      return false;
     }
+    set({ persistenceError: null });
+    get().toast('Game saved.', 'good');
+    return true;
   },
 
   quitToMenu: () => {
     const g = get().game;
-    if (g) saveGame(g, get().activeSaveSlot);
-    set({ started: false });
+    if (g && !saveGame(g, get().activeSaveSlot)) {
+      const message = 'Exit cancelled because the game could not be saved.';
+      set({ persistenceError: message });
+      get().toast(message, 'bad');
+      return false;
+    }
+    set({ started: false, persistenceError: null });
+    return true;
   },
 
   tick: () => {
@@ -186,7 +252,8 @@ export const useGame = create<Store>((set, get) => ({
     // Autosave once a game day.
     if (g.minutes - g.autosaveAt > MINUTES_PER_DAY) {
       g = { ...g, autosaveAt: g.minutes };
-      saveGame(g, s.activeSaveSlot);
+      const saved = saveGame(g, s.activeSaveSlot);
+      set({ persistenceError: saved ? null : 'Autosave failed. Progress is only being kept in this tab.' });
     }
     set({ game: g });
   },
@@ -210,53 +277,48 @@ export const useGame = create<Store>((set, get) => ({
   setShowSaveManager: (v) => set({ showSaveManager: v }),
   saveToSlot: (slot) => {
     const g = get().game;
-    if (!g) return;
-    if (saveGame(g, slot)) {
-      set({ activeSaveSlot: slot });
-      get().toast(`Saved to slot ${slot + 1}.`, 'good');
+    if (!g) return false;
+    if (!isSaveSlot(slot)) {
+      const message = 'Choose a valid save slot.';
+      set({ persistenceError: message });
+      get().toast(message, 'bad');
+      return false;
     }
+    if (saveGame(g, slot)) {
+      set({ activeSaveSlot: slot, persistenceError: null });
+      get().toast(`Saved to slot ${slot + 1}.`, 'good');
+      return true;
+    }
+    const message = `Slot ${slot + 1} could not be saved.`;
+    set({ persistenceError: message });
+    get().toast(message, 'bad');
+    return false;
   },
 
   placeNode: (kind, gx, gy) => {
     const s = get();
     const g = s.game;
     if (!g) return;
-    const mods = researchModifiers(g.researchDone);
     const spec = NODE_SPECS[kind];
-    if (spec.requires && !g.researchDone.includes(spec.requires)) {
-      s.toast(`${spec.label} needs research first.`, 'bad');
+    const issue = nodePlacementIssue(g, kind, gx, gy);
+    if (issue) {
+      s.toast(issue, 'bad', gx, gy);
       return;
     }
     const district = g.districts.find((d) => d.cells.some((c) => c.gx === gx && c.gy === gy));
-    if (!district) {
-      s.toast('Pick a tile inside the city.', 'bad');
-      return;
-    }
-    if (!district.unlocked) {
-      s.toast(`${district.name} is not licensed yet.`, 'bad');
-      return;
-    }
-    if (g.nodes.some((n) => n.gx === gx && n.gy === gy)) {
-      s.toast('Something is already here.', 'bad');
-      return;
-    }
-    const cost = Math.round(spec.baseCost * (kind === 'access' ? mods.accessCostMul : 1));
-    if (g.money < cost) {
-      s.toast('Not enough money.', 'bad');
-      return;
-    }
+    if (!district) return;
+    const cost = nodePlacementCost(g, kind);
 
-    const capacity =
-      kind === 'tower'
-        ? towerCapacity(g.spectrum, 1)
-        : nodeCapacity(kind, 1) * (kind === 'access' ? mods.accessCapacityMul : 1);
+    const capacity = effectiveNodeCapacity(kind, 1, g.spectrum, g.researchDone);
     const count = g.nodes.filter((n) => n.kind === kind).length + 1;
+    const nodeId = uid('n');
     withGame(set, (draft) => {
       draft.money -= cost;
+      recordLedger(draft, 'network_build', `${spec.label}: ${district.name}`, -cost);
       draft.nodes = [
         ...draft.nodes,
         {
-          id: uid('n'),
+          id: nodeId,
           kind,
           name: `${district.name} ${spec.label}${count > 1 ? ` ${count}` : ''}`,
           gx,
@@ -271,6 +333,7 @@ export const useGame = create<Store>((set, get) => ({
           servicedAt: draft.minutes,
         },
       ];
+      if (kind === 'datacenter') draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: 'colocation' };
       pushLog(draft, `${spec.label} built in ${district.name}.`, 'good');
     });
     s.toast(`${spec.label} built`, 'good', gx, gy);
@@ -294,21 +357,18 @@ export const useGame = create<Store>((set, get) => ({
       set({ linkFrom: null });
       return;
     }
-    if (g.links.some((l) => (l.aId === a.id && l.bId === b.id) || (l.aId === b.id && l.bId === a.id))) {
-      s.toast('These are already connected.', 'bad');
+    const issue = fibreConnectionIssue(g, a.id, b.id);
+    if (issue) {
+      s.toast(issue, 'bad');
       set({ linkFrom: null });
       return;
     }
     const length = Math.hypot(a.gx - b.gx, a.gy - b.gy);
-    const cost = Math.round(length * FIBER_COST_PER_UNIT);
-    if (g.money < cost) {
-      s.toast('Not enough money for that span.', 'bad');
-      set({ linkFrom: null });
-      return;
-    }
+    const cost = fibreConnectionCost(g, a.id, b.id);
     const mods = researchModifiers(g.researchDone);
     withGame(set, (draft) => {
       draft.money -= cost;
+      recordLedger(draft, 'network_build', `Fibre: ${a.name} to ${b.name}`, -cost);
       draft.links = [
         ...draft.links,
         {
@@ -337,6 +397,14 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const node = g.nodes.find((n) => n.id === id);
     if (!node) return;
+    if (g.incidents.some((incident) => !incident.resolved && incident.targetType === 'node' && incident.targetId === id)) {
+      s.toast('Resolve the site fault before upgrading it.', 'bad');
+      return;
+    }
+    if (g.maintenanceOrders.some((order) => order.nodeId === id && order.status !== 'completed')) {
+      s.toast('Finish or clear the planned work before upgrading this site.', 'bad');
+      return;
+    }
     const mods = researchModifiers(g.researchDone);
     const spec = NODE_SPECS[node.kind];
     const maxTier =
@@ -352,13 +420,13 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
+      recordLedger(draft, 'network_upgrade', `${node.name}: tier ${node.tier + 1}`, -cost);
       draft.nodes = draft.nodes.map((n) =>
         n.id === id
           ? {
               ...n,
               tier: n.tier + 1,
-              capacityGbps:
-                n.kind === 'tower' ? towerCapacity(draft.spectrum, n.tier + 1) : nodeCapacity(n.kind, n.tier + 1),
+              capacityGbps: effectiveNodeCapacity(n.kind, n.tier + 1, draft.spectrum, draft.researchDone),
               health: Math.max(n.health, 92),
               servicedAt: draft.minutes,
             }
@@ -382,19 +450,109 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
+      recordLedger(draft, 'network_service', `Service: ${node.name}`, -cost);
       draft.nodes = draft.nodes.map((n) => (n.id === id ? { ...n, health: 100, servicedAt: draft.minutes } : n));
     });
     s.toast('Maintenance done', 'good', node.gx, node.gy);
   },
 
+  scheduleMaintenance: (id, mode) => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    const node = g.nodes.find((entry) => entry.id === id);
+    if (!node) return;
+    if (mode === 'defer') {
+      s.toast(`${node.name} stays in service, and its failure odds keep climbing.`, 'info');
+      return;
+    }
+    if (node.down || g.incidents.some((incident) => !incident.resolved && incident.targetId === id)) {
+      s.toast('Resolve the active fault before planning service.', 'bad');
+      return;
+    }
+    if (g.maintenanceOrders.some((order) => order.nodeId === id && order.status !== 'completed')) {
+      s.toast('This site already has planned work queued.', 'bad');
+      return;
+    }
+    const cost = maintenanceCost(node, mode);
+    if (g.money < cost) {
+      s.toast('Not enough cash for this maintenance window.', 'bad');
+      return;
+    }
+    const config = MAINTENANCE_CONFIG[mode];
+    const scheduledAt = maintenanceStart(g.minutes, mode);
+    withGame(set, (draft) => {
+      draft.money -= cost;
+      recordLedger(draft, 'network_service', `${config.label}: ${node.name}`, -cost);
+      draft.maintenanceOrders = [
+        ...draft.maintenanceOrders,
+        {
+          id: uid('maint'),
+          nodeId: id,
+          mode,
+          status: 'scheduled',
+          scheduledAt,
+          startedAt: null,
+          minutesLeft: config.durationMinutes,
+          technicianId: null,
+          cost,
+        },
+      ];
+      pushLog(draft, `${config.label} booked for ${node.name}.`, 'info');
+    });
+    s.toast(mode === 'urgent' ? 'Crew queued for dispatch' : '02:00 maintenance booked', 'good', node.gx, node.gy);
+  },
+  // Work that has not started yet can be called off and the fee returned.
+  cancelMaintenance: (orderId) => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    const order = g.maintenanceOrders.find((entry) => entry.id === orderId);
+    if (!order) return;
+    if (order.status !== 'scheduled') {
+      s.toast('The crew is already on site, so this cannot be called off.', 'bad');
+      return;
+    }
+    const node = g.nodes.find((entry) => entry.id === order.nodeId);
+    withGame(set, (draft) => {
+      draft.money += order.cost;
+      recordLedger(draft, 'network_service', `Cancelled: ${node?.name ?? 'site'}`, order.cost);
+      draft.maintenanceOrders = draft.maintenanceOrders.filter((entry) => entry.id !== orderId);
+      pushLog(draft, `Planned work at ${node?.name ?? 'a site'} was called off.`, 'info');
+    });
+    s.toast('Maintenance cancelled and refunded.', 'good');
+  },
   sellNode: (id) => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    const attachedLinkIds = new Set(
+      g.links.filter((link) => link.aId === id || link.bId === id).map((link) => link.id),
+    );
+    const blockingIncident = g.incidents.find(
+      (incident) =>
+        !incident.resolved &&
+        ((incident.targetType === 'node' && incident.targetId === id) ||
+          (incident.targetType === 'link' && attachedLinkIds.has(incident.targetId))),
+    );
+    if (blockingIncident) {
+      s.toast('Resolve faults on this site and its fibre before decommissioning it.', 'bad');
+      return;
+    }
+    if (g.maintenanceOrders.some((order) => order.nodeId === id && order.status !== 'completed')) {
+      s.toast('Complete the planned work before decommissioning this site.', 'bad');
+      return;
+    }
     withGame(set, (draft) => {
       const node = draft.nodes.find((n) => n.id === id);
       if (!node) return;
       const refund = Math.round(NODE_SPECS[node.kind].baseCost * 0.35 * node.tier);
       draft.money += refund;
+      recordLedger(draft, 'asset_sale', `Decommissioned: ${node.name}`, refund);
       draft.nodes = draft.nodes.filter((n) => n.id !== id);
       draft.links = draft.links.filter((l) => l.aId !== id && l.bId !== id);
+      const { [id]: _removedMode, ...remainingModes } = draft.dataCenterModes;
+      draft.dataCenterModes = remainingModes;
       pushLog(draft, `${node.name} decommissioned (+$${refund.toLocaleString()}).`, 'info');
     });
     set({ selection: null });
@@ -418,6 +576,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
+      recordLedger(draft, 'network_upgrade', 'Fibre capacity upgrade', -cost);
       draft.links = draft.links.map((l) =>
         l.id === id ? { ...l, tier: l.tier + 1, capacityGbps: linkCapacity(l.tier + 1) * mods.linkCapacityMul } : l,
       );
@@ -426,10 +585,17 @@ export const useGame = create<Store>((set, get) => ({
   },
 
   sellLink: (id) => {
+    const s = get();
+    if (s.game?.incidents.some((incident) => !incident.resolved && incident.targetType === 'link' && incident.targetId === id)) {
+      s.toast('Resolve the fault before removing this fibre span.', 'bad');
+      return;
+    }
     withGame(set, (draft) => {
       const link = draft.links.find((l) => l.id === id);
       if (!link) return;
-      draft.money += Math.round(link.length * FIBER_COST_PER_UNIT * 0.2);
+      const refund = Math.round(link.length * FIBER_COST_PER_UNIT * 0.2);
+      draft.money += refund;
+      recordLedger(draft, 'asset_sale', 'Fibre recovery', refund);
       draft.links = draft.links.filter((l) => l.id !== id);
     });
     set({ selection: null });
@@ -447,17 +613,31 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= district.entryCost;
+      recordLedger(draft, 'district_licence', `${district.name} licence`, -district.entryCost);
       draft.districts = draft.districts.map((d) => (d.id === id ? { ...d, unlocked: true } : d));
       pushLog(draft, `Licensed to build in ${district.name}.`, 'good');
     });
     s.toast(`${district.name} licensed`, 'good', district.center.gx, district.center.gy);
   },
 
-  updatePackage: (id, patch) =>
+  updatePackage: (id, patch) => {
+    const s = get();
+    const current = s.game?.packages.find((pack) => pack.id === id);
+    if (!current) return;
+    if (
+      patch.active === false &&
+      current.active &&
+      !s.game?.packages.some((pack) => pack.id !== id && pack.segment === current.segment && pack.active)
+    ) {
+      s.toast(`Keep at least one ${current.segment} package active.`, 'bad');
+      return;
+    }
     withGame(set, (draft) => {
-      draft.packages = draft.packages.map((p) => (p.id === id ? { ...p, ...patch } : p));
-      redistributePackages(draft);
-    }),
+      draft.packages = draft.packages.map((pack) => (pack.id === id ? { ...pack, ...patch } : pack));
+      if (current.segment === 'mobile') redistributeMobilePackages(draft);
+      else redistributePackages(draft);
+    });
+  },
 
   startResearch: (id) => {
     const s = get();
@@ -473,54 +653,83 @@ export const useGame = create<Store>((set, get) => ({
       s.toast('Not enough money.', 'bad');
       return;
     }
+    if (g.researchPoints < node.points) {
+      s.toast(`Need ${node.points} research points.`, 'bad');
+      return;
+    }
     withGame(set, (draft) => {
       draft.money -= node.cost;
+      draft.researchPoints -= node.points;
       draft.researchActive = { id, daysLeft: node.days };
+      recordLedger(draft, 'research', `Research: ${node.name}`, -node.cost);
       pushLog(draft, `Research started: ${node.name}.`, 'info');
     });
     s.toast(`Researching ${node.name}`, 'good');
   },
 
-  acceptOffer: (id) => {
+  acceptOffer: (id, mode = 'standard') => {
     const s = get();
     const g = s.game;
     if (!g) return;
     const offer = g.offers.find((o) => o.id === id);
     if (!offer) return;
+    if (g.contracts.some((contract) => contract.buildingId === offer.buildingId)) {
+      s.toast('That building already has an active contract.', 'bad');
+      return;
+    }
     const cover = offer.requiresRedundancy ? districtRedundancy(g, offer.districtId) : null;
     if (cover && !cover.complete) {
       const name = g.districts.find((d) => d.id === offer.districtId)?.name ?? 'that district';
       s.toast(`${name}: ${cover.done} of ${cover.total} sites have a second path.`, 'bad');
       return;
     }
+
+    const negotiation = resolveNegotiation(g, offer, mode);
+    const building = g.buildings.find((entry) => entry.id === offer.buildingId);
+    if (!negotiation.accepted) {
+      withGame(set, (draft) => {
+        draft.offers = draft.offers.filter((entry) => entry.id !== id);
+        pushLog(draft, `${offer.clientName} rejected the premium counter and walked away.`, 'bad');
+      });
+      s.toast('Premium counter rejected', 'bad', building?.gx, building?.gy);
+      return;
+    }
+
+    const agreed = negotiation.terms;
     withGame(set, (draft) => {
-      draft.offers = draft.offers.filter((o) => o.id !== id);
-      draft.money += offer.signingBonus;
+      draft.offers = draft.offers.filter((o) => o.id !== id && o.buildingId !== offer.buildingId);
+      draft.money += agreed.signingBonus;
+      recordLedger(draft, 'contract_bonus', `${agreed.clientName} signing bonus`, agreed.signingBonus);
       draft.contracts = [
         ...draft.contracts,
         {
           id: uid('c'),
-          clientName: offer.clientName,
-          districtId: offer.districtId,
-          buildingId: offer.buildingId,
-          bandwidthGbps: offer.bandwidthGbps,
-          monthlyRevenue: offer.monthlyRevenue,
-          slaPercent: offer.slaPercent,
+          clientName: agreed.clientName,
+          districtId: agreed.districtId,
+          buildingId: agreed.buildingId,
+          bandwidthGbps: agreed.bandwidthGbps,
+          monthlyRevenue: agreed.monthlyRevenue,
+          slaPercent: agreed.slaPercent,
           downtimeMinutes: 0,
           penaltyPaid: 0,
           startedAt: draft.minutes,
-          termMonths: offer.termMonths,
-          requiresRedundancy: offer.requiresRedundancy,
-          segment: offer.segment,
+          termMonths: agreed.termMonths,
+          requiresRedundancy: agreed.requiresRedundancy,
+          segment: agreed.segment,
         },
       ];
       draft.buildings = draft.buildings.map((b) =>
-        b.id === offer.buildingId ? { ...b, connected: 1, lastConnectedAt: draft.minutes } : b,
+        b.id === agreed.buildingId ? { ...b, connected: 1, lastConnectedAt: draft.minutes } : b,
       );
-      pushLog(draft, `Signed ${offer.clientName} at $${offer.monthlyRevenue.toLocaleString()}/mo.`, 'good');
+      const term = mode === 'flexible' ? ' on a flexible SLA' : mode === 'premium' ? ' after a premium counter' : '';
+      pushLog(draft, `Signed ${agreed.clientName}${term} at $${agreed.monthlyRevenue.toLocaleString()}/mo.`, 'good');
     });
-    const b = g.buildings.find((x) => x.id === offer.buildingId);
-    s.toast(`${offer.clientName} signed`, 'good', b?.gx, b?.gy);
+    s.toast(
+      mode === 'premium' ? 'Premium counter accepted' : `${agreed.clientName} signed`,
+      'good',
+      building?.gx,
+      building?.gy,
+    );
   },
 
   declineOffer: (id) => withGame(set, (draft) => void (draft.offers = draft.offers.filter((o) => o.id !== id))),
@@ -531,14 +740,16 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const inc = g.incidents.find((i) => i.id === incidentId);
     if (!inc || inc.resolved) return;
-    const tech = g.technicians.find((t) => t.state === 'idle');
+    if (inc.assignedTechId) {
+      s.toast('A crew is already assigned to that incident.', 'bad');
+      return;
+    }
+    const tech = g.technicians.find((t) => t.state === 'idle' && t.maintenanceId === null);
     if (!tech) {
       s.toast('Every crew is already out.', 'bad');
       return;
     }
-    // Emergency work needs cash up front. A scheduled repair is your own crew's
-    // time, so it always goes ahead, otherwise a broke player is stuck with a
-    // dead network and no way back.
+    // Emergency work needs cash up front.
     if (mode === 'emergency') {
       const cost = repairCost(inc, 'emergency');
       if (g.money < cost) {
@@ -564,6 +775,7 @@ export const useGame = create<Store>((set, get) => ({
       const rng = makeRng(Math.floor(Math.random() * 1e9));
       const base = draft.nodes.find((n) => n.kind === 'pop') ?? draft.nodes[0];
       draft.money -= cost;
+      recordLedger(draft, 'staff', 'Field crew recruitment', -cost);
       draft.technicians = [
         ...draft.technicians,
         {
@@ -573,6 +785,7 @@ export const useGame = create<Store>((set, get) => ({
           salary: 2200 + Math.floor(rng() * 700),
           experience: 0,
           incidentId: null,
+          maintenanceId: null,
           gx: base?.gx ?? 0,
           gy: base?.gy ?? 0,
           homeGx: base?.gx ?? 0,
@@ -599,6 +812,7 @@ export const useGame = create<Store>((set, get) => ({
         role
       ];
       draft.money -= cost;
+      recordLedger(draft, 'staff', `${role.replace(/_/g, ' ')} recruitment`, -cost);
       draft.employees = [
         ...draft.employees,
         { id: uid('e'), name: personName(rng), role, salary, skill: 1 + Math.floor(rng() * 4), experience: 0 },
@@ -607,11 +821,21 @@ export const useGame = create<Store>((set, get) => ({
     s.toast('Hired', 'good');
   },
 
-  fireStaff: (id) =>
+  fireStaff: (id) => {
+    const s = get();
+    const technician = s.game?.technicians.find((t) => t.id === id);
+    if (
+      technician &&
+      (technician.state !== 'idle' || technician.incidentId !== null || technician.maintenanceId !== null)
+    ) {
+      s.toast('That crew must finish and return before they can be released.', 'bad');
+      return;
+    }
     withGame(set, (draft) => {
       draft.employees = draft.employees.filter((e) => e.id !== id);
       draft.technicians = draft.technicians.filter((t) => t.id !== id);
-    }),
+    });
+  },
 
   placeBid: (amount) => {
     const s = get();
@@ -638,10 +862,127 @@ export const useGame = create<Store>((set, get) => ({
 
   setRetention: (value) => withGame(set, (draft) => void (draft.retentionBudget = Math.max(0, value))),
 
+  startCampaign: (districtId, kind) => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    const district = g.districts.find((entry) => entry.id === districtId);
+    const config = CAMPAIGN_CONFIG[kind];
+    if (!district?.unlocked) {
+      s.toast('Unlock the district before campaigning there.', 'bad');
+      return;
+    }
+    if (g.campaigns.some((campaign) => campaign.districtId === districtId && campaign.endsAt > g.minutes)) {
+      s.toast('A district can run only one focused campaign at a time.', 'bad');
+      return;
+    }
+    if (kind === 'mobile' && (!g.researchDone.includes('mobile_4g') || !g.spectrum.length)) {
+      s.toast('Launch 4G and secure spectrum before promoting mobile service.', 'bad');
+      return;
+    }
+    if (g.money < config.cost) {
+      s.toast('Not enough cash for this campaign.', 'bad');
+      return;
+    }
+    withGame(set, (draft) => {
+      draft.money -= config.cost;
+      recordLedger(draft, 'campaign', `${config.label}: ${district.name}`, -config.cost);
+      draft.campaigns = [
+        ...draft.campaigns,
+        {
+          id: uid('campaign'),
+          districtId,
+          kind,
+          startedAt: draft.minutes,
+          endsAt: draft.minutes + config.durationDays * MINUTES_PER_DAY,
+          cost: config.cost,
+        },
+      ];
+      pushLog(draft, `${config.label} started in ${district.name}.`, 'good');
+    });
+    s.toast(`${config.label} is live`, 'good');
+  },
+
+  setTrafficPolicy: (policy) => {
+    const s = get();
+    const g = s.game;
+    if (!g || policy === g.trafficPolicy) return;
+    if (policy !== 'balanced' && !g.researchDone.includes('noc')) {
+      s.toast('A Network Operations Centre is required for traffic policy control.', 'bad');
+      return;
+    }
+    if (policy === 'mobile' && !g.researchDone.includes('mobile_5g')) {
+      s.toast('5G Standalone research unlocks the mobile network slice.', 'bad');
+      return;
+    }
+    withGame(set, (draft) => {
+      draft.trafficPolicy = policy;
+      pushLog(draft, `Traffic policy changed to ${policy.replace(/_/g, ' ')}.`, 'info');
+    });
+    s.toast('Traffic policy applied', 'good');
+  },
+
+  setInterconnectPlan: (plan) => {
+    const s = get();
+    const g = s.game;
+    if (!g || plan === g.interconnectPlan) return;
+    const config = INTERCONNECT_CONFIG[plan];
+    const routes = config.requiresDataCenter ? computeRoutes(g) : {};
+    if (
+      config.requiresDataCenter &&
+      !g.nodes.some((node) => node.kind === 'datacenter' && !node.down && routes[node.id])
+    ) {
+      s.toast('The CDN partner needs an online data centre.', 'bad');
+      return;
+    }
+    withGame(set, (draft) => {
+      draft.interconnectPlan = plan;
+      pushLog(draft, `${config.label} interconnection activated.`, 'info');
+    });
+    s.toast(`${config.label} selected`, 'good');
+  },
+
+  toggleWholesaleFixed: () =>
+    withGame(set, (draft) => {
+      draft.wholesaleFixed = !draft.wholesaleFixed;
+      pushLog(draft, `Fixed wholesale ${draft.wholesaleFixed ? 'opened' : 'closed'} to partners.`, 'info');
+    }),
+
+  toggleMvno: () => {
+    const s = get();
+    const g = s.game;
+    if (!g) return;
+    if (!g.mvnoEnabled && (!g.researchDone.includes('mobile_4g') || !g.spectrum.length)) {
+      s.toast('MVNO access needs a live mobile platform and spectrum.', 'bad');
+      return;
+    }
+    withGame(set, (draft) => {
+      draft.mvnoEnabled = !draft.mvnoEnabled;
+      pushLog(draft, `MVNO access ${draft.mvnoEnabled ? 'opened' : 'closed'} to partners.`, 'info');
+    });
+  },
+
+  setDataCenterMode: (nodeId, mode) => {
+    const s = get();
+    const g = s.game;
+    const node = g?.nodes.find((entry) => entry.id === nodeId && entry.kind === 'datacenter');
+    if (!g || !node || g.dataCenterModes[nodeId] === mode) return;
+    const config = DATA_CENTER_MODE_CONFIG[mode];
+    withGame(set, (draft) => {
+      draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: mode };
+      pushLog(draft, `${node.name} switched to ${config.label}.`, 'info');
+    });
+    s.toast(`${config.label} workload applied`, 'good');
+  },
+
   takeLoan: (principal, termMonths) => {
     const s = get();
     const g = s.game;
     if (!g) return;
+    if (!Number.isFinite(principal) || principal <= 0 || !Number.isInteger(termMonths) || termMonths <= 0) {
+      s.toast('Choose a valid loan amount and term.', 'bad');
+      return;
+    }
     const headroom = creditLimit(g);
     if (principal > headroom) {
       s.toast('More than the banks will lend you.', 'bad');
@@ -650,6 +991,7 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       draft.loans = [...draft.loans, createLoan(draft, principal, termMonths)];
       draft.money += principal;
+      recordLedger(draft, 'loan_draw', 'Loan drawdown', principal);
       pushLog(draft, `Borrowed $${principal.toLocaleString()} over ${termMonths} months.`, 'info');
     });
     s.toast('Loan drawn down', 'good');
@@ -668,6 +1010,7 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       draft.money -= loan.remaining;
       draft.loans = draft.loans.filter((l) => l.id !== id);
+      recordLedger(draft, 'loan_payment', 'Loan repaid in full', -loan.remaining);
       pushLog(draft, 'Loan repaid in full.', 'good');
     });
     s.toast('Loan cleared', 'good');

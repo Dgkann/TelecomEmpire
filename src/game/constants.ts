@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 15;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -106,9 +106,7 @@ export const FIBER_MAINTENANCE_PER_UNIT = 22;
 
 export const POWER_COST_PER_KW_MONTH = 130;
 
-// The reference residential price the whole market is measured against. Both
-// your price index and every rival's are relative to this, so nobody's price
-// can chase anybody else's in a loop.
+// The reference residential price the whole market is measured against.
 export const BASELINE_ARPU = 34;
 
 export const TRANSIT_TIERS = [
@@ -228,12 +226,10 @@ export const DIFFICULTY: Record<
   },
 };
 
-// A data centre earns from hosting and colocation. Sited where the businesses
-// are, it earns more.
+// A data centre earns from hosting and colocation.
 export const DATACENTER_HOSTING_BASE = 38000;
 
-// Edge caching serves popular traffic locally, so it never crosses your network
-// at all. This is the real reason to build one: it adds headroom everywhere.
+// Edge caching serves popular traffic locally, so it never crosses your network at all.
 export const DATACENTER_CACHE_PER_TIER = 0.08;
 export const DATACENTER_CACHE_CAP = 0.3;
 

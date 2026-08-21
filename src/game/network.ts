@@ -1,8 +1,6 @@
 import type { GameState, NetLink, NetNode } from './types';
 
-// Traffic is not simulated packet by packet. Each district's demand is pushed
-// onto the shortest live path back to a core, every element on that path picks
-// up load, and the worst-loaded one decides what customers feel.
+// Traffic is not simulated packet by packet.
 
 export interface Adjacency {
   [nodeId: string]: Array<{ linkId: string; otherId: string; length: number }>;
@@ -90,8 +88,7 @@ export function isRedundant(state: GameState, nodeId: string, routes: Record<str
   return true;
 }
 
-// How many of the district's sites survive losing any single span. Reported as
-// a count because the all-or-nothing answer hides the progress you paid for.
+// How many of the district's sites survive losing any single span.
 export function districtRedundancy(state: GameState, districtId: string) {
   const routes = computeRoutes(state);
   const serving = servingNodes(state, districtId).filter((n) => routes[n.id]);
@@ -103,9 +100,23 @@ export function districtIsRedundant(state: GameState, districtId: string): boole
   return districtRedundancy(state, districtId).complete;
 }
 
-export function servingNodes(state: GameState, districtId: string): NetNode[] {
+// Planned work powers a site down, so only another serving site keeps a district alive.
+export function servingCoverAfterLoss(state: GameState, nodeId: string): { others: number; safe: boolean } {
+  const node = state.nodes.find((n) => n.id === nodeId);
+  if (!node) return { others: 0, safe: true };
+  const without = { ...state, nodes: state.nodes.map((n) => (n.id === nodeId ? { ...n, down: true } : n)) };
+  const routes = computeRoutes(without);
+  const others = servingNodes(without, node.districtId).filter((n) => n.id !== nodeId && !n.down && routes[n.id]).length;
+  return { others, safe: others > 0 };
+}
+
+export function servingNodes(
+  state: GameState,
+  districtId: string,
+  kinds: NetNode['kind'][] = ['pop', 'access'],
+): NetNode[] {
   return state.nodes.filter(
-    (n) => n.districtId === districtId && (n.kind === 'pop' || n.kind === 'access' || n.kind === 'tower') && !n.down,
+    (n) => n.districtId === districtId && kinds.includes(n.kind) && !n.down,
   );
 }
 
@@ -121,6 +132,25 @@ export interface LoadResult {
   totalServed: number;
 }
 
+export interface TrafficService {
+  id: string;
+  districtId: string;
+  demandGbps: number;
+  servingNodeIds: string[];
+  // Relative share of a congested resource. One preserves the old balanced behaviour.
+  priority?: number;
+}
+
+export interface ServiceLoadResult {
+  nodeTraffic: Record<string, number>;
+  linkTraffic: Record<string, number>;
+  serviceServed: Record<string, number>;
+  servicePressure: Record<string, number>;
+  serviceOutage: Record<string, boolean>;
+  totalDemand: number;
+  totalServed: number;
+}
+
 // districtDemand is in Gbps at the current time of day.
 export function loadNetwork(
   state: GameState,
@@ -129,45 +159,93 @@ export function loadNetwork(
   // Share by what each node delivers end to end, not by the size of the box.
   autoBalance = false,
 ): LoadResult {
+  const services = state.districts.map((district) => ({
+    id: district.id,
+    districtId: district.id,
+    demandGbps: districtDemand[district.id] ?? 0,
+    servingNodeIds: servingNodes(state, district.id).map((node) => node.id),
+  }));
+  const result = loadServices(state, services, routes, autoBalance);
+  return {
+    nodeTraffic: result.nodeTraffic,
+    linkTraffic: result.linkTraffic,
+    districtServed: result.serviceServed,
+    districtPressure: result.servicePressure,
+    districtOutage: result.serviceOutage,
+    totalDemand: result.totalDemand,
+    totalServed: result.totalServed,
+  };
+}
+
+export function loadServices(
+  state: GameState,
+  services: TrafficService[],
+  routes: Record<string, RouteInfo>,
+  autoBalance = false,
+): ServiceLoadResult {
+  // Collect all offered load before measuring shared bottlenecks to avoid district-order bias.
+  const offeredNodeTraffic: Record<string, number> = {};
+  const offeredLinkTraffic: Record<string, number> = {};
+  const weightedNodeTraffic: Record<string, number> = {};
+  const weightedLinkTraffic: Record<string, number> = {};
   const nodeTraffic: Record<string, number> = {};
   const linkTraffic: Record<string, number> = {};
-  const districtServed: Record<string, number> = {};
-  const districtPressure: Record<string, number> = {};
-  const districtOutage: Record<string, boolean> = {};
+  const serviceServed: Record<string, number> = {};
+  const servicePressure: Record<string, number> = {};
+  const serviceOutage: Record<string, boolean> = {};
   let totalDemand = 0;
   let totalServed = 0;
 
-  for (const n of state.nodes) nodeTraffic[n.id] = 0;
-  for (const l of state.links) linkTraffic[l.id] = 0;
+  for (const n of state.nodes) {
+    offeredNodeTraffic[n.id] = 0;
+    weightedNodeTraffic[n.id] = 0;
+    nodeTraffic[n.id] = 0;
+  }
+  for (const l of state.links) {
+    offeredLinkTraffic[l.id] = 0;
+    weightedLinkTraffic[l.id] = 0;
+    linkTraffic[l.id] = 0;
+  }
 
   const nodeById: Record<string, NetNode> = {};
   for (const n of state.nodes) nodeById[n.id] = n;
   const linkById: Record<string, NetLink> = {};
   for (const l of state.links) linkById[l.id] = l;
 
-  for (const district of state.districts) {
-    const demand = districtDemand[district.id] ?? 0;
+  interface PlannedFlow {
+    node: NetNode;
+    route: RouteInfo;
+    offered: number;
+    priority: number;
+  }
+  const planned: Record<string, PlannedFlow[]> = {};
+
+  for (const service of services) {
+    const demand = service.demandGbps;
+    const priority = Math.max(0.1, service.priority ?? 1);
     totalDemand += demand;
     if (demand <= 0) {
-      districtServed[district.id] = 1;
-      districtPressure[district.id] = 0;
-      districtOutage[district.id] = false;
+      serviceServed[service.id] = 1;
+      servicePressure[service.id] = 0;
+      serviceOutage[service.id] = false;
       continue;
     }
 
-    const serving = servingNodes(state, district.id).filter((n) => routes[n.id]);
+    const serving = service.servingNodeIds
+      .map((id) => nodeById[id])
+      .filter((node): node is NetNode => Boolean(node && !node.down && routes[node.id]));
     if (serving.length === 0) {
-      districtServed[district.id] = 0;
-      districtPressure[district.id] = 2;
-      districtOutage[district.id] = true;
+      serviceServed[service.id] = 0;
+      servicePressure[service.id] = 2;
+      serviceOutage[service.id] = true;
       continue;
     }
 
     const weightOf = (n: NetNode) => {
-      if (!autoBalance) return n.capacityGbps;
+      if (!autoBalance) return Math.max(0, n.capacityGbps);
       const route = routes[n.id];
-      if (!route) return n.capacityGbps;
-      let cap = n.capacityGbps;
+      if (!route) return Math.max(0, n.capacityGbps);
+      let cap = Math.max(0, n.capacityGbps);
       for (const linkId of route.path) {
         const link = linkById[linkId];
         if (link) cap = Math.min(cap, link.capacityGbps);
@@ -179,53 +257,102 @@ export function loadNetwork(
       return Math.max(cap, n.capacityGbps * 0.15);
     };
 
-    const totalCap = serving.reduce((s, n) => s + weightOf(n), 0) || 1;
-    let servedHere = 0;
-    let worstPressure = 0;
-
-    for (const node of serving) {
-      const share = (weightOf(node) / totalCap) * demand;
-      nodeTraffic[node.id] += share;
-      const route = routes[node.id];
-      for (const linkId of route.path) linkTraffic[linkId] += share;
-      for (const hopId of route.hops) nodeTraffic[hopId] += share;
-      servedHere += share;
+    const weights = serving.map((node) => ({ node, weight: weightOf(node) }));
+    const totalCap = weights.reduce((sum, item) => sum + item.weight, 0);
+    if (totalCap <= 0) {
+      serviceServed[service.id] = 0;
+      servicePressure[service.id] = 2;
+      serviceOutage[service.id] = false;
+      continue;
     }
 
-    // Second pass: measure the tightest element each serving node depends on.
-    for (const node of serving) {
+    const flows: PlannedFlow[] = [];
+    for (const { node, weight } of weights) {
+      const share = (weight / totalCap) * demand;
+      if (share <= 0) continue;
       const route = routes[node.id];
-      let pressure = nodeTraffic[node.id] / Math.max(0.01, node.capacityGbps);
+      const flow = { node, route, offered: share, priority };
+      flows.push(flow);
+      offeredNodeTraffic[node.id] += share;
+      weightedNodeTraffic[node.id] += share * priority;
+      for (const linkId of route.path) {
+        offeredLinkTraffic[linkId] += share;
+        weightedLinkTraffic[linkId] += share * priority;
+      }
+      for (const hopId of route.hops) {
+        offeredNodeTraffic[hopId] += share;
+        weightedNodeTraffic[hopId] += share * priority;
+      }
+    }
+    planned[service.id] = flows;
+  }
+
+  // Scale each district's flows by its worst final path pressure to conserve shared capacity.
+  for (const service of services) {
+    const demand = service.demandGbps;
+    if (demand <= 0 || serviceOutage[service.id]) continue;
+    const flows = planned[service.id] ?? [];
+    if (!flows.length) continue;
+
+    let worstPressure = 0;
+    let servedFraction = 1;
+    let blocked = false;
+    const recordPressure = (traffic: number, weightedTraffic: number, capacity: number, priority: number) => {
+      if (traffic <= 0) return;
+      if (capacity <= 0) {
+        blocked = true;
+        worstPressure = Math.max(worstPressure, 2);
+        servedFraction = 0;
+        return;
+      }
+      if (traffic <= capacity) {
+        worstPressure = Math.max(worstPressure, traffic / capacity);
+        return;
+      }
+      const localFraction = Math.min(1, (capacity * priority) / Math.max(0.001, weightedTraffic));
+      servedFraction = Math.min(servedFraction, localFraction);
+      worstPressure = Math.max(worstPressure, 1 / Math.max(0.001, localFraction));
+    };
+
+    for (const { node, route, priority } of flows) {
+      recordPressure(offeredNodeTraffic[node.id], weightedNodeTraffic[node.id], node.capacityGbps, priority);
       for (const linkId of route.path) {
         const link = linkById[linkId];
-        if (link) pressure = Math.max(pressure, linkTraffic[linkId] / Math.max(0.01, link.capacityGbps));
+        if (link)
+          recordPressure(offeredLinkTraffic[linkId], weightedLinkTraffic[linkId], link.capacityGbps, priority);
       }
       for (const hopId of route.hops) {
         const hop = nodeById[hopId];
-        if (hop) pressure = Math.max(pressure, nodeTraffic[hopId] / Math.max(0.01, hop.capacityGbps));
+        if (hop)
+          recordPressure(offeredNodeTraffic[hopId], weightedNodeTraffic[hopId], hop.capacityGbps, priority);
       }
-      worstPressure = Math.max(worstPressure, pressure);
     }
 
-    districtPressure[district.id] = worstPressure;
-    // Demand above capacity is simply not carried.
-    const servedFraction = worstPressure > 1 ? 1 / worstPressure : 1;
-    districtServed[district.id] = servedFraction;
-    districtOutage[district.id] = false;
-    totalServed += servedHere * servedFraction;
+    if (blocked) servedFraction = 0;
+    let servedHere = 0;
+    for (const { node, route, offered } of flows) {
+      const carried = offered * servedFraction;
+      nodeTraffic[node.id] += carried;
+      for (const linkId of route.path) linkTraffic[linkId] += carried;
+      for (const hopId of route.hops) nodeTraffic[hopId] += carried;
+      servedHere += carried;
+    }
+    servicePressure[service.id] = worstPressure;
+    serviceServed[service.id] = Math.max(0, Math.min(1, servedHere / demand));
+    serviceOutage[service.id] = false;
+    totalServed += servedHere;
   }
 
-  return { nodeTraffic, linkTraffic, districtServed, districtPressure, districtOutage, totalDemand, totalServed };
+  return { nodeTraffic, linkTraffic, serviceServed, servicePressure, serviceOutage, totalDemand, totalServed };
 }
 
 export const nodeUtil = (n: NetNode) => (n.capacityGbps > 0 ? n.trafficGbps / n.capacityGbps : 0);
 export const linkUtil = (l: NetLink) => (l.capacityGbps > 0 ? l.trafficGbps / l.capacityGbps : 0);
 
-// Capacity that customer traffic actually has to fit through: the access layer
-// that terminates it, and the transit that carries it off-net.
+// Capacity that customer traffic actually has to fit through: the access layer that terminates it.
 export function servingCapacity(nodes: NetNode[]) {
   return nodes
-    .filter((n) => !n.down && (n.kind === 'pop' || n.kind === 'access' || n.kind === 'tower'))
+    .filter((n) => !n.down && (n.kind === 'pop' || n.kind === 'access'))
     .reduce((sum, n) => sum + n.capacityGbps, 0);
 }
 
@@ -238,8 +365,7 @@ export interface Forecast {
   confident: boolean;
 }
 
-// Straight line fit over recent daily peaks. Deliberately simple: the point is
-// to let a player see a wall coming, not to be a good statistician.
+// Straight line fit over recent daily peaks.
 export function forecastDemand(history: number[], today: number, daysAhead: number): Forecast {
   const points = history.slice(-14);
   if (points.length < 4) {

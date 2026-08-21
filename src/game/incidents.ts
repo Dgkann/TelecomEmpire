@@ -117,20 +117,35 @@ const TEMPLATES: IncidentTemplate[] = [
   },
 ];
 
-export function rollIncident(state: GameState, rng: Rng, mods: { incidentDurationMul: number }): Incident | null {
-  const candidates = TEMPLATES.filter((t) => {
-    if (t.target === 'link') return state.links.some((l) => !l.down);
-    return state.nodes.some((n) => !n.down && (!t.nodeKinds || t.nodeKinds.includes(n.kind)));
-  });
+export function rollIncident(
+  state: GameState,
+  rng: Rng,
+  mods: { incidentDurationMul: number; ddosRateMul?: number },
+): Incident | null {
+  const maintenanceNodes = new Set(
+    state.maintenanceOrders.filter((order) => order.status !== 'completed').map((order) => order.nodeId),
+  );
+  const candidates = TEMPLATES.filter((template) => {
+    if (template.target === 'link') return state.links.some((link) => !link.down);
+    return state.nodes.some(
+      (node) =>
+        !node.down &&
+        !maintenanceNodes.has(node.id) &&
+        (!template.nodeKinds || template.nodeKinds.includes(node.kind)),
+    );
+  }).map((template) => ({
+    template,
+    weight: template.weight * (template.kind === 'ddos' ? (mods.ddosRateMul ?? 1) : 1),
+  }));
   if (!candidates.length) return null;
 
-  const total = candidates.reduce((s, t) => s + t.weight, 0);
+  const total = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
   let roll = rng() * total;
-  let tpl = candidates[0];
-  for (const c of candidates) {
-    roll -= c.weight;
+  let tpl = candidates[0].template;
+  for (const candidate of candidates) {
+    roll -= candidate.weight;
     if (roll <= 0) {
-      tpl = c;
+      tpl = candidate.template;
       break;
     }
   }
@@ -150,7 +165,9 @@ export function rollIncident(state: GameState, rng: Rng, mods: { incidentDuratio
     districtId = endpoint?.districtId ?? state.districts[0].id;
     place = state.districts.find((d) => d.id === districtId)?.name ?? 'the city';
   } else {
-    const options = state.nodes.filter((n) => !n.down && (!tpl.nodeKinds || tpl.nodeKinds.includes(n.kind)));
+    const options = state.nodes.filter(
+      (n) => !n.down && !maintenanceNodes.has(n.id) && (!tpl.nodeKinds || tpl.nodeKinds.includes(n.kind)),
+    );
     const node = options[Math.floor(rng() * options.length)];
     if (!node) return null;
     targetId = node.id;

@@ -192,12 +192,43 @@ export interface Technician {
   salary: number;
   experience: number;
   incidentId: string | null;
+  maintenanceId: string | null;
   gx: number;
   gy: number;
   homeGx: number;
   homeGy: number;
   state: 'idle' | 'driving' | 'working' | 'returning';
 }
+
+export type MaintenanceMode = 'urgent' | 'overnight' | 'defer';
+export type MaintenanceStatus = 'scheduled' | 'active' | 'completed';
+
+export interface MaintenanceOrder {
+  id: string;
+  nodeId: string;
+  mode: MaintenanceMode;
+  status: MaintenanceStatus;
+  scheduledAt: number;
+  startedAt: number | null;
+  minutesLeft: number;
+  technicianId: string | null;
+  cost: number;
+}
+
+export type CampaignKind = 'acquisition' | 'retention' | 'business' | 'mobile';
+
+export interface DistrictCampaign {
+  id: string;
+  districtId: string;
+  kind: CampaignKind;
+  startedAt: number;
+  endsAt: number;
+  cost: number;
+}
+
+export type TrafficPolicy = 'balanced' | 'residential' | 'business' | 'mobile';
+export type InterconnectPlan = 'transit' | 'ixp' | 'cdn';
+export type DataCenterMode = 'cache' | 'colocation' | 'cloud' | 'recovery';
 
 export type StaffRole =
   | 'network_engineer'
@@ -221,6 +252,7 @@ export interface ResearchNode {
   name: string;
   description: string;
   cost: number;
+  points: number;
   days: number;
   requires: string[];
   unlocks: string[];
@@ -241,6 +273,7 @@ export interface Competitor {
   // districtId -> 0..1 of the district their own access network reaches
   coverage: Record<string, number>;
   mobileCoverage: Record<string, number>;
+  spectrum: SpectrumHolding[];
   tech: number;
   lastMove: string | null;
 }
@@ -258,7 +291,7 @@ export interface Loan {
 
 export interface Regulation {
   id: string;
-  kind: 'coverage' | 'price_cap';
+  kind: 'coverage' | 'price_cap' | 'resilience';
   title: string;
   detail: string;
   // Null for obligations that apply to the whole company.
@@ -299,18 +332,63 @@ export interface LogEntry {
 
 export interface FinanceSnapshot {
   revenueResidential: number;
+  revenueMobile: number;
   revenueBusiness: number;
   revenueEnterprise: number;
+  revenueHosting: number;
+  revenueWholesale: number;
   costSalaries: number;
   costPower: number;
   costMaintenance: number;
   costTransit: number;
   costMarketing: number;
+  costRetention: number;
+  costLoanPayments: number;
   penalties: number;
+}
+
+export type FinanceCategory =
+  | 'residential'
+  | 'mobile'
+  | 'business'
+  | 'enterprise'
+  | 'hosting'
+  | 'wholesale'
+  | 'salaries'
+  | 'power'
+  | 'maintenance'
+  | 'transit'
+  | 'marketing'
+  | 'retention'
+  | 'sla_penalty'
+  | 'loan_draw'
+  | 'loan_payment'
+  | 'spectrum'
+  | 'research'
+  | 'staff'
+  | 'network_build'
+  | 'network_upgrade'
+  | 'network_service'
+  | 'district_licence'
+  | 'incident_response'
+  | 'contract_bonus'
+  | 'campaign'
+  | 'asset_sale'
+  | 'regulatory_fine';
+
+export interface FinanceLedgerEntry {
+  id: string;
+  at: number;
+  category: FinanceCategory;
+  label: string;
+  amount: number;
 }
 
 export interface NetworkStats {
   demandGbps: number;
+  fixedDemandGbps: number;
+  mobileDemandGbps: number;
+  transitGbps: number;
   servedGbps: number;
   coreUtilization: number;
   packetLoss: number; // 0..1
@@ -359,6 +437,7 @@ export interface GameState {
   offers: ContractOffer[];
 
   incidents: Incident[];
+  maintenanceOrders: MaintenanceOrder[];
   technicians: Technician[];
   employees: Employee[];
 
@@ -371,12 +450,20 @@ export interface GameState {
 
   stats: NetworkStats;
   finance: FinanceSnapshot;
+  ledger: FinanceLedgerEntry[];
   history: Array<{ month: number; revenue: number; expense: number; customers: number }>;
   monthAccumulator: { revenue: number; expense: number };
 
   marketingBudget: number;
   retentionBudget: number;
+  campaigns: DistrictCampaign[];
   churn: ChurnEvent[];
+
+  trafficPolicy: TrafficPolicy;
+  interconnectPlan: InterconnectPlan;
+  wholesaleFixed: boolean;
+  mvnoEnabled: boolean;
+  dataCenterModes: Record<string, DataCenterMode>;
 
   // Daily peak demand in Gbps, oldest first. Feeds the forecast.
   demandHistory: number[];
