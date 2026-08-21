@@ -71,4 +71,9 @@ export const CITY_EVENTS = [
   { name: 'Public Holiday', mul: 1.5, hours: 14, blurb: 'Nobody is at work. Everybody is streaming.' },
   { name: 'Major Game Release', mul: 2.2, hours: 8, blurb: 'A 140 GB download landed at midnight.' },
   { name: 'Storm Warning', mul: 1.3, hours: 10, blurb: 'The city is indoors and the weather is rough on infrastructure.' },
+  { name: 'E-sports Tournament', mul: 2.4, hours: 7, blurb: 'Thousands of low-latency streams are live at once.' },
+  { name: 'University Results Day', mul: 1.8, hours: 6, blurb: 'Every student is refreshing the same portal.' },
+  { name: 'Cloud Migration Weekend', mul: 2.1, hours: 12, blurb: 'Businesses are moving years of data before Monday.' },
+  { name: 'Heatwave', mul: 1.6, hours: 16, blurb: 'Cooling systems and home streaming are both under pressure.' },
+  { name: 'City Marathon', mul: 1.7, hours: 8, blurb: 'Live video follows runners through every district.' },
 ];

@@ -75,7 +75,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
 
   // The one bottleneck the map cannot draw.
   const transitCap = TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1);
-  const peak = Math.max(state.stats.demandGbps, ...state.demandHistory.slice(-7));
+  const peak = state.stats.transitGbps;
   const transitUse = peak / Math.max(0.01, transitCap);
   const nextTransit = TRANSIT_TIERS[state.transitTier + 1];
   if (transitUse >= 0.75 && nextTransit) {
@@ -93,8 +93,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
     });
   }
 
-  // Price moves the rivals' pull as hard as coverage does, but nothing ever
-  // suggested touching it, so most operators never did.
+  // Price moves the rivals' pull as hard as coverage does, but nothing ever suggested touching it.
   const rivals = state.competitors;
   if (rivals.length) {
     const mine = priceIndex(state);
