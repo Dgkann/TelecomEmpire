@@ -1,11 +1,11 @@
 import { MINUTES_PER_DAY } from './constants';
 import { priceIndex } from './economy';
+import { computeRoutes, isRedundant } from './network';
 import { pick, randInt, uid, type Rng } from './rng';
 import { clamp } from './util';
 import type { GameState, Regulation } from './types';
 
-// The regulator is the part of the pressure curve you cannot outgrow. The
-// bigger you get, the more is expected of you.
+// The regulator is the part of the pressure curve you cannot outgrow.
 
 // Nothing is asked of a company too small to matter.
 const MIN_CUSTOMERS = 600;
@@ -14,7 +14,8 @@ export function makeRegulation(s: GameState, rng: Rng, customers: number): Regul
   const live = s.districts.filter((d) => d.unlocked);
   if (!live.length) return null;
 
-  const wantsCoverage = rng() < 0.6;
+  const roll = rng();
+  const wantsCoverage = roll < 0.5;
 
   if (wantsCoverage) {
     // Pick somewhere you are thin, and ask for a reachable improvement.
@@ -29,6 +30,22 @@ export function makeRegulation(s: GameState, rng: Rng, customers: number): Regul
       target,
       dueAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 60, 120),
       fine: Math.round((30000 + customers * 22) / 1000) * 1000,
+      status: 'pending',
+    };
+  }
+
+  if (roll < 0.75) {
+    const current = networkResilience(s);
+    const target = clamp(current + 0.2 + rng() * 0.15, 0.35, 0.9);
+    return {
+      id: uid('reg'),
+      kind: 'resilience',
+      title: 'Resilience audit',
+      detail: `Protect ${Math.round(target * 100)}% of customer-facing sites with a second fibre path.`,
+      districtId: null,
+      target,
+      dueAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 60, 110),
+      fine: Math.round((35000 + customers * 20) / 1000) * 1000,
       status: 'pending',
     };
   }
@@ -65,8 +82,10 @@ export function settleRegulations(s: GameState): RegulationOutcome[] {
     if (r.kind === 'coverage') {
       const d = s.districts.find((x) => x.id === r.districtId);
       met = !!d && d.coverage >= r.target;
-    } else {
+    } else if (r.kind === 'price_cap') {
       met = priceIndex(s) <= r.target;
+    } else {
+      met = networkResilience(s) >= r.target;
     }
 
     outcomes.push({ regulation: r, met });
@@ -90,7 +109,15 @@ export function regulationProgress(s: GameState, r: Regulation) {
     const d = s.districts.find((x) => x.id === r.districtId);
     return d ? clamp(d.coverage / r.target, 0, 1) : 0;
   }
-  return priceIndex(s) <= r.target ? 1 : clamp(r.target / priceIndex(s), 0, 1);
+  if (r.kind === 'price_cap') return priceIndex(s) <= r.target ? 1 : clamp(r.target / priceIndex(s), 0, 1);
+  return clamp(networkResilience(s) / Math.max(0.01, r.target), 0, 1);
+}
+
+export function networkResilience(s: GameState) {
+  const routes = computeRoutes(s);
+  const sites = s.nodes.filter((node) => node.kind === 'pop' || node.kind === 'access' || node.kind === 'tower');
+  if (!sites.length) return 1;
+  return sites.filter((node) => isRedundant(s, node.id, routes)).length / sites.length;
 }
 
 export const randomRegulator = (rng: Rng) => pick(rng, ['the regulator', 'the ministry', 'the telecoms authority']);
