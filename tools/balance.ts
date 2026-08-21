@@ -63,8 +63,7 @@ for (let day = 0; day < DAYS; day++) {
     peakPressure = Math.max(peakPressure, g.stats.coreUtilization);
   }
 
-  // --- naive player policy, run once per day ---
-  // 1. upgrade anything above 80% utilisation if affordable
+  // --- naive player policy, run once per day --- 1.
   for (const n of g.nodes) {
     if (n.capacityGbps > 0 && n.trafficGbps / n.capacityGbps > 0.8 && n.tier < 4) {
       const cost = Math.round(NODE_SPECS[n.kind].baseCost * Math.pow(NODE_SPECS[n.kind].tierCostMul, n.tier - 1) * 0.8);
@@ -83,8 +82,7 @@ for (let day = 0; day < DAYS; day++) {
       }
     }
   }
-  // 2. dispatch a crew to any unassigned incident, emergency if we can afford
-  //    it, otherwise the slow scheduled repair, which is always available.
+  // 2.
   for (const inc of g.incidents) {
     if (inc.resolved || inc.assignedTechId) continue;
     const t = g.technicians.find((x) => x.state === 'idle');
@@ -116,8 +114,9 @@ for (let day = 0; day < DAYS; day++) {
     const next = RESEARCH.find(
       (r) => !g.researchDone.includes(r.id) && r.requires.every((q) => g.researchDone.includes(q)),
     );
-    if (next && g.money > next.cost * 2) {
+    if (next && g.money > next.cost * 2 && g.researchPoints >= next.points) {
       g.money -= next.cost;
+      g.researchPoints -= next.points;
       g.researchActive = { id: next.id, daysLeft: next.days };
     }
   }
