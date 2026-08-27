@@ -1,9 +1,32 @@
 // Invariant checks, run headless.
-import { MINUTES_PER_DAY, MINUTES_PER_MONTH, MOBILE_MARKET_SHARE, NODE_SPECS, SAVE_VERSION, SLA_PENALTY_CAP, TRANSIT_TIERS, linkCapacity, nodeCapacity, towerCapacity, towerRadius } from '../src/game/constants';
+import {
+  MINUTES_PER_DAY,
+  MINUTES_PER_MONTH,
+  MOBILE_MARKET_SHARE,
+  NODE_SPECS,
+  SAVE_VERSION,
+  SLA_PENALTY_CAP,
+  TRANSIT_TIERS,
+  linkCapacity,
+  nodeCapacity,
+  towerCapacity,
+  towerRadius,
+} from '../src/game/constants';
 import { effectiveNodeCapacity } from '../src/game/capacity';
 import { monthlyBreakdown, priceIndex } from '../src/game/economy';
 import { districtPull, leaderOf, playerShareTarget, rivalPosture, tickCompetitors } from '../src/game/competitors';
-import { computeRoutes, daysUntilFull, districtIsRedundant, districtRedundancy, forecastDemand, servingCoverAfterLoss, isRedundant, loadNetwork, loadServices, servingCapacity } from '../src/game/network';
+import {
+  computeRoutes,
+  daysUntilFull,
+  districtIsRedundant,
+  districtRedundancy,
+  forecastDemand,
+  servingCoverAfterLoss,
+  isRedundant,
+  loadNetwork,
+  loadServices,
+  servingCapacity,
+} from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
 import { researchModifiers } from '../src/game/research';
 import { makeRegulation, networkResilience, pendingRegulations, regulationProgress } from '../src/game/regulator';
@@ -14,12 +37,34 @@ import { repairCost } from '../src/game/incidents';
 import { hostingRevenue } from '../src/game/economy';
 import { currentMonthCashFlow } from '../src/game/financeLedger';
 import { clearSave, exportSave, importSave, listSaveMeta, loadGame, migrate, saveGame } from '../src/game/save';
-import { boundedIncidentMultipliers, createNewGame, dispatch, INCIDENT_LOAD_FLOOR, mobileSubs, residentialSubs, step, totalCustomers } from '../src/game/simulation';
+import {
+  boundedIncidentMultipliers,
+  createNewGame,
+  customerGrowthSnapshot,
+  dispatch,
+  INCIDENT_LOAD_FLOOR,
+  mobileSubs,
+  residentialSubs,
+  step,
+  totalCustomers,
+} from '../src/game/simulation';
 import { makeRng } from '../src/game/rng';
 import { staffModifiers, trainEmployee } from '../src/game/staff';
 import { contractProfile, negotiatedTerms, premiumCounterChance, resolveNegotiation } from '../src/game/contracts';
-import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../src/game/placement';
-import {MAINTENANCE_CONFIG, DATA_CENTER_MODE_CONFIG, INTERCONNECT_CONFIG, maintenanceCost, wholesaleRevenue } from '../src/game/strategy';
+import {
+  fibreConnectionCost,
+  fibreConnectionIssue,
+  nodePlacementCost,
+  nodePlacementIssue,
+} from '../src/game/placement';
+import {
+  MAINTENANCE_CONFIG,
+  DATA_CENTER_MODE_CONFIG,
+  INTERCONNECT_CONFIG,
+  interconnectOperational,
+  maintenanceCost,
+  wholesaleRevenue,
+} from '../src/game/strategy';
 import { useGame } from '../src/store/gameStore';
 import type { ContractOffer, GameState, Incident, NetLink, NetNode } from '../src/game/types';
 
@@ -75,9 +120,13 @@ function repairAll(g: GameState): GameState {
     s = {
       ...s,
       incidents: s.incidents.map((x) =>
-        x.id === inc.id ? { ...x, repairMinutesLeft: Math.round(x.repairTotalMinutes * 0.28), assignedTechId: tech.id } : x,
+        x.id === inc.id
+          ? { ...x, repairMinutesLeft: Math.round(x.repairTotalMinutes * 0.28), assignedTechId: tech.id }
+          : x,
       ),
-      technicians: s.technicians.map((t) => (t.id === tech.id ? { ...t, incidentId: inc.id, state: 'driving' as const } : t)),
+      technicians: s.technicians.map((t) =>
+        t.id === tech.id ? { ...t, incidentId: inc.id, state: 'driving' as const } : t,
+      ),
     };
   }
   return s;
@@ -156,23 +205,53 @@ group('save archive and NOC telemetry');
   const second = { ...newGame(2020), companyName: 'Slot Two' };
   saveGame(first, 0);
   saveGame(second, 1);
-  check('multiple slots stay independent', loadGame(0)?.companyName === 'Slot One' && loadGame(1)?.companyName === 'Slot Two');
+  check(
+    'multiple slots stay independent',
+    loadGame(0)?.companyName === 'Slot One' && loadGame(1)?.companyName === 'Slot Two',
+  );
   check('slot metadata lists both companies', listSaveMeta()[1]?.company === 'Slot Two');
   const raw = exportSave(0);
   clearSave(2);
   const imported = raw ? importSave(raw, 2) : null;
-  check('a save exports and imports into another slot', imported?.companyName === 'Slot One' && loadGame(2)?.companyName === 'Slot One');
+  check(
+    'a save exports and imports into another slot',
+    imported?.companyName === 'Slot One' && loadGame(2)?.companyName === 'Slot One',
+  );
 
   let sampled = newGame(3031);
   for (let i = 0; i < 13; i++) sampled = step(sampled);
   check('the NOC records hourly telemetry', sampled.telemetry.length >= 1);
-  check('telemetry values remain finite', sampled.telemetry.every((p) => Number.isFinite(p.demandGbps) && Number.isFinite(p.cash)));
+  check(
+    'telemetry values remain finite',
+    sampled.telemetry.every((p) => Number.isFinite(p.demandGbps) && Number.isFinite(p.cash)),
+  );
 
-  const stressed = { ...sampled, links: sampled.links.map((l, i) => i === 0 ? { ...l, trafficGbps: l.capacityGbps } : l) };
-  check('operations detects a capacity priority', operationsInsights(stressed).some((i) => i.id.startsWith('capacity-')));
-  const synthetic = { id: 'c-test', clientName: 'Test Bank', districtId: stressed.districts[0].id, buildingId: stressed.buildings[0].id, bandwidthGbps: 1, monthlyRevenue: 1000, slaPercent: 99.9, downtimeMinutes: 50, penaltyPaid: 0, startedAt: 0, termMonths: 12, segment: 'enterprise' as const };
+  const stressed = {
+    ...sampled,
+    links: sampled.links.map((l, i) => (i === 0 ? { ...l, trafficGbps: l.capacityGbps } : l)),
+  };
+  check(
+    'operations detects a capacity priority',
+    operationsInsights(stressed).some((i) => i.id.startsWith('capacity-')),
+  );
+  const synthetic = {
+    id: 'c-test',
+    clientName: 'Test Bank',
+    districtId: stressed.districts[0].id,
+    buildingId: stressed.buildings[0].id,
+    bandwidthGbps: 1,
+    monthlyRevenue: 1000,
+    slaPercent: 99.9,
+    downtimeMinutes: 50,
+    penaltyPaid: 0,
+    startedAt: 0,
+    termMonths: 12,
+    segment: 'enterprise' as const,
+  };
   check('contract risk reports consumed SLA allowance', contractRisk(stressed, synthetic).usage > 0);
-  clearSave(0); clearSave(1); clearSave(2);
+  clearSave(0);
+  clearSave(1);
+  clearSave(2);
 }
 
 group('migrating a version 1 save');
@@ -198,7 +277,10 @@ group('migrating a version 1 save');
     check('auction is backfilled', migrated.auction === null);
     check('nextAuctionAt is backfilled', migrated.nextAuctionAt === Infinity, `${migrated.nextAuctionAt}`);
     check('mobile packages are backfilled', migrated.packages.filter((p) => p.segment === 'mobile').length === 3);
-    check('districts gain radio fields', migrated.districts.every((d) => d.mobileCoverage === 0 && d.mobileSubs === 0));
+    check(
+      'districts gain radio fields',
+      migrated.districts.every((d) => d.mobileCoverage === 0 && d.mobileSubs === 0),
+    );
     check('a migrated save can be stepped', Number.isFinite(step(migrated).money));
   }
 
@@ -217,7 +299,10 @@ group('save validation and corruption recovery');
 
   const oldFinance = clone();
   delete (oldFinance.finance as Record<string, unknown>).costRetention;
-  check('a pre-retention finance snapshot is backfilled', migrate(oldFinance, SAVE_VERSION)?.finance.costRetention === 0);
+  check(
+    'a pre-retention finance snapshot is backfilled',
+    migrate(oldFinance, SAVE_VERSION)?.finance.costRetention === 0,
+  );
 
   const badDifficulty = clone();
   badDifficulty.difficulty = 'impossible';
@@ -267,7 +352,10 @@ group('save validation and corruption recovery');
   firstTech.state = 'working';
   const repaired = migrate(recoverable, SAVE_VERSION);
   check('a fault for a removed asset is safely discarded', repaired?.incidents.length === 0);
-  check('a crew orphaned by a removed fault returns idle', repaired?.technicians[0].incidentId === null && repaired.technicians[0].state === 'idle');
+  check(
+    'a crew orphaned by a removed fault returns idle',
+    repaired?.technicians[0].incidentId === null && repaired.technicians[0].state === 'idle',
+  );
 
   const mismatched = clone();
   mismatched.incidents = [
@@ -301,7 +389,9 @@ group('save validation and corruption recovery');
   );
 
   const portfolio = clone();
-  const clientBuildings = g.buildings.filter((building) => building.kind !== 'park' && building.segment !== 'residential');
+  const clientBuildings = g.buildings.filter(
+    (building) => building.kind !== 'park' && building.segment !== 'residential',
+  );
   const contractedBuilding = clientBuildings[0];
   const offeredBuilding = clientBuildings[1];
   const contract = {
@@ -335,13 +425,24 @@ group('save validation and corruption recovery');
   };
   portfolio.contracts = [contract, { ...contract, id: 'contract-duplicate' }];
   portfolio.offers = [
-    { ...offer, id: 'offer-on-contracted-building', districtId: contractedBuilding.districtId, buildingId: contractedBuilding.id },
+    {
+      ...offer,
+      id: 'offer-on-contracted-building',
+      districtId: contractedBuilding.districtId,
+      buildingId: contractedBuilding.id,
+    },
     offer,
     { ...offer, id: 'offer-duplicate' },
   ];
   const normalizedPortfolio = migrate(portfolio, SAVE_VERSION);
-  check('duplicate contracts keep the first client for a building', normalizedPortfolio?.contracts.map((entry) => entry.id).join() === 'contract-first');
-  check('offers on reserved buildings are removed deterministically', normalizedPortfolio?.offers.map((entry) => entry.id).join() === 'offer-first');
+  check(
+    'duplicate contracts keep the first client for a building',
+    normalizedPortfolio?.contracts.map((entry) => entry.id).join() === 'contract-first',
+  );
+  check(
+    'offers on reserved buildings are removed deterministically',
+    normalizedPortfolio?.offers.map((entry) => entry.id).join() === 'offer-first',
+  );
 
   clearSave(0);
   check('a valid state is accepted for storage', saveGame(g, 0));
@@ -486,8 +587,14 @@ group('competitors');
 {
   let g = newGame(8080);
   const startCoverage = g.competitors.map((c) => Object.values(c.coverage).reduce((a, b) => a + b, 0));
-  check('rivals start with coverage behind their share', startCoverage.every((v) => v > 0));
-  check('rivals start with cash', g.competitors.every((c) => c.cash > 0));
+  check(
+    'rivals start with coverage behind their share',
+    startCoverage.every((v) => v > 0),
+  );
+  check(
+    'rivals start with cash',
+    g.competitors.every((c) => c.cash > 0),
+  );
 
   g = runDays(g, 180, repairAll);
 
@@ -496,12 +603,16 @@ group('competitors');
   );
   check('rivals expand their own coverage over time', grew);
 
-  const badShare = g.competitors.find((c) =>
-    Object.values(c.share).some((v) => !Number.isFinite(v) || v < 0 || v > 1),
-  );
+  const badShare = g.competitors.find((c) => Object.values(c.share).some((v) => !Number.isFinite(v) || v < 0 || v > 1));
   check('rival share stays a valid fraction', !badShare, badShare?.name);
-  check('rival cash stays finite', g.competitors.every((c) => Number.isFinite(c.cash)));
-  check('rival prices stay in a sane band', g.competitors.every((c) => c.priceIndex >= 0.5 && c.priceIndex <= 1.5));
+  check(
+    'rival cash stays finite',
+    g.competitors.every((c) => Number.isFinite(c.cash)),
+  );
+  check(
+    'rival prices stay in a sane band',
+    g.competitors.every((c) => c.priceIndex >= 0.5 && c.priceIndex <= 1.5),
+  );
 
   const d = g.districts[0];
   const pull = districtPull(g, d);
@@ -525,15 +636,67 @@ group('pricing does not spiral');
   g = runDays(g, 240, repairAll);
 
   check('your price index does not move when you do not change prices', Math.abs(priceIndex(g) - before) < 0.001);
-  check('rivals do not all collapse to the price floor', g.competitors.some((c) => c.priceIndex > 0.8), g.competitors.map((c) => c.priceIndex.toFixed(2)).join('/'));
-  check('rivals undercut an expensive player', g.competitors.every((c) => c.priceIndex < before));
+  check(
+    'rivals do not all collapse to the price floor',
+    g.competitors.some((c) => c.priceIndex > 0.8),
+    g.competitors.map((c) => c.priceIndex.toFixed(2)).join('/'),
+  );
+  check(
+    'rivals undercut an expensive player',
+    g.competitors.every((c) => c.priceIndex < before),
+  );
 
   // Cheap and well run should out-pull three rivals; expensive and neglected should not.
   const strong = newGame(707);
-  const good = { ...strong, reputation: 90, districts: strong.districts.map((d) => ({ ...d, coverage: 0.9, satisfaction: 90 })) };
-  const weak = { ...strong, reputation: 30, districts: strong.districts.map((d) => ({ ...d, coverage: 0.2, satisfaction: 40 })) };
-  check('a well run operator can lead its city', playerShareTarget(good, good.districts[0]) > 0.5, `${playerShareTarget(good, good.districts[0]).toFixed(2)}`);
-  check('a neglected operator loses the city', playerShareTarget(weak, weak.districts[0]) < 0.3, `${playerShareTarget(weak, weak.districts[0]).toFixed(2)}`);
+  const good = {
+    ...strong,
+    reputation: 90,
+    districts: strong.districts.map((d) => ({ ...d, coverage: 0.9, satisfaction: 90 })),
+  };
+  const weak = {
+    ...strong,
+    reputation: 30,
+    districts: strong.districts.map((d) => ({ ...d, coverage: 0.2, satisfaction: 40 })),
+  };
+  check(
+    'a well run operator can lead its city',
+    playerShareTarget(good, good.districts[0]) > 0.5,
+    `${playerShareTarget(good, good.districts[0]).toFixed(2)}`,
+  );
+  check(
+    'a neglected operator loses the city',
+    playerShareTarget(weak, weak.districts[0]) < 0.3,
+    `${playerShareTarget(weak, weak.districts[0]).toFixed(2)}`,
+  );
+
+  const marketPriced = {
+    ...strong,
+    packages: strong.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 34 } : p)),
+  };
+  const valuePriced = {
+    ...strong,
+    packages: strong.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 24 } : p)),
+  };
+  const marketPull = districtPull(marketPriced, marketPriced.districts[0]).player;
+  const valuePull = districtPull(valuePriced, valuePriced.districts[0]).player;
+  check(
+    'a clear price lead materially lifts customer pull',
+    valuePull > marketPull * 1.18,
+    `${marketPull} -> ${valuePull}`,
+  );
+
+  const startGrowth = customerGrowthSnapshot(strong, strong.districts[0]);
+  const rampGrowth = customerGrowthSnapshot({ ...strong, minutes: 11 * MINUTES_PER_DAY + 8 * 60 }, strong.districts[0]);
+  const matureGrowth = customerGrowthSnapshot(
+    { ...strong, minutes: 15 * MINUTES_PER_DAY + 8 * 60 },
+    strong.districts[0],
+  );
+  check('starter customers have a seven-day market-loss grace period', startGrowth.marketLossExposure === 0);
+  check(
+    'market-loss exposure ramps in instead of switching on at once',
+    rampGrowth.marketLossExposure > 0 && rampGrowth.marketLossExposure < 1,
+  );
+  check('market-loss exposure reaches normal after two weeks', matureGrowth.marketLossExposure === 1);
 }
 
 group('churn is attributed');
@@ -544,19 +707,68 @@ group('churn is attributed');
   g = runDays(g, 200, repairAll);
 
   check('losses are recorded', g.churn.length > 0, `${g.churn.length} events`);
-  check('every loss names a district', g.churn.every((c) => g.districts.some((d) => d.id === c.districtId)));
-  check('every loss has a reason', g.churn.every((c) => ['price', 'outage', 'congestion', 'support'].includes(c.reason)));
-  check('loss counts are positive and finite', g.churn.every((c) => Number.isFinite(c.count) && c.count > 0));
+  check(
+    'every loss names a district',
+    g.churn.every((c) => g.districts.some((d) => d.id === c.districtId)),
+  );
+  check(
+    'every loss has a reason',
+    g.churn.every((c) =>
+      ['price', 'outage', 'congestion', 'support', 'coverage', 'competition', 'satisfaction'].includes(c.reason),
+    ),
+  );
+  check(
+    'loss counts are positive and finite',
+    g.churn.every((c) => Number.isFinite(c.count) && c.count > 0),
+  );
   check('the log stays bounded', g.churn.length <= 30, `${g.churn.length}`);
-  check('at least some losses go to a named rival', g.churn.some((c) => c.toId !== null));
+  check(
+    'at least some losses go to a named rival',
+    g.churn.some((c) => c.toId !== null),
+  );
 
   // Retention spend should visibly slow the bleeding.
-  const base = { ...newGame(1313), packages: newGame(1313).packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 2.4 } : p)) };
+  const base = {
+    ...newGame(1313),
+    packages: newGame(1313).packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 2.4 } : p)),
+  };
   const without = runDays({ ...base, retentionBudget: 0 }, 120, repairAll);
   const withSpend = runDays({ ...base, retentionBudget: 30000 }, 120, repairAll);
   const lostWithout = without.churn.reduce((a, c) => a + c.count, 0);
   const lostWith = withSpend.churn.reduce((a, c) => a + c.count, 0);
-  check('retention spend reduces churn', lostWith < lostWithout, `${Math.round(lostWithout)} -> ${Math.round(lostWith)}`);
+  check(
+    'retention spend reduces churn',
+    lostWith < lostWithout,
+    `${Math.round(lostWithout)} -> ${Math.round(lostWith)}`,
+  );
+
+  let cheap = newGame(1414);
+  const homeId = cheap.districts.find((district) => district.unlocked)!.id;
+  cheap = {
+    ...cheap,
+    minutes: 16 * MINUTES_PER_DAY,
+    reputation: 80,
+    packages: cheap.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 12 } : p)),
+    buildings: cheap.buildings.map((building) =>
+      building.districtId === homeId && building.segment === 'residential' ? { ...building, connected: 1 } : building,
+    ),
+    districts: cheap.districts.map((district) =>
+      district.id === homeId ? { ...district, coverage: 0.08, satisfaction: 85 } : district,
+    ),
+    competitors: cheap.competitors.map((competitor) => ({
+      ...competitor,
+      priceIndex: 1.1,
+      coverage: { ...competitor.coverage, [homeId]: 0.8 },
+      share: { ...competitor.share, [homeId]: 0.25 },
+    })),
+  };
+  cheap = runDays(cheap, 3, repairAll);
+  check('a cheap operator can still lose customers for non-price reasons', cheap.churn.length > 0);
+  check(
+    'cheap-operator losses are not falsely labelled as price churn',
+    cheap.churn.every((entry) => entry.reason !== 'price'),
+    cheap.churn.map((entry) => entry.reason).join(','),
+  );
 }
 
 group('borrowing and solvency');
@@ -612,12 +824,18 @@ group('equipment ages');
   g = runDays(g, 400, repairAll);
   const oldest = g.nodes.reduce((a, b) => (a.servicedAt <= b.servicedAt ? a : b));
   check('unserviced kit drifts below pristine', oldest.health < 100, `${oldest.health.toFixed(0)}`);
-  check('ageing has a floor', g.nodes.every((n) => n.health >= 20));
+  check(
+    'ageing has a floor',
+    g.nodes.every((n) => n.health >= 20),
+  );
 
   // Servicing should visibly restore it.
   const serviced = { ...g, nodes: g.nodes.map((n) => ({ ...n, health: 100, servicedAt: g.minutes })) };
   const later = runDays(serviced, 5, repairAll);
-  check('a serviced node stays healthy for a while', later.nodes.every((n) => n.health > 95));
+  check(
+    'a serviced node stays healthy for a while',
+    later.nodes.every((n) => n.health > 95),
+  );
 
   // A bigger network should take longer to fix, not the same time.
   const small = newGame(11);
@@ -664,7 +882,11 @@ group('the regulator');
   const moneyBefore = doomed.money;
   const after = runDays(doomed, 3, repairAll);
   check('an unmet obligation is marked failed', after.regulations[0].status === 'failed');
-  check('an unmet obligation costs money', after.money < moneyBefore - 40000, `${Math.round(moneyBefore - after.money)}`);
+  check(
+    'an unmet obligation costs money',
+    after.money < moneyBefore - 40000,
+    `${Math.round(moneyBefore - after.money)}`,
+  );
 
   // And one that is already satisfied should pass.
   const easy: GameState = {
@@ -697,7 +919,10 @@ group('demand forecasting');
   let g = newGame(5150);
   g = runDays(g, 30, repairAll);
   check('the game records daily peaks', g.demandHistory.length >= 25, `${g.demandHistory.length}`);
-  check('recorded peaks are finite', g.demandHistory.every((v) => Number.isFinite(v) && v >= 0));
+  check(
+    'recorded peaks are finite',
+    g.demandHistory.every((v) => Number.isFinite(v) && v >= 0),
+  );
   check('history is bounded', runDays(g, 60, repairAll).demandHistory.length <= 45);
   const live = forecastDemand(g.demandHistory, g.stats.demandGbps, 30);
   finite('the live forecast is a real number', live.projected);
@@ -722,7 +947,23 @@ group('data centres earn their keep');
     builtAt: 0,
     servicedAt: 0,
   };
-  const withDc: GameState = { ...g, nodes: [...g.nodes, dc] };
+  const dcLink: NetLink = {
+    id: 'dc-link',
+    aId: dc.id,
+    bId: g.nodes[0].id,
+    capacityGbps: 100,
+    trafficGbps: 0,
+    down: false,
+    tier: 1,
+    length: 1,
+    builtAt: 0,
+  };
+  const withDc: GameState = {
+    ...g,
+    nodes: [...g.nodes, dc],
+    links: [...g.links, dcLink],
+    dataCenterModes: { dc1: 'colocation' },
+  };
 
   check('no data centre means no hosting income', hostingRevenue(g) === 0);
   check('a data centre earns hosting income', hostingRevenue(withDc) > 0, `${Math.round(hostingRevenue(withDc))}`);
@@ -738,13 +979,30 @@ group('data centres earn their keep');
 
   check('no data centre means no caching', cacheRatio(g) === 0);
   check('a data centre offloads traffic', cacheRatio(withDc) > 0, `${cacheRatio(withDc)}`);
-  const many: GameState = { ...g, nodes: [...g.nodes, dc, { ...dc, id: 'dc2' }, { ...dc, id: 'dc3' }, { ...dc, id: 'dc4' }, { ...dc, id: 'dc5' }] };
+  const disconnected: GameState = {
+    ...g,
+    nodes: [...g.nodes, dc],
+    dataCenterModes: { dc1: 'colocation' },
+  };
+  check('a disconnected data centre earns no hosting income', hostingRevenue(disconnected) === 0);
+  check('a disconnected data centre provides no cache offload', cacheRatio(disconnected) === 0);
+  const extraDcs = ['dc2', 'dc3', 'dc4', 'dc5'].map((id) => ({ ...dc, id }));
+  const many: GameState = {
+    ...withDc,
+    nodes: [...withDc.nodes, ...extraDcs],
+    links: [...withDc.links, ...extraDcs.map((node) => ({ ...dcLink, id: `${node.id}-link`, aId: node.id }))],
+  };
   check('caching is capped', cacheRatio(many) <= 0.3, `${cacheRatio(many)}`);
 
-  // And the offload should show up as less traffic on the network.
-  const plain = runDays(g, 20, repairAll);
-  const cached = runDays(withDc, 20, repairAll);
-  check('caching lowers carried traffic', cached.stats.demandGbps < plain.stats.demandGbps * 1.01);
+  // Compare one identical demand tick: data-centre workload is its own class and
+  // should not hide the reduction in customer traffic produced by the cache.
+  const plain = step(g);
+  const cached = step(withDc);
+  const customerTraffic = (state: GameState) =>
+    state.stats.serviceDemandGbps.residential +
+    state.stats.serviceDemandGbps.mobile +
+    state.stats.serviceDemandGbps.wholesale;
+  check('caching lowers carried customer traffic', customerTraffic(cached) < customerTraffic(plain));
 }
 
 group('the company ladder');
@@ -752,7 +1010,10 @@ group('the company ladder');
   const g = newGame(6060);
   check('a new company starts at the bottom', g.rank === 0 && rankOf(g).id === 'local');
   check('the first rung has no requirements', RANKS[0].requirements.length === 0);
-  check('every later rung has requirements', RANKS.slice(1).every((r) => r.requirements.length > 0));
+  check(
+    'every later rung has requirements',
+    RANKS.slice(1).every((r) => r.requirements.length > 0),
+  );
   check('customer counting is finite', Number.isFinite(customerCount(g)));
   check('city share starts small', cityShare(g) >= 0 && cityShare(g) < 1, `${cityShare(g).toFixed(2)}`);
 
@@ -794,15 +1055,27 @@ group('the ladder is reachable');
   const customerReq = top.requirements.find((r) => r.label.includes('customers'));
   const required = Number(customerReq?.label.replace(/[^0-9]/g, '') ?? 0);
 
-  check('the city is big enough for the top rank', required < market * 0.75, `needs ${required}, market ${Math.round(market)}`);
-  check('the top rank is still an achievement', required > market * 0.3, `needs ${required}, market ${Math.round(market)}`);
+  check(
+    'the city is big enough for the top rank',
+    required < market * 0.75,
+    `needs ${required}, market ${Math.round(market)}`,
+  );
+  check(
+    'the top rank is still an achievement',
+    required > market * 0.3,
+    `needs ${required}, market ${Math.round(market)}`,
+  );
 
   // Every rung should ask for more than the one below it.
   const targets = RANKS.slice(1).map((r) => {
     const req = r.requirements.find((x) => x.label.includes('customers'));
     return Number(req?.label.replace(/[^0-9]/g, '') ?? 0);
   });
-  check('rungs get harder in order', targets.every((v, i) => i === 0 || v > targets[i - 1]), targets.join(' < '));
+  check(
+    'rungs get harder in order',
+    targets.every((v, i) => i === 0 || v > targets[i - 1]),
+    targets.join(' < '),
+  );
 }
 
 group('a tower with no fibre behind it');
@@ -830,7 +1103,11 @@ group('a tower with no fibre behind it');
     nodes: [...g.nodes, orphan],
   };
   g = runDays(g, 30, repairAll);
-  check('an unconnected tower gives no coverage', g.districts[0].mobileCoverage === 0, `${g.districts[0].mobileCoverage}`);
+  check(
+    'an unconnected tower gives no coverage',
+    g.districts[0].mobileCoverage === 0,
+    `${g.districts[0].mobileCoverage}`,
+  );
   check('an unconnected tower sells nothing', mobileSubs(g) === 0, `${mobileSubs(g)}`);
 }
 
@@ -841,10 +1118,21 @@ group('growing the network is not self-defeating');
   // A new site must not raise the price of every future call-out.
   const g = newGame(4242);
   const fault: Incident = {
-    id: 'i1', kind: 'fiber_cut', title: 'Fibre Cut', description: '',
-    targetId: g.links[0].id, targetType: 'link', districtId: g.districts[0].id,
-    startedAt: 0, repairMinutesLeft: null, repairTotalMinutes: 400, repairBaseMinutes: 400,
-    assignedTechId: null, affected: 0, resolved: false, degrade: false,
+    id: 'i1',
+    kind: 'fiber_cut',
+    title: 'Fibre Cut',
+    description: '',
+    targetId: g.links[0].id,
+    targetType: 'link',
+    districtId: g.districts[0].id,
+    startedAt: 0,
+    repairMinutesLeft: null,
+    repairTotalMinutes: 400,
+    repairBaseMinutes: 400,
+    assignedTechId: null,
+    affected: 0,
+    resolved: false,
+    degrade: false,
   };
   const onABigNetwork: Incident = { ...fault, repairTotalMinutes: 720 };
   check(
@@ -881,10 +1169,7 @@ group('upstream transit is a signposted wall, not a hidden one');
   );
 
   const roomy = { ...g, stats: { ...g.stats, transitGbps: cap * 0.4 }, demandHistory: [cap * 0.4] };
-  check(
-    'headroom is not nagged about',
-    !operationsInsights(roomy).find((i) => i.id === 'transit-headroom'),
-  );
+  check('headroom is not nagged about', !operationsInsights(roomy).find((i) => i.id === 'transit-headroom'));
 
   // Layout cannot be measured headlessly, so guard the input length instead.
   const detail = (d: number) => {
@@ -903,7 +1188,6 @@ group('upstream transit is a signposted wall, not a hidden one');
   );
 }
 
-
 group('automatic balancing earns its 900k');
 {
   // ai_ops set a flag nobody read.
@@ -911,11 +1195,31 @@ group('automatic balancing earns its 900k');
   const core = g.nodes.find((n) => n.kind === 'core')!;
   const home = g.districts[0];
   const pop = (id: string, dx: number): NetNode => ({
-    id, kind: 'pop', name: `POP ${id}`, gx: core.gx + dx, gy: core.gy + 1, districtId: home.id,
-    tier: 1, capacityGbps: nodeCapacity('pop', 1), trafficGbps: 0, health: 100, down: false, builtAt: 0, servicedAt: 0,
+    id,
+    kind: 'pop',
+    name: `POP ${id}`,
+    gx: core.gx + dx,
+    gy: core.gy + 1,
+    districtId: home.id,
+    tier: 1,
+    capacityGbps: nodeCapacity('pop', 1),
+    trafficGbps: 0,
+    health: 100,
+    down: false,
+    builtAt: 0,
+    servicedAt: 0,
   });
-  const span = (id: string, b: string, cap: number): NetLink =>
-    ({ id, aId: core.id, bId: b, capacityGbps: cap, trafficGbps: 0, down: false, tier: 1, length: 2, builtAt: 0 });
+  const span = (id: string, b: string, cap: number): NetLink => ({
+    id,
+    aId: core.id,
+    bId: b,
+    capacityGbps: cap,
+    trafficGbps: 0,
+    down: false,
+    tier: 1,
+    length: 2,
+    builtAt: 0,
+  });
   g = { ...g, nodes: [core, pop('wide', 2), pop('thin', -2)], links: [span('lw', 'wide', 10), span('lt', 'thin', 1)] };
 
   const demand: Record<string, number> = {};
@@ -947,13 +1251,13 @@ group('automatic balancing earns its 900k');
   );
 }
 
-
 group('a client is somewhere a client could be');
 {
   let g = newGame(12345);
   g = runDays(g, 200, (s) => {
     let n = s;
-    for (const o of n.offers) n = { ...n, contracts: [...n.contracts, { ...o, downtimeMinutes: 0, penaltyPaid: 0, startedAt: n.minutes }] };
+    for (const o of n.offers)
+      n = { ...n, contracts: [...n.contracts, { ...o, downtimeMinutes: 0, penaltyPaid: 0, startedAt: n.minutes }] };
     return { ...n, offers: [] };
   });
   const parks = g.contracts.filter((c) => g.buildings.find((b) => b.id === c.buildingId)?.kind === 'park');
@@ -961,14 +1265,14 @@ group('a client is somewhere a client could be');
   check('contracts are still being signed', g.contracts.length > 0, `${g.contracts.length}`);
 }
 
-
 group('an SLA breach cannot cost unbounded money');
 {
   // A month of downtime used to be billed at 2% of the fee per hour with no ceiling.
   let g = newGame(4321);
   g = runDays(g, 120, (s) => {
     let n = s;
-    for (const o of n.offers) n = { ...n, contracts: [...n.contracts, { ...o, downtimeMinutes: 0, penaltyPaid: 0, startedAt: n.minutes }] };
+    for (const o of n.offers)
+      n = { ...n, contracts: [...n.contracts, { ...o, downtimeMinutes: 0, penaltyPaid: 0, startedAt: n.minutes }] };
     return { ...n, offers: [] };
   });
   check('the run produced contracts to test', g.contracts.length > 0, `${g.contracts.length}`);
@@ -997,7 +1301,6 @@ group('an SLA breach cannot cost unbounded money');
   check('the cap is a real ceiling, not zero', SLA_PENALTY_CAP > 0);
 }
 
-
 group('a sealed bid you can no longer cover');
 {
   // The bid is sealed days before it settles, so the cash behind it can be gone.
@@ -1008,21 +1311,32 @@ group('a sealed bid you can no longer cover');
     researchDone: ['ftth', 'fiber10g', 'mobile_4g'],
     // Far above anything a rival can raise.
     auction: {
-      id: 'a1', band: '700', blocks: 2, reserve: 50000, closesAt: g.minutes + 60,
-      playerBid: 5000000, result: null,
+      id: 'a1',
+      band: '700',
+      blocks: 2,
+      reserve: 50000,
+      closesAt: g.minutes + 60,
+      playerBid: 5000000,
+      result: null,
     },
     money: 120000,
   };
   const before = g.money;
   g = runDays(g, 2, repairAll);
   const bids = g.auction?.result?.bids ?? [];
-  check('the player really was the top bid', bids[0]?.bidderId === 'player', JSON.stringify(bids.map((b) => b.bidderId)));
+  check(
+    'the player really was the top bid',
+    bids[0]?.bidderId === 'player',
+    JSON.stringify(bids.map((b) => b.bidderId)),
+  );
   check('the lot is not awarded to them', g.auction?.result?.winnerId !== 'player', `${g.auction?.result?.winnerId}`);
   check('they are not charged for it', g.money > before - 50000, `${Math.round(before)} -> ${Math.round(g.money)}`);
   check('they do not receive the spectrum', !g.spectrum.some((h) => h.band === '700'), JSON.stringify(g.spectrum));
-  check('the default is not silent', g.log.some((l) => /could not cover/i.test(l.text)));
+  check(
+    'the default is not silent',
+    g.log.some((l) => /could not cover/i.test(l.text)),
+  );
 }
-
 
 group('a second path is worth building');
 {
@@ -1041,8 +1355,15 @@ group('a second path is worth building');
     links: [
       ...g.links,
       ...serving.map((n) => ({
-        id: `loop-${n.id}`, aId: n.id, bId: core.id, capacityGbps: linkCapacity(2),
-        trafficGbps: 0, down: false, tier: 2, length: 3, builtAt: 0,
+        id: `loop-${n.id}`,
+        aId: n.id,
+        bId: core.id,
+        capacityGbps: linkCapacity(2),
+        trafficGbps: 0,
+        down: false,
+        tier: 2,
+        length: 3,
+        builtAt: 0,
       })),
     ],
   };
@@ -1071,7 +1392,9 @@ group('a second path is worth building');
       district.id === shopDistrict.id ? { ...district, coverage: 0.5, unlocked: true } : district,
     ),
     buildings: shopState.buildings.map((building) =>
-      building.districtId === shopDistrict.id && building.segment === 'business' ? { ...building, kind: 'shop' as const } : building,
+      building.districtId === shopDistrict.id && building.segment === 'business'
+        ? { ...building, kind: 'shop' as const }
+        : building,
     ),
   };
   let shopOffers = 0;
@@ -1084,16 +1407,22 @@ group('a second path is worth building');
     }
     shopState = { ...shopState, offers: [] };
   }
-  check('shops are exempt from the second-path gate', shopOffers > 0 && demandingShops === 0, `${demandingShops} of ${shopOffers}`);
+  check(
+    'shops are exempt from the second-path gate',
+    shopOffers > 0 && demandingShops === 0,
+    `${demandingShops} of ${shopOffers}`,
+  );
 }
-
 
 group('pricing is a lever the game points at');
 {
   let g = newGame(8080);
   g = runDays(g, 45, repairAll);
   const rivalsAt = (index: number) => ({ ...g, competitors: g.competitors.map((c) => ({ ...c, priceIndex: index })) });
-  const priced = (s: GameState, price: number) => ({ ...s, packages: s.packages.map((p) => (p.segment === 'residential' ? { ...p, price } : p)) });
+  const priced = (s: GameState, price: number) => ({
+    ...s,
+    packages: s.packages.map((p) => (p.segment === 'residential' ? { ...p, price } : p)),
+  });
   const idOf = (s: GameState) => operationsInsights(s).map((i) => i.id);
 
   check('being well above the market is raised', idOf(priced(rivalsAt(0.8), 60)).includes('pricing-high'));
@@ -1114,7 +1443,6 @@ group('pricing is a lever the game points at');
   check('it sends you to the pricing panel', high?.target.type === 'screen' && high.target.anchor === 'pricing');
 }
 
-
 group('redundancy progress is visible before it is complete');
 {
   // Covering four of five sites used to look identical to covering none.
@@ -1129,10 +1457,20 @@ group('redundancy progress is visible before it is complete');
   const serving = g.nodes.filter((n) => n.districtId === home.id && n.kind !== 'core');
   const one = {
     ...g,
-    links: [...g.links, {
-      id: 'alt1', aId: serving[0].id, bId: core.id, capacityGbps: linkCapacity(1),
-      trafficGbps: 0, down: false, tier: 1, length: 4, builtAt: 0,
-    }],
+    links: [
+      ...g.links,
+      {
+        id: 'alt1',
+        aId: serving[0].id,
+        bId: core.id,
+        capacityGbps: linkCapacity(1),
+        trafficGbps: 0,
+        down: false,
+        tier: 1,
+        length: 4,
+        builtAt: 0,
+      },
+    ],
   };
   const after = districtRedundancy(one, home.id);
   check('one span moves the count', after.done > before.done, `${before.done} -> ${after.done}`);
@@ -1146,7 +1484,11 @@ group('phase-one economic and network invariants');
 
   const facility = creditLimit(g);
   const maxed: GameState = { ...g, loans: [createLoan(g, facility, 36)] };
-  check('drawing the full facility leaves no renewable minimum headroom', creditLimit(maxed) === 0, `${creditLimit(maxed)}`);
+  check(
+    'drawing the full facility leaves no renewable minimum headroom',
+    creditLimit(maxed) === 0,
+    `${creditLimit(maxed)}`,
+  );
 
   const noRetention = monthlyBreakdown({ ...g, retentionBudget: 0 }, researchModifiers(g.researchDone));
   const fullRetention = monthlyBreakdown({ ...g, retentionBudget: 30000 }, researchModifiers(g.researchDone));
@@ -1183,8 +1525,28 @@ group('phase-one economic and network invariants');
     down: false,
   };
   const sharedLinks: NetLink[] = [
-    { id: 'shared-a', aId: accessA.id, bId: core.id, capacityGbps: 100, trafficGbps: 0, down: false, tier: 1, length: 1, builtAt: 0 },
-    { id: 'shared-b', aId: accessB.id, bId: core.id, capacityGbps: 100, trafficGbps: 0, down: false, tier: 1, length: 1, builtAt: 0 },
+    {
+      id: 'shared-a',
+      aId: accessA.id,
+      bId: core.id,
+      capacityGbps: 100,
+      trafficGbps: 0,
+      down: false,
+      tier: 1,
+      length: 1,
+      builtAt: 0,
+    },
+    {
+      id: 'shared-b',
+      aId: accessB.id,
+      bId: core.id,
+      capacityGbps: 100,
+      trafficGbps: 0,
+      down: false,
+      tier: 1,
+      length: 1,
+      builtAt: 0,
+    },
   ];
   const shared: GameState = { ...g, nodes: [core, accessA, accessB], links: sharedLinks };
   const sharedDemand = { [d1.id]: 8, [d2.id]: 8 };
@@ -1197,8 +1559,16 @@ group('phase-one economic and network invariants');
       Math.abs(forward.districtServed[d2.id] - backward.districtServed[d2.id]) < 1e-9,
     `${forward.districtServed[d1.id]}/${forward.districtServed[d2.id]}`,
   );
-  check('a 10 Gbps core never carries more than 10 Gbps', forward.nodeTraffic[core.id] <= 10 + 1e-9, `${forward.nodeTraffic[core.id]}`);
-  check('reported service is conserved through the shared core', Math.abs(forward.totalServed - 10) < 1e-9, `${forward.totalServed}`);
+  check(
+    'a 10 Gbps core never carries more than 10 Gbps',
+    forward.nodeTraffic[core.id] <= 10 + 1e-9,
+    `${forward.nodeTraffic[core.id]}`,
+  );
+  check(
+    'reported service is conserved through the shared core',
+    Math.abs(forward.totalServed - 10) < 1e-9,
+    `${forward.totalServed}`,
+  );
   check(
     'both districts see the same final shared pressure',
     Math.abs(forward.districtPressure[d1.id] - 1.6) < 1e-9 && Math.abs(forward.districtPressure[d2.id] - 1.6) < 1e-9,
@@ -1211,11 +1581,23 @@ group('tariff, contract and repair lifecycle invariants');
   const g = newGame(9201);
   const inactive: GameState = {
     ...g,
-    packages: g.packages.map((p) => ({ ...p, active: false, subscribers: p.segment === 'mobile' ? 1000 : p.subscribers })),
+    packages: g.packages.map((p) => ({
+      ...p,
+      active: false,
+      subscribers: p.segment === 'mobile' ? 1000 : p.subscribers,
+    })),
   };
   const inactiveMoney = monthlyBreakdown(inactive, researchModifiers(inactive.researchDone));
-  check('inactive fixed tariffs earn no revenue', inactiveMoney.revenueResidential === 0, `${inactiveMoney.revenueResidential}`);
-  check('inactive mobile tariffs earn no stale revenue', inactiveMoney.revenueMobile === 0, `${inactiveMoney.revenueMobile}`);
+  check(
+    'inactive fixed tariffs earn no revenue',
+    inactiveMoney.revenueResidential === 0,
+    `${inactiveMoney.revenueResidential}`,
+  );
+  check(
+    'inactive mobile tariffs earn no stale revenue',
+    inactiveMoney.revenueMobile === 0,
+    `${inactiveMoney.revenueMobile}`,
+  );
   check('an unavailable fixed service is not treated as free', priceIndex(inactive) === 1, `${priceIndex(inactive)}`);
 
   const normalized = step(inactive);
@@ -1255,8 +1637,14 @@ group('tariff, contract and repair lifecycle invariants');
     buildings: g.buildings.map((b) => (b.id === building.id ? { ...b, connected: 1 } : b)),
   };
   const afterExpiry = step(expiredState);
-  check('an expired contract with a missed SLA leaves the portfolio', !afterExpiry.contracts.some((c) => c.id === expiredContract.id));
-  check('an ended contract releases its building', afterExpiry.buildings.find((b) => b.id === building.id)?.connected === 0);
+  check(
+    'an expired contract with a missed SLA leaves the portfolio',
+    !afterExpiry.contracts.some((c) => c.id === expiredContract.id),
+  );
+  check(
+    'an ended contract releases its building',
+    afterExpiry.buildings.find((b) => b.id === building.id)?.connected === 0,
+  );
 
   let renewed: GameState['contracts'][number] | null = null;
   for (let seed = 9202; seed < 9232 && !renewed; seed++) {
@@ -1347,14 +1735,23 @@ group('tariff, contract and repair lifecycle invariants');
   const firstTech = dispatched.technicians[0];
   const secondTech = dispatched.technicians[1];
   check('a valid idle crew can be dispatched', dispatch(dispatched, incident.id, firstTech.id, 'normal') === true);
-  check('paid repairs appear in the finance ledger', dispatched.ledger.some((entry) => entry.category === 'incident_response' && entry.amount < 0));
+  check(
+    'paid repairs appear in the finance ledger',
+    dispatched.ledger.some((entry) => entry.category === 'incident_response' && entry.amount < 0),
+  );
   const afterFirstDispatch = dispatched.money;
-  check('an assigned incident rejects a second dispatch', dispatch(dispatched, incident.id, secondTech.id, 'normal') === false);
+  check(
+    'an assigned incident rejects a second dispatch',
+    dispatch(dispatched, incident.id, secondTech.id, 'normal') === false,
+  );
   check('a rejected dispatch never charges money', dispatched.money === afterFirstDispatch);
 
   const remaining = dispatched.incidents[0].repairMinutesLeft!;
   const orphaned = step({ ...dispatched, technicians: [] });
-  check('an incident with a missing assigned crew does not repair itself', orphaned.incidents[0].repairMinutesLeft === remaining);
+  check(
+    'an incident with a missing assigned crew does not repair itself',
+    orphaned.incidents[0].repairMinutesLeft === remaining,
+  );
 
   const working = step({
     ...dispatched,
@@ -1384,7 +1781,10 @@ group('effective node capacity is shared and persistent');
     ),
   };
   const after = step(withGpon);
-  check('a simulation tick preserves the GPON capacity bonus', Math.abs(after.nodes.find((n) => n.id === accessId)!.capacityGbps - 2.4) < 1e-9);
+  check(
+    'a simulation tick preserves the GPON capacity bonus',
+    Math.abs(after.nodes.find((n) => n.id === accessId)!.capacityGbps - 2.4) < 1e-9,
+  );
 
   const degrading: Incident = {
     id: 'gpon-degrade',
@@ -1445,15 +1845,31 @@ group('store command and persistence guards');
   });
   const beforeNodeSale = useGame.getState().game!;
   useGame.getState().sellNode(node.id);
-  check('a node with an unresolved fault cannot be sold', useGame.getState().game?.nodes.some((entry) => entry.id === node.id) === true);
-  check('a blocked node sale changes no money or topology', useGame.getState().game?.money === beforeNodeSale.money && useGame.getState().game?.links.length === beforeNodeSale.links.length);
+  check(
+    'a node with an unresolved fault cannot be sold',
+    useGame.getState().game?.nodes.some((entry) => entry.id === node.id) === true,
+  );
+  check(
+    'a blocked node sale changes no money or topology',
+    useGame.getState().game?.money === beforeNodeSale.money &&
+      useGame.getState().game?.links.length === beforeNodeSale.links.length,
+  );
   check('a blocked node sale preserves selection', useGame.getState().selection?.id === node.id);
 
-  useGame.setState({ game: { ...g, incidents: [incidentFor('link', attachedLink.id)] }, selection: { type: 'node', id: node.id } });
+  useGame.setState({
+    game: { ...g, incidents: [incidentFor('link', attachedLink.id)] },
+    selection: { type: 'node', id: node.id },
+  });
   useGame.getState().sellNode(node.id);
-  check('a node cannot be sold around a faulted attached span', useGame.getState().game?.nodes.some((entry) => entry.id === node.id) === true);
+  check(
+    'a node cannot be sold around a faulted attached span',
+    useGame.getState().game?.nodes.some((entry) => entry.id === node.id) === true,
+  );
   useGame.getState().sellLink(attachedLink.id);
-  check('a faulted fibre span cannot be sold', useGame.getState().game?.links.some((entry) => entry.id === attachedLink.id) === true);
+  check(
+    'a faulted fibre span cannot be sold',
+    useGame.getState().game?.links.some((entry) => entry.id === attachedLink.id) === true,
+  );
 
   const technician = g.technicians[0];
   useGame.setState({
@@ -1465,10 +1881,16 @@ group('store command and persistence guards');
     },
   });
   useGame.getState().fireStaff(technician.id);
-  check('a deployed technician cannot be fired', useGame.getState().game?.technicians.some((entry) => entry.id === technician.id) === true);
+  check(
+    'a deployed technician cannot be fired',
+    useGame.getState().game?.technicians.some((entry) => entry.id === technician.id) === true,
+  );
   useGame.setState({ game: { ...g, technicians: g.technicians.map((entry) => ({ ...entry })) } });
   useGame.getState().fireStaff(technician.id);
-  check('an idle technician can be released', useGame.getState().game?.technicians.some((entry) => entry.id === technician.id) === false);
+  check(
+    'an idle technician can be released',
+    useGame.getState().game?.technicians.some((entry) => entry.id === technician.id) === false,
+  );
 
   const residential = g.packages.filter((entry) => entry.segment === 'residential');
   const soleResidential = residential[0];
@@ -1481,7 +1903,10 @@ group('store command and persistence guards');
     },
   });
   useGame.getState().updatePackage(soleResidential.id, { active: false });
-  check('the store protects the final active fixed tariff', useGame.getState().game?.packages.find((entry) => entry.id === soleResidential.id)?.active === true);
+  check(
+    'the store protects the final active fixed tariff',
+    useGame.getState().game?.packages.find((entry) => entry.id === soleResidential.id)?.active === true,
+  );
 
   const mobile = g.packages.filter((entry) => entry.segment === 'mobile');
   useGame.setState({
@@ -1496,7 +1921,10 @@ group('store command and persistence guards');
   useGame.getState().updatePackage(mobile[0].id, { active: false });
   const mobileAfterEdit = useGame.getState().game!.packages.filter((entry) => entry.segment === 'mobile');
   check('a disabled mobile tariff immediately loses stale subscribers', mobileAfterEdit[0].subscribers === 0);
-  check('mobile edits redistribute the full radio customer base', mobileAfterEdit.reduce((sum, entry) => sum + entry.subscribers, 0) === 900);
+  check(
+    'mobile edits redistribute the full radio customer base',
+    mobileAfterEdit.reduce((sum, entry) => sum + entry.subscribers, 0) === 900,
+  );
 
   const access: NetNode = { ...node, kind: 'access', tier: 1, capacityGbps: 2 };
   const gponState: GameState = {
@@ -1509,13 +1937,23 @@ group('store command and persistence guards');
   useGame.setState({ game: gponState });
   useGame.getState().upgradeNode(access.id);
   const upgradedAccess = useGame.getState().game!.nodes.find((entry) => entry.id === access.id)!;
-  check('store upgrades preserve the GPON capacity multiplier', upgradedAccess.tier === 2 && Math.abs(upgradedAccess.capacityGbps - 4.8) < 1e-9);
-  check('network upgrades appear in the finance ledger', useGame.getState().game!.ledger.some((entry) => entry.category === 'network_upgrade' && entry.amount < 0));
+  check(
+    'store upgrades preserve the GPON capacity multiplier',
+    upgradedAccess.tier === 2 && Math.abs(upgradedAccess.capacityGbps - 4.8) < 1e-9,
+  );
+  check(
+    'network upgrades appear in the finance ledger',
+    useGame.getState().game!.ledger.some((entry) => entry.category === 'network_upgrade' && entry.amount < 0),
+  );
 
   useGame.setState({ game: { ...gponState, incidents: [incidentFor('node', access.id)] } });
   const moneyBeforeFaultedUpgrade = useGame.getState().game!.money;
   useGame.getState().upgradeNode(access.id);
-  check('a faulted node cannot be upgraded around its incident', useGame.getState().game?.nodes.find((entry) => entry.id === access.id)?.tier === 1 && useGame.getState().game?.money === moneyBeforeFaultedUpgrade);
+  check(
+    'a faulted node cannot be upgraded around its incident',
+    useGame.getState().game?.nodes.find((entry) => entry.id === access.id)?.tier === 1 &&
+      useGame.getState().game?.money === moneyBeforeFaultedUpgrade,
+  );
 
   const fibreTarget: NetNode = {
     ...node,
@@ -1537,28 +1975,52 @@ group('store command and persistence guards');
     'the second fibre click builds an unconnected span',
     useGame.getState().game!.links.length === linksBeforeFibre + 1 && useGame.getState().linkFrom === null,
   );
-  check('new fibre appears in the finance ledger', useGame.getState().game!.ledger.some((entry) => entry.category === 'network_build' && entry.amount < 0));
+  check(
+    'new fibre appears in the finance ledger',
+    useGame.getState().game!.ledger.some((entry) => entry.category === 'network_build' && entry.amount < 0),
+  );
 
   useGame.setState({ game: g, started: true, activeSaveSlot: 0, persistenceError: null });
-  check('invalid public save slots are rejected', useGame.getState().saveToSlot(99) === false && useGame.getState().activeSaveSlot === 0);
+  check(
+    'invalid public save slots are rejected',
+    useGame.getState().saveToSlot(99) === false && useGame.getState().activeSaveSlot === 0,
+  );
   check('invalid public continue slots are rejected', useGame.getState().continueGame(-1) === false);
 
   const workingStorage = globalThis.localStorage;
   try {
     (globalThis as unknown as { localStorage: unknown }).localStorage = {
       getItem: () => null,
-      setItem: () => { throw new Error('storage unavailable'); },
-      removeItem: () => { throw new Error('storage unavailable'); },
+      setItem: () => {
+        throw new Error('storage unavailable');
+      },
+      removeItem: () => {
+        throw new Error('storage unavailable');
+      },
     };
     useGame.setState({ game: g, started: true, activeSaveSlot: 0, persistenceError: null });
-    check('manual save failure is reported and retains the game', useGame.getState().save() === false && useGame.getState().game === g);
-    check('failed save-and-exit keeps the running game open', useGame.getState().quitToMenu() === false && useGame.getState().started === true);
+    check(
+      'manual save failure is reported and retains the game',
+      useGame.getState().save() === false && useGame.getState().game === g,
+    );
+    check(
+      'failed save-and-exit keeps the running game open',
+      useGame.getState().quitToMenu() === false && useGame.getState().started === true,
+    );
     useGame.getState().resetSave();
-    check('failed deletion cannot discard the in-memory game', useGame.getState().started === true && useGame.getState().game === g);
+    check(
+      'failed deletion cannot discard the in-memory game',
+      useGame.getState().started === true && useGame.getState().game === g,
+    );
     useGame.setState({ game: null, started: false, persistenceError: null });
     check(
       'a new game does not start without its initial snapshot',
-      useGame.getState().newGame({ companyName: 'No Storage', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 9302 }, 0) === false &&
+      useGame
+        .getState()
+        .newGame(
+          { companyName: 'No Storage', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 9302 },
+          0,
+        ) === false &&
         useGame.getState().started === false &&
         useGame.getState().game === null,
     );
@@ -1568,7 +2030,10 @@ group('store command and persistence guards');
   }
 
   useGame.setState({ game: g, started: true, activeSaveSlot: 0, persistenceError: 'old failure' });
-  check('a successful manual save clears the persistent error', useGame.getState().save() === true && useGame.getState().persistenceError === null);
+  check(
+    'a successful manual save clears the persistent error',
+    useGame.getState().save() === true && useGame.getState().persistenceError === null,
+  );
   clearSave(0);
   useGame.setState({ toast: originalToast });
 }
@@ -1630,25 +2095,31 @@ group('phase-two traffic separation and transit accounting');
         ? { ...building, connected: 1 }
         : building,
     ),
-    contracts: [{
-      id: 'transit-contract',
-      clientName: 'Transit Stress Client',
-      districtId: crowdedHome.id,
-      buildingId: transitBuilding.id,
-      bandwidthGbps: 1000,
-      monthlyRevenue: 1000,
-      slaPercent: 99,
-      downtimeMinutes: 0,
-      penaltyPaid: 0,
-      startedAt: crowded.minutes,
-      termMonths: 12,
-      segment: 'business',
-      requiresRedundancy: false,
-    }],
+    contracts: [
+      {
+        id: 'transit-contract',
+        clientName: 'Transit Stress Client',
+        districtId: crowdedHome.id,
+        buildingId: transitBuilding.id,
+        bandwidthGbps: 1000,
+        monthlyRevenue: 1000,
+        slaPercent: 99,
+        downtimeMinutes: 0,
+        penaltyPaid: 0,
+        startedAt: crowded.minutes,
+        termMonths: 12,
+        segment: 'business',
+        requiresRedundancy: false,
+      },
+    ],
   };
   const transitStep = step(transitState);
   const transitCap = TRANSIT_TIERS[transitStep.transitTier].capacity;
-  check('transit load is based on traffic carried by the local network', transitStep.stats.transitGbps > transitCap, `${transitStep.stats.transitGbps}`);
+  check(
+    'transit load is based on traffic carried by the local network',
+    transitStep.stats.transitGbps > transitCap,
+    `${transitStep.stats.transitGbps}`,
+  );
   check('reported service cannot exceed upstream transit capacity', transitStep.stats.servedGbps <= transitCap + 1e-9);
   check(
     'fixed and mobile demand remain separately observable',
@@ -1682,8 +2153,14 @@ group('phase-two rival spectrum and balance sheets');
   const settled = step(auctionState);
   const winner = settled.competitors.find((competitor) => competitor.id === richRival.id)!;
   check('a rival winner pays from its own cash', winner.cash < 1_000_000 && winner.cash >= 0, `${winner.cash}`);
-  check('a rival winner records the spectrum holding', winner.spectrum.some((holding) => holding.band === '1800'));
-  check('cashless rivals cannot submit funded bids', settled.competitors.slice(1).every((competitor) => competitor.cash === 0));
+  check(
+    'a rival winner records the spectrum holding',
+    winner.spectrum.some((holding) => holding.band === '1800'),
+  );
+  check(
+    'cashless rivals cannot submit funded bids',
+    settled.competitors.slice(1).every((competitor) => competitor.cash === 0),
+  );
 
   const withSpectrum = newGame(9502);
   withSpectrum.competitors = withSpectrum.competitors.map((competitor, index) => ({
@@ -1702,7 +2179,10 @@ group('phase-two rival spectrum and balance sheets');
     tickCompetitors(withoutSpectrum, makeRng(day + 100), 1);
   }
   const radioWith = Object.values(withSpectrum.competitors[0].mobileCoverage).reduce((sum, value) => sum + value, 0);
-  const radioWithout = Object.values(withoutSpectrum.competitors[0].mobileCoverage).reduce((sum, value) => sum + value, 0);
+  const radioWithout = Object.values(withoutSpectrum.competitors[0].mobileCoverage).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
   check('owned spectrum enables rival mobile rollout', radioWith > 0, `${radioWith}`);
   check('a rival without spectrum cannot create mobile coverage', radioWithout === 0, `${radioWithout}`);
 }
@@ -1723,15 +2203,29 @@ group('phase-two staff, research points and finance ledger');
   };
   const bareMods = staffModifiers(bare);
   const staffMods = staffModifiers(staffed);
-  check('network engineers reduce maintenance cost', monthlyBreakdown(staffed, researchModifiers([])).costMaintenance < monthlyBreakdown(bare, researchModifiers([])).costMaintenance);
-  check('NOC engineers reduce incident frequency and duration', staffMods.incidentRateMul < 1 && staffMods.incidentDurationMul < 1);
+  check(
+    'network engineers reduce maintenance cost',
+    monthlyBreakdown(staffed, researchModifiers([])).costMaintenance <
+      monthlyBreakdown(bare, researchModifiers([])).costMaintenance,
+  );
+  check(
+    'NOC engineers reduce incident frequency and duration',
+    staffMods.incidentRateMul < 1 && staffMods.incidentDurationMul < 1,
+  );
   check('support skill creates a visible satisfaction bonus', staffMods.supportSatisfaction > 0);
-  check('sales skill improves growth and contract generation', staffMods.customerGrowthMul > 1 && staffMods.offerRateMul > 1);
+  check(
+    'sales skill improves growth and contract generation',
+    staffMods.customerGrowthMul > 1 && staffMods.offerRateMul > 1,
+  );
   check('security skill reduces DDoS frequency and impact', staffMods.ddosRateMul < 1 && staffMods.ddosImpactMul < 1);
-  check('staff generate research points while an empty team does not', staffMods.researchPointsPerDay > bareMods.researchPointsPerDay);
+  check(
+    'staff generate research points while an empty team does not',
+    staffMods.researchPointsPerDay > bareMods.researchPointsPerDay,
+  );
   check(
     'experience can raise an employee skill level',
-    trainEmployee({ id: 'trainee', name: 'Trainee', role: 'sales', salary: 1, skill: 1, experience: 119 }, 1).skill === 2,
+    trainEmployee({ id: 'trainee', name: 'Trainee', role: 'sales', salary: 1, skill: 1, experience: 119 }, 1).skill ===
+      2,
   );
 
   const originalToast = useGame.getState().toast;
@@ -1742,7 +2236,10 @@ group('phase-two staff, research points and finance ledger');
   const researching = useGame.getState().game!;
   check('research consumes its research-point cost', researching.researchPoints === 0);
   check('research still consumes its cash cost', researching.money === 60000);
-  check('research spending appears in the finance ledger', researching.ledger.some((entry) => entry.category === 'research' && entry.amount === -40000));
+  check(
+    'research spending appears in the finance ledger',
+    researching.ledger.some((entry) => entry.category === 'research' && entry.amount === -40000),
+  );
 
   useGame.setState({ game: { ...researchState, researchPoints: 11, researchActive: null } });
   useGame.getState().startResearch('ftth');
@@ -1750,7 +2247,10 @@ group('phase-two staff, research points and finance ledger');
 
   useGame.setState({ game: { ...g, money: 1_000_000, ledger: [] } });
   useGame.getState().takeLoan(10000, 12);
-  check('loan drawdowns appear in the finance ledger', useGame.getState().game?.ledger.some((entry) => entry.category === 'loan_draw' && entry.amount === 10000) === true);
+  check(
+    'loan drawdowns appear in the finance ledger',
+    useGame.getState().game?.ledger.some((entry) => entry.category === 'loan_draw' && entry.amount === 10000) === true,
+  );
   useGame.setState({ toast: originalToast });
 
   const pointState: GameState = {
@@ -1770,10 +2270,22 @@ group('phase-two staff, research points and finance ledger');
     ledger: [],
   };
   const closedMonth = step(monthEnd);
-  check('the ledger records salary costs at month close', closedMonth.ledger.some((entry) => entry.category === 'salaries' && entry.amount < 0));
-  check('the ledger records maintenance costs at month close', closedMonth.ledger.some((entry) => entry.category === 'maintenance' && entry.amount < 0));
-  check('the ledger records SLA penalties at month close', closedMonth.ledger.some((entry) => entry.category === 'sla_penalty' && entry.amount === -125));
-  check('finance ledger identifiers remain unique', new Set(closedMonth.ledger.map((entry) => entry.id)).size === closedMonth.ledger.length);
+  check(
+    'the ledger records salary costs at month close',
+    closedMonth.ledger.some((entry) => entry.category === 'salaries' && entry.amount < 0),
+  );
+  check(
+    'the ledger records maintenance costs at month close',
+    closedMonth.ledger.some((entry) => entry.category === 'maintenance' && entry.amount < 0),
+  );
+  check(
+    'the ledger records SLA penalties at month close',
+    closedMonth.ledger.some((entry) => entry.category === 'sla_penalty' && entry.amount === -125),
+  );
+  check(
+    'finance ledger identifiers remain unique',
+    new Set(closedMonth.ledger.map((entry) => entry.id)).size === closedMonth.ledger.length,
+  );
 }
 
 group('phase-two save migration');
@@ -1787,9 +2299,18 @@ group('phase-two save migration');
   legacy.stats = oldStats;
   delete legacy.ledger;
   const migrated = migrate(legacy, 13);
-  check('version 13 saves gain rival spectrum holdings', migrated?.competitors.every((competitor) => Array.isArray(competitor.spectrum)) === true);
-  check('version 13 saves gain separated traffic statistics', migrated?.stats.fixedDemandGbps === 0 && migrated.stats.mobileDemandGbps === 0);
-  check('version 13 saves gain an empty finance ledger', Array.isArray(migrated?.ledger) && migrated?.ledger.length === 0);
+  check(
+    'version 13 saves gain rival spectrum holdings',
+    migrated?.competitors.every((competitor) => Array.isArray(competitor.spectrum)) === true,
+  );
+  check(
+    'version 13 saves gain separated traffic statistics',
+    migrated?.stats.fixedDemandGbps === 0 && migrated.stats.mobileDemandGbps === 0,
+  );
+  check(
+    'version 13 saves gain an empty finance ledger',
+    Array.isArray(migrated?.ledger) && migrated?.ledger.length === 0,
+  );
 }
 
 group('phase-three planning, progression and strategy');
@@ -1800,17 +2321,40 @@ group('phase-three planning, progression and strategy');
     .cells.find((cell) => !g.nodes.some((node) => node.gx === cell.gx && node.gy === cell.gy))!;
   const lockedCell = g.districts.find((district) => !district.unlocked)!.cells[0];
   check('a valid site preview is accepted', nodePlacementIssue(g, 'pop', unlockedCell.gx, unlockedCell.gy) === null);
-  check('a locked district explains why placement is invalid', nodePlacementIssue(g, 'pop', lockedCell.gx, lockedCell.gy)?.includes('not licensed') === true);
-  check('an occupied tile explains why placement is invalid', nodePlacementIssue(g, 'pop', g.nodes[0].gx, g.nodes[0].gy)?.includes('already occupies') === true);
-  check('GPON placement preview uses the discounted access cost', nodePlacementCost({ ...g, researchDone: ['ftth', 'gpon'] }, 'access') < nodePlacementCost(g, 'access'));
+  check(
+    'a locked district explains why placement is invalid',
+    nodePlacementIssue(g, 'pop', lockedCell.gx, lockedCell.gy)?.includes('not licensed') === true,
+  );
+  check(
+    'an occupied tile explains why placement is invalid',
+    nodePlacementIssue(g, 'pop', g.nodes[0].gx, g.nodes[0].gy)?.includes('already occupies') === true,
+  );
+  check(
+    'GPON placement preview uses the discounted access cost',
+    nodePlacementCost({ ...g, researchDone: ['ftth', 'gpon'] }, 'access') < nodePlacementCost(g, 'access'),
+  );
 
   const source = g.nodes[0];
   const destination = g.nodes[1];
-  check('existing fibre is rejected before a player spends money', fibreConnectionIssue(g, source.id, destination.id)?.includes('already connected') === true);
-  const unlinked: NetNode = { ...destination, id: 'phase-three-unlinked', gx: destination.gx + 3, gy: destination.gy + 1 };
+  check(
+    'existing fibre is rejected before a player spends money',
+    fibreConnectionIssue(g, source.id, destination.id)?.includes('already connected') === true,
+  );
+  const unlinked: NetNode = {
+    ...destination,
+    id: 'phase-three-unlinked',
+    gx: destination.gx + 3,
+    gy: destination.gy + 1,
+  };
   const fibreState: GameState = { ...g, nodes: [...g.nodes, unlinked], money: 1_000_000 };
-  check('an unconnected fibre destination is accepted', fibreConnectionIssue(fibreState, source.id, unlinked.id) === null);
-  check('fibre preview and construction share a positive price', fibreConnectionCost(fibreState, source.id, unlinked.id) > 0);
+  check(
+    'an unconnected fibre destination is accepted',
+    fibreConnectionIssue(fibreState, source.id, unlinked.id) === null,
+  );
+  check(
+    'fibre preview and construction share a positive price',
+    fibreConnectionCost(fibreState, source.id, unlinked.id) > 0,
+  );
 
   const protectedState: GameState = {
     ...g,
@@ -1825,18 +2369,35 @@ group('phase-three planning, progression and strategy');
       },
     ],
   };
-  check('resilience reports independently protected customer sites', networkResilience(protectedState) === 1, `${networkResilience(protectedState)}`);
+  check(
+    'resilience reports independently protected customer sites',
+    networkResilience(protectedState) === 1,
+    `${networkResilience(protectedState)}`,
+  );
   const resilienceRule = makeRegulation(protectedState, () => 0.6, 2000);
   check('the regulator can issue a resilience audit', resilienceRule?.kind === 'resilience');
 
   const advancedFixed = researchModifiers(['ftth', 'fiber10g', 'backbone100g', 'metro_mesh']);
   check('metro mesh unlocks fibre tier four', advancedFixed.maxLinkTier === 4);
-  check('metro mesh adds capacity beyond 10G fibre', advancedFixed.linkCapacityMul > researchModifiers(['ftth', 'fiber10g']).linkCapacityMul);
+  check(
+    'metro mesh adds capacity beyond 10G fibre',
+    advancedFixed.linkCapacityMul > researchModifiers(['ftth', 'fiber10g']).linkCapacityMul,
+  );
   const predictive = researchModifiers(['noc', 'auto_dispatch', 'ddos_scrub', 'predictive_maintenance']);
-  check('predictive maintenance reduces both incidents and maintenance cost', predictive.incidentRateMul < researchModifiers(['noc']).incidentRateMul && predictive.maintenanceCostMul === 0.8);
-  check('private 5G raises the value and volume of new offers', researchModifiers(['private_5g']).contractRevenueMul === 1.2 && researchModifiers(['private_5g']).hasPrivate5g);
+  check(
+    'predictive maintenance reduces both incidents and maintenance cost',
+    predictive.incidentRateMul < researchModifiers(['noc']).incidentRateMul && predictive.maintenanceCostMul === 0.8,
+  );
+  check(
+    'private 5G raises the value and volume of new offers',
+    researchModifiers(['private_5g']).contractRevenueMul === 1.2 && researchModifiers(['private_5g']).hasPrivate5g,
+  );
 
-  check('critical-care contracts pay a premium for stricter service', contractProfile('hospital').revenueMul > contractProfile('office').revenueMul && contractProfile('hospital').slaFloor === 99.99);
+  check(
+    'critical-care contracts pay a premium for stricter service',
+    contractProfile('hospital').revenueMul > contractProfile('office').revenueMul &&
+      contractProfile('hospital').slaFloor === 99.99,
+  );
   const insolventRival = { ...g.competitors[0], cash: -1 };
   check('rival intelligence exposes a recovery strategy', rivalPosture(g, insolventRival).label === 'Recovery');
 }
@@ -1858,13 +2419,25 @@ group('cash-flow clarity and bounded incident suppression');
   check('capital spending is separated from operating profit', cash.capitalSpend === 40000, `${cash.capitalSpend}`);
   check('repairs and bonuses remain visible as one-offs', cash.otherOneOffNet === 5000, `${cash.otherOneOffNet}`);
   check('free cash flow includes capital and one-off activity', cash.freeCashFlow === 35000, `${cash.freeCashFlow}`);
-  check('financing is separated from free cash flow', cash.financing === 50000 && cash.netCashMovement === 85000, `${cash.financing}/${cash.netCashMovement}`);
+  check(
+    'financing is separated from free cash flow',
+    cash.financing === 50000 && cash.netCashMovement === 85000,
+    `${cash.financing}/${cash.netCashMovement}`,
+  );
 
   const mild = boundedIncidentMultipliers(0.8, 0.8);
   const fullyStacked = boundedIncidentMultipliers(0.298, 0.44);
   check('ordinary incident reductions keep their designed strength', Math.abs(mild.load - 0.64) < 1e-9, `${mild.load}`);
-  check('stacked incident reductions stop at the combined load floor', Math.abs(fullyStacked.load - INCIDENT_LOAD_FLOOR) < 1e-9, `${fullyStacked.load}`);
-  check('the incident floor still leaves both prevention and duration benefits', fullyStacked.rate < 1 && fullyStacked.duration < 1, `${fullyStacked.rate}/${fullyStacked.duration}`);
+  check(
+    'stacked incident reductions stop at the combined load floor',
+    Math.abs(fullyStacked.load - INCIDENT_LOAD_FLOOR) < 1e-9,
+    `${fullyStacked.load}`,
+  );
+  check(
+    'the incident floor still leaves both prevention and duration benefits',
+    fullyStacked.rate < 1 && fullyStacked.duration < 1,
+    `${fullyStacked.rate}/${fullyStacked.duration}`,
+  );
 }
 
 group('contract negotiation');
@@ -1905,7 +2478,10 @@ group('contract negotiation');
   );
 
   const premium = negotiatedTerms(offer, 'premium');
-  check('a premium counter raises recurring revenue and trims the bonus', premium.monthlyRevenue > offer.monthlyRevenue && premium.signingBonus < offer.signingBonus);
+  check(
+    'a premium counter raises recurring revenue and trims the bonus',
+    premium.monthlyRevenue > offer.monthlyRevenue && premium.signingBonus < offer.signingBonus,
+  );
 
   const weakDistricts = g.districts.map((district) =>
     district.id === offer.districtId ? { ...district, satisfaction: 0 } : district,
@@ -1940,7 +2516,11 @@ group('contract negotiation');
   };
   const weakChance = premiumCounterChance(weakState, offer);
   const strongChance = premiumCounterChance(strongState, offer);
-  check('reputation, service and sales improve premium close chance', strongChance > weakChance, `${weakChance} -> ${strongChance}`);
+  check(
+    'reputation, service and sales improve premium close chance',
+    strongChance > weakChance,
+    `${weakChance} -> ${strongChance}`,
+  );
   check('premium close chance stays bounded', weakChance >= 0.25 && strongChance <= 0.9);
   check(
     'the same premium counter always resolves the same way',
@@ -1963,8 +2543,14 @@ group('contract negotiation');
     'the store signs the displayed flexible terms',
     flexibleContract?.monthlyRevenue === flexible.monthlyRevenue && flexibleContract.slaPercent === flexible.slaPercent,
   );
-  check('a negotiated deal records its adjusted signing bonus', afterFlexible.money === flexibleState.money + flexible.signingBonus);
-  check('a negotiated signing bonus reaches the ledger', afterFlexible.ledger.some((entry) => entry.category === 'contract_bonus' && entry.amount === flexible.signingBonus));
+  check(
+    'a negotiated deal records its adjusted signing bonus',
+    afterFlexible.money === flexibleState.money + flexible.signingBonus,
+  );
+  check(
+    'a negotiated signing bonus reaches the ledger',
+    afterFlexible.ledger.some((entry) => entry.category === 'contract_bonus' && entry.amount === flexible.signingBonus),
+  );
 
   let rejectedOffer: ContractOffer | null = null;
   let acceptedOffer: ContractOffer | null = null;
@@ -1973,7 +2559,10 @@ group('contract negotiation');
     if (resolveNegotiation(g, candidate, 'premium').accepted) acceptedOffer ??= candidate;
     else rejectedOffer ??= candidate;
   }
-  check('deterministic counters include both accepted and rejected outcomes', rejectedOffer !== null && acceptedOffer !== null);
+  check(
+    'deterministic counters include both accepted and rejected outcomes',
+    rejectedOffer !== null && acceptedOffer !== null,
+  );
 
   if (rejectedOffer) {
     const rejectedState: GameState = {
@@ -1988,8 +2577,15 @@ group('contract negotiation');
     useGame.setState({ game: rejectedState, started: true });
     useGame.getState().acceptOffer(rejectedOffer.id, 'premium');
     const rejected = useGame.getState().game!;
-    check('a rejected premium counter consumes the offer without a contract', rejected.offers.length === 0 && rejected.contracts.length === 0);
-    check('a rejected counter changes no cash or connection', rejected.money === rejectedState.money && rejected.buildings.find((entry) => entry.id === rejectedOffer!.buildingId)?.connected === connectedBefore);
+    check(
+      'a rejected premium counter consumes the offer without a contract',
+      rejected.offers.length === 0 && rejected.contracts.length === 0,
+    );
+    check(
+      'a rejected counter changes no cash or connection',
+      rejected.money === rejectedState.money &&
+        rejected.buildings.find((entry) => entry.id === rejectedOffer!.buildingId)?.connected === connectedBefore,
+    );
   }
 
   if (acceptedOffer) {
@@ -2007,18 +2603,25 @@ group('contract negotiation');
     const accepted = useGame.getState().game!;
     check(
       'an accepted premium counter signs its higher recurring fee',
-      accepted.contracts[0]?.monthlyRevenue === acceptedTerms.monthlyRevenue && accepted.money === acceptedState.money + acceptedTerms.signingBonus,
+      accepted.contracts[0]?.monthlyRevenue === acceptedTerms.monthlyRevenue &&
+        accepted.money === acceptedState.money + acceptedTerms.signingBonus,
     );
     saveGame(accepted, 2);
     const reloaded = loadGame(2);
-    check('negotiated contract terms survive a save round-trip', reloaded?.contracts[0]?.monthlyRevenue === acceptedTerms.monthlyRevenue);
+    check(
+      'negotiated contract terms survive a save round-trip',
+      reloaded?.contracts[0]?.monthlyRevenue === acceptedTerms.monthlyRevenue,
+    );
     clearSave(2);
   }
 
   const gatedOffer: ContractOffer = { ...offer, id: 'negotiation-gated', requiresRedundancy: true };
   useGame.setState({ game: { ...g, contracts: [], offers: [gatedOffer] }, started: true });
   useGame.getState().acceptOffer(gatedOffer.id, 'premium');
-  check('negotiation cannot bypass a redundancy requirement', useGame.getState().game?.offers[0]?.id === gatedOffer.id && useGame.getState().game?.contracts.length === 0);
+  check(
+    'negotiation cannot bypass a redundancy requirement',
+    useGame.getState().game?.offers[0]?.id === gatedOffer.id && useGame.getState().game?.contracts.length === 0,
+  );
 }
 
 group('integrated operator strategy mechanics');
@@ -2036,14 +2639,76 @@ group('integrated operator strategy mechanics');
   delete legacy.mvnoEnabled;
   delete legacy.dataCenterModes;
   const migrated = migrate(legacy, 14);
-  check('version 14 saves gain the complete strategy state', Boolean(
-    migrated &&
+  check(
+    'version 14 saves gain the complete strategy state',
+    Boolean(
+      migrated &&
       migrated.maintenanceOrders.length === 0 &&
       migrated.campaigns.length === 0 &&
       migrated.trafficPolicy === 'balanced' &&
       migrated.interconnectPlan === 'transit' &&
       migrated.finance.revenueWholesale === 0,
-  ));
+    ),
+  );
+
+  const occupiedCells = new Set(current.nodes.map((node) => `${node.gx}:${node.gy}`));
+  const legacyDcCell = current.districts
+    .flatMap((district) => district.cells)
+    .find((cell) => !occupiedCells.has(`${cell.gx}:${cell.gy}`))!;
+  const legacy15 = {
+    ...current,
+    version: 15,
+    nodes: [
+      ...current.nodes,
+      {
+        ...current.nodes[1],
+        id: 'legacy-dc',
+        kind: 'datacenter',
+        name: 'Legacy DC',
+        gx: legacyDcCell.gx,
+        gy: legacyDcCell.gy,
+      },
+    ],
+    campaigns: [
+      {
+        id: 'legacy-campaign',
+        districtId: current.districts[0].id,
+        kind: 'acquisition',
+        startedAt: current.minutes,
+        endsAt: current.minutes + MINUTES_PER_DAY,
+        cost: 1000,
+      },
+    ],
+    dataCenterModes: {},
+    stats: { ...current.stats },
+  } as unknown as Record<string, unknown>;
+  delete legacy15.campaignHistory;
+  delete legacy15.dataCenterModeChangedAt;
+  delete (legacy15.stats as Record<string, unknown>).serviceDemandGbps;
+  delete (legacy15.stats as Record<string, unknown>).serviceServedGbps;
+  const migrated15 = migrate(legacy15, 15);
+  check(
+    'version 15 saves gain service telemetry and campaign baselines',
+    Boolean(
+      migrated15 &&
+      migrated15.dataCenterModes['legacy-dc'] === 'colocation' &&
+      migrated15.dataCenterModeChangedAt['legacy-dc'] === 0 &&
+      migrated15.campaignHistory.length === 0 &&
+      migrated15.campaigns[0]?.baselineCustomers >= 0 &&
+      migrated15.stats.serviceDemandGbps.workload === 0 &&
+      migrated15.stats.serviceServedGbps.wholesale === 0,
+    ),
+    migrated15
+      ? JSON.stringify({
+          mode: migrated15.dataCenterModes['legacy-dc'],
+          changedAt: migrated15.dataCenterModeChangedAt['legacy-dc'],
+          history: migrated15.campaignHistory.length,
+          campaign: migrated15.campaigns[0],
+          demand: migrated15.stats.serviceDemandGbps,
+          served: migrated15.stats.serviceServedGbps,
+        })
+      : 'migration returned null',
+  );
 
   const traffic = newGame(11002);
   const access = traffic.nodes.find((node) => node.kind === 'pop')!;
@@ -2059,21 +2724,80 @@ group('integrated operator strategy mechanics');
     ],
     routes,
   );
-  check('QoS gives the protected service a larger congested share', prioritised.serviceServed.sla > prioritised.serviceServed.home, `${prioritised.serviceServed.home}/${prioritised.serviceServed.sla}`);
-  check('QoS still conserves shared core capacity', prioritised.nodeTraffic[traffic.nodes[0].id] <= 10.0001, `${prioritised.nodeTraffic[traffic.nodes[0].id]}`);
+  check(
+    'QoS gives the protected service a larger congested share',
+    prioritised.serviceServed.sla > prioritised.serviceServed.home,
+    `${prioritised.serviceServed.home}/${prioritised.serviceServed.sla}`,
+  );
+  check(
+    'QoS still conserves shared core capacity',
+    prioritised.nodeTraffic[traffic.nodes[0].id] <= 10.0001,
+    `${prioritised.nodeTraffic[traffic.nodes[0].id]}`,
+  );
 
   const transitBase = monthlyBreakdown(traffic, researchModifiers(traffic.researchDone));
   const peered = { ...traffic, interconnectPlan: 'ixp' as const };
   const transitPeered = monthlyBreakdown(peered, researchModifiers(peered.researchDone));
-  check('an IXP has a visible monthly commitment', Math.abs(transitPeered.costTransit - transitBase.costTransit - INTERCONNECT_CONFIG.ixp.monthly) < 0.01);
+  check(
+    'an IXP has a visible monthly commitment',
+    Math.abs(transitPeered.costTransit - transitBase.costTransit - INTERCONNECT_CONFIG.ixp.monthly) < 0.01,
+  );
+  const suspendedCdn = { ...traffic, interconnectPlan: 'cdn' as const };
+  check('a CDN partnership is suspended without a routed data centre', !interconnectOperational(suspendedCdn));
+  check('a suspended CDN provides no cache offload', cacheRatio(suspendedCdn) === 0);
+  check(
+    'a suspended CDN commitment still appears on the bill',
+    Math.abs(
+      monthlyBreakdown(suspendedCdn, researchModifiers(suspendedCdn.researchDone)).costTransit -
+        transitBase.costTransit -
+        INTERCONNECT_CONFIG.cdn.monthly,
+    ) < 0.01,
+  );
 
   const wholesale = {
     ...traffic,
     wholesaleFixed: true,
-    districts: traffic.districts.map((district) => ({ ...district, coverage: district.unlocked ? 0.5 : district.coverage })),
+    districts: traffic.districts.map((district) => ({
+      ...district,
+      coverage: district.unlocked ? 0.5 : district.coverage,
+    })),
   };
   check('fixed wholesale earns positive monthly revenue', wholesaleRevenue(wholesale) > 0);
-  check('wholesale revenue reaches the operating statement', monthlyBreakdown(wholesale, researchModifiers(wholesale.researchDone)).revenueWholesale > 0);
+  check(
+    'wholesale revenue reaches the operating statement',
+    monthlyBreakdown(wholesale, researchModifiers(wholesale.researchDone)).revenueWholesale > 0,
+  );
+  const wholesaleFull: GameState = {
+    ...wholesale,
+    stats: {
+      ...wholesale.stats,
+      serviceDemandGbps: { ...wholesale.stats.serviceDemandGbps, wholesale: 10 },
+      serviceServedGbps: { ...wholesale.stats.serviceServedGbps, wholesale: 10 },
+    },
+  };
+  const wholesaleQuarter: GameState = {
+    ...wholesaleFull,
+    stats: {
+      ...wholesaleFull.stats,
+      serviceServedGbps: { ...wholesaleFull.stats.serviceServedGbps, wholesale: 2.5 },
+    },
+  };
+  check(
+    'wholesale income follows delivered service quality',
+    Math.abs(wholesaleRevenue(wholesaleQuarter) / wholesaleRevenue(wholesaleFull) - 0.25) < 0.001,
+  );
+  const measured = step(wholesale);
+  const trafficClasses = ['residential', 'business', 'mobile', 'wholesale', 'workload'] as const;
+  check(
+    'service telemetry remains finite and conserves delivery',
+    trafficClasses.every(
+      (kind) =>
+        Number.isFinite(measured.stats.serviceDemandGbps[kind]) &&
+        Number.isFinite(measured.stats.serviceServedGbps[kind]) &&
+        measured.stats.serviceDemandGbps[kind] >= 0 &&
+        measured.stats.serviceServedGbps[kind] <= measured.stats.serviceDemandGbps[kind] + 0.0001,
+    ),
+  );
 
   const dataCentre: NetNode = {
     ...access,
@@ -2086,29 +2810,53 @@ group('integrated operator strategy mechanics');
   const colocated: GameState = {
     ...traffic,
     nodes: [...traffic.nodes, dataCentre],
+    links: [
+      ...traffic.links,
+      {
+        id: 'strategy-dc-link',
+        aId: dataCentre.id,
+        bId: traffic.nodes[0].id,
+        capacityGbps: 100,
+        trafficGbps: 0,
+        down: false,
+        tier: 1,
+        length: 1,
+        builtAt: traffic.minutes,
+      },
+    ],
     dataCenterModes: { 'strategy-dc': 'colocation' },
   };
   const cloud: GameState = { ...colocated, dataCenterModes: { 'strategy-dc': 'cloud' } };
   const cached: GameState = { ...colocated, dataCenterModes: { 'strategy-dc': 'cache' } };
-  check('cloud mode trades extra load for more hosting income', hostingRevenue(cloud) > hostingRevenue(colocated) && DATA_CENTER_MODE_CONFIG.cloud.workloadPerTier > DATA_CENTER_MODE_CONFIG.colocation.workloadPerTier);
+  check(
+    'cloud mode trades extra load for more hosting income',
+    hostingRevenue(cloud) > hostingRevenue(colocated) &&
+      DATA_CENTER_MODE_CONFIG.cloud.workloadPerTier > DATA_CENTER_MODE_CONFIG.colocation.workloadPerTier,
+  );
   check('edge-cache mode offloads more traffic than colocation', cacheRatio(cached) > cacheRatio(colocated));
-  check('cloud mode draws more power than colocation', monthlyBreakdown(cloud, researchModifiers(cloud.researchDone)).costPower > monthlyBreakdown(colocated, researchModifiers(colocated.researchDone)).costPower);
+  check(
+    'cloud mode draws more power than colocation',
+    monthlyBreakdown(cloud, researchModifiers(cloud.researchDone)).costPower >
+      monthlyBreakdown(colocated, researchModifiers(colocated.researchDone)).costPower,
+  );
 
   const maintenance = newGame(11003);
   const site = maintenance.nodes[1];
   site.health = 55;
   const cost = maintenanceCost(site, 'urgent');
-  maintenance.maintenanceOrders = [{
-    id: 'planned-work',
-    nodeId: site.id,
-    mode: 'urgent',
-    status: 'scheduled',
-    scheduledAt: maintenance.minutes,
-    startedAt: null,
-    minutesLeft: 5,
-    technicianId: null,
-    cost,
-  }];
+  maintenance.maintenanceOrders = [
+    {
+      id: 'planned-work',
+      nodeId: site.id,
+      mode: 'urgent',
+      status: 'scheduled',
+      scheduledAt: maintenance.minutes,
+      startedAt: null,
+      minutesLeft: 5,
+      technicianId: null,
+      cost,
+    },
+  ];
   tickMaintenance(maintenance, 5);
   const assigned = maintenance.maintenanceOrders[0];
   const crew = maintenance.technicians.find((technician) => technician.id === assigned.technicianId)!;
@@ -2117,8 +2865,14 @@ group('integrated operator strategy mechanics');
   crew.state = 'working';
   tickMaintenance(maintenance, 5);
   check('planned maintenance consumes a real crew', assigned.technicianId !== null);
-  check('planned maintenance restores site condition', maintenance.nodes.find((node) => node.id === site.id)?.health === 100);
-  check('the crew returns after planned maintenance', maintenance.technicians.find((technician) => technician.id === crew.id)?.state === 'returning');
+  check(
+    'planned maintenance restores site condition',
+    maintenance.nodes.find((node) => node.id === site.id)?.health === 100,
+  );
+  check(
+    'the crew returns after planned maintenance',
+    maintenance.technicians.find((technician) => technician.id === crew.id)?.state === 'returning',
+  );
 
   const commercial = newGame(11004);
   commercial.money = 1_000_000;
@@ -2126,30 +2880,69 @@ group('integrated operator strategy mechanics');
   const district = commercial.districts.find((entry) => entry.unlocked)!;
   useGame.getState().startCampaign(district.id, 'acquisition');
   const campaigned = useGame.getState().game!;
-  check('district campaigns charge once and become active', campaigned.campaigns.length === 1 && campaigned.money < commercial.money);
-  check('campaign spending is visible in the finance ledger', campaigned.ledger.some((entry) => entry.category === 'campaign'));
+  check(
+    'district campaigns charge once and become active',
+    campaigned.campaigns.length === 1 && campaigned.money < commercial.money,
+  );
+  check(
+    'campaign spending is visible in the finance ledger',
+    campaigned.ledger.some((entry) => entry.category === 'campaign'),
+  );
   useGame.getState().toggleWholesaleFixed();
   check('wholesale access is a reversible company policy', useGame.getState().game?.wholesaleFixed === true);
 }
-
 
 group('planned maintenance keeps its promises');
 {
   let g = newGame(2024);
   g = runDays(g, 40, repairAll);
-  g = { ...g, nodes: g.nodes.map((n) => ({ ...n, down: false, health: 100 })), links: g.links.map((l) => ({ ...l, down: false })), incidents: [] };
+  g = {
+    ...g,
+    nodes: g.nodes.map((n) => ({ ...n, down: false, health: 100 })),
+    links: g.links.map((l) => ({ ...l, down: false })),
+    incidents: [],
+  };
   const core = g.nodes.find((n) => n.kind === 'core')!;
   const pop = g.nodes.find((n) => n.kind === 'pop')!;
 
   // A spare fibre path does not save a district, because the work powers the site down.
-  const spare = { ...g, links: [...g.links, { id: 'spare', aId: pop.id, bId: core.id, capacityGbps: linkCapacity(1), trafficGbps: 0, down: false, tier: 1, length: 14, builtAt: 0 }] };
+  const spare = {
+    ...g,
+    links: [
+      ...g.links,
+      {
+        id: 'spare',
+        aId: pop.id,
+        bId: core.id,
+        capacityGbps: linkCapacity(1),
+        trafficGbps: 0,
+        down: false,
+        tier: 1,
+        length: 14,
+        builtAt: 0,
+      },
+    ],
+  };
   check('a second path alone does not cover planned work', !servingCoverAfterLoss(spare, pop.id).safe);
 
   const cell = g.districts[0].cells.find((c) => !g.nodes.some((n) => Math.hypot(n.gx - c.gx, n.gy - c.gy) < 2.5))!;
   const twoSites = {
     ...g,
     nodes: [...g.nodes, { ...pop, id: 'pop2', name: 'Second POP', gx: cell.gx, gy: cell.gy }],
-    links: [...g.links, { id: 'l2', aId: 'pop2', bId: core.id, capacityGbps: linkCapacity(1), trafficGbps: 0, down: false, tier: 1, length: 6, builtAt: 0 }],
+    links: [
+      ...g.links,
+      {
+        id: 'l2',
+        aId: 'pop2',
+        bId: core.id,
+        capacityGbps: linkCapacity(1),
+        trafficGbps: 0,
+        down: false,
+        tier: 1,
+        length: 6,
+        builtAt: 0,
+      },
+    ],
   };
   check('a second serving site does cover it', servingCoverAfterLoss(twoSites, pop.id).safe);
   check('and the panel can say how many stand in', servingCoverAfterLoss(twoSites, pop.id).others === 1);
@@ -2162,9 +2955,12 @@ group('planned maintenance keeps its promises');
   let auto = { ...g, money: 400000, researchDone: ['auto_dispatch', 'ddos_scrub', 'predictive_maintenance'] };
   auto = { ...auto, nodes: auto.nodes.map((n) => (n.id === pop.id ? { ...n, health: 60 } : n)) };
   auto = runDays(auto, 2);
-  check('telemetry books the work itself', auto.maintenanceOrders.some((o) => o.nodeId === pop.id), `${auto.maintenanceOrders.length} orders`);
+  check(
+    'telemetry books the work itself',
+    auto.maintenanceOrders.some((o) => o.nodeId === pop.id),
+    `${auto.maintenanceOrders.length} orders`,
+  );
 }
-
 
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
