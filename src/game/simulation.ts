@@ -40,13 +40,78 @@ import {
   TRAFFIC_POLICY_CONFIG,
   activeCampaign,
   dataCenterMode,
+  interconnectOperational,
+  operationalDataCenters,
   wholesaleDemand,
   maintenanceCost,
   maintenanceStart,
   MAINTENANCE_CONFIG,
 } from './strategy';
 import { makeRng, pick, rand, randInt, uid, type Rng } from './rng';
-import type { Building, ChurnReason, Difficulty, District, GameState, Incident, NetNode, Technician } from './types';
+import type {
+  Building,
+  ChurnReason,
+  Difficulty,
+  District,
+  GameState,
+  Incident,
+  NetNode,
+  ServiceTraffic,
+  Technician,
+  TrafficClass,
+} from './types';
+
+const emptyServiceTraffic = (): ServiceTraffic => ({
+  residential: 0,
+  business: 0,
+  mobile: 0,
+  wholesale: 0,
+  workload: 0,
+});
+
+const trafficClassOf = (serviceId: string): TrafficClass => {
+  if (serviceId.startsWith('residential:')) return 'residential';
+  if (serviceId.startsWith('business:')) return 'business';
+  if (serviceId.startsWith('mobile:')) return 'mobile';
+  if (serviceId.startsWith('wholesale-')) return 'wholesale';
+  return 'workload';
+};
+
+// Weighted max-min allocation keeps priority meaningful at the upstream edge
+// without leaving capacity idle when a protected class asks for very little.
+function allocateTransit(
+  offered: ServiceTraffic,
+  priorities: Record<TrafficClass, number>,
+  capacity: number,
+): ServiceTraffic {
+  const carried = emptyServiceTraffic();
+  let remainingCapacity = Math.max(0, capacity);
+  let remaining = (Object.keys(offered) as TrafficClass[]).filter((key) => offered[key] > 0);
+
+  while (remaining.length && remainingCapacity > 0.000001) {
+    const weighted = remaining.reduce((sum, key) => sum + offered[key] * priorities[key], 0);
+    if (weighted <= 0) break;
+    const roundCapacity = remainingCapacity;
+    const saturated: TrafficClass[] = [];
+    for (const key of remaining) {
+      const share = (roundCapacity * offered[key] * priorities[key]) / weighted;
+      const need = offered[key] - carried[key];
+      if (share >= need) {
+        carried[key] += need;
+        remainingCapacity -= need;
+        saturated.push(key);
+      }
+    }
+    if (!saturated.length) {
+      for (const key of remaining) {
+        carried[key] += (remainingCapacity * offered[key] * priorities[key]) / weighted;
+      }
+      break;
+    }
+    remaining = remaining.filter((key) => !saturated.includes(key));
+  }
+  return carried;
+}
 
 export function dateFromMinutes(minutes: number) {
   return new Date(START_DATE.getTime() + minutes * 60000);
@@ -162,13 +227,61 @@ export function createNewGame(opts: NewGameOptions): GameState {
     nodes: [core, pop],
     links: [link],
     packages: [
-      { id: 'pkg_start', name: 'Starter Fibre', speedMbps: 100, price: 20, segment: 'residential', active: true, subscribers: 0 },
-      { id: 'pkg_plus', name: 'Fibre Plus', speedMbps: 500, price: 35, segment: 'residential', active: true, subscribers: 0 },
-      { id: 'pkg_ultra', name: 'Ultra Fibre', speedMbps: 1000, price: 50, segment: 'residential', active: true, subscribers: 0 },
+      {
+        id: 'pkg_start',
+        name: 'Starter Fibre',
+        speedMbps: 100,
+        price: 20,
+        segment: 'residential',
+        active: true,
+        subscribers: 0,
+      },
+      {
+        id: 'pkg_plus',
+        name: 'Fibre Plus',
+        speedMbps: 500,
+        price: 35,
+        segment: 'residential',
+        active: true,
+        subscribers: 0,
+      },
+      {
+        id: 'pkg_ultra',
+        name: 'Ultra Fibre',
+        speedMbps: 1000,
+        price: 50,
+        segment: 'residential',
+        active: true,
+        subscribers: 0,
+      },
       // Sold only once you have radios and spectrum to run them on.
-      { id: 'pkg_mob_lite', name: 'Mobile Lite', speedMbps: 40, price: 12, segment: 'mobile', active: true, subscribers: 0 },
-      { id: 'pkg_mob_std', name: 'Mobile Standard', speedMbps: 100, price: 22, segment: 'mobile', active: true, subscribers: 0 },
-      { id: 'pkg_mob_max', name: 'Mobile Unlimited', speedMbps: 300, price: 38, segment: 'mobile', active: true, subscribers: 0 },
+      {
+        id: 'pkg_mob_lite',
+        name: 'Mobile Lite',
+        speedMbps: 40,
+        price: 12,
+        segment: 'mobile',
+        active: true,
+        subscribers: 0,
+      },
+      {
+        id: 'pkg_mob_std',
+        name: 'Mobile Standard',
+        speedMbps: 100,
+        price: 22,
+        segment: 'mobile',
+        active: true,
+        subscribers: 0,
+      },
+      {
+        id: 'pkg_mob_max',
+        name: 'Mobile Unlimited',
+        speedMbps: 300,
+        price: 38,
+        segment: 'mobile',
+        active: true,
+        subscribers: 0,
+      },
     ],
     contracts: [],
     offers: [],
@@ -182,12 +295,53 @@ export function createNewGame(opts: NewGameOptions): GameState {
     researchDone: [],
     researchActive: null,
     competitors: [
-      { id: 'novatel', name: 'NovaTel', color: '#ff9f43', aggression: 0.9, share: {}, priceIndex: 1, cash: 250000, coverage: {}, mobileCoverage: {}, spectrum: [], tech: 0.2, lastMove: null },
-      { id: 'hypernet', name: 'HyperNet', color: '#a78bfa', aggression: 1.1, share: {}, priceIndex: 0.92, cash: 250000, coverage: {}, mobileCoverage: {}, spectrum: [], tech: 0.2, lastMove: null },
-      { id: 'telestar', name: 'Telestar', color: '#7ee787', aggression: 0.7, share: {}, priceIndex: 1.12, cash: 250000, coverage: {}, mobileCoverage: {}, spectrum: [], tech: 0.2, lastMove: null },
+      {
+        id: 'novatel',
+        name: 'NovaTel',
+        color: '#ff9f43',
+        aggression: 0.9,
+        share: {},
+        priceIndex: 1,
+        cash: 250000,
+        coverage: {},
+        mobileCoverage: {},
+        spectrum: [],
+        tech: 0.2,
+        lastMove: null,
+      },
+      {
+        id: 'hypernet',
+        name: 'HyperNet',
+        color: '#a78bfa',
+        aggression: 1.1,
+        share: {},
+        priceIndex: 0.92,
+        cash: 250000,
+        coverage: {},
+        mobileCoverage: {},
+        spectrum: [],
+        tech: 0.2,
+        lastMove: null,
+      },
+      {
+        id: 'telestar',
+        name: 'Telestar',
+        color: '#7ee787',
+        aggression: 0.7,
+        share: {},
+        priceIndex: 1.12,
+        cash: 250000,
+        coverage: {},
+        mobileCoverage: {},
+        spectrum: [],
+        tech: 0.2,
+        lastMove: null,
+      },
     ],
     posts: [],
-    log: [{ id: uid('log'), at: 8 * 60, text: `${opts.companyName} is licensed to operate in ${home.name}.`, tone: 'info' }],
+    log: [
+      { id: uid('log'), at: 8 * 60, text: `${opts.companyName} is licensed to operate in ${home.name}.`, tone: 'info' },
+    ],
     stats: {
       demandGbps: 0,
       fixedDemandGbps: 0,
@@ -198,6 +352,8 @@ export function createNewGame(opts: NewGameOptions): GameState {
       packetLoss: 0,
       latencyMs: 12,
       health: 100,
+      serviceDemandGbps: emptyServiceTraffic(),
+      serviceServedGbps: emptyServiceTraffic(),
       outages: {},
     },
     finance: {
@@ -222,12 +378,14 @@ export function createNewGame(opts: NewGameOptions): GameState {
     marketingBudget: 2000,
     retentionBudget: 0,
     campaigns: [],
+    campaignHistory: [],
     churn: [],
     trafficPolicy: 'balanced',
     interconnectPlan: 'transit',
     wholesaleFixed: false,
     mvnoEnabled: false,
     dataCenterModes: {},
+    dataCenterModeChangedAt: {},
     demandHistory: [],
     dayPeakDemand: 0,
     telemetry: [],
@@ -287,7 +445,9 @@ function makeTechnician(rng: Rng, gx: number, gy: number): Technician {
 }
 
 function seedStartingCustomers(state: GameState, count: number, districtId: string) {
-  const pool = state.buildings.filter((b) => b.districtId === districtId && b.segment === 'residential' && b.households > 0);
+  const pool = state.buildings.filter(
+    (b) => b.districtId === districtId && b.segment === 'residential' && b.households > 0,
+  );
   let left = count;
   let i = 0;
   while (left > 0 && i < pool.length * 4) {
@@ -304,10 +464,13 @@ function seedStartingCustomers(state: GameState, count: number, districtId: stri
 
 // Fraction of popular traffic served locally by connected data centres and partners.
 export function cacheRatio(s: GameState) {
-  const local = s.nodes
-    .filter((n) => n.kind === 'datacenter' && !n.down)
-    .reduce((sum, n) => sum + DATA_CENTER_MODE_CONFIG[dataCenterMode(s, n.id)].cachePerTier * n.tier, 0);
-  return Math.min(0.3, local + INTERCONNECT_CONFIG[s.interconnectPlan].cacheOffload);
+  const routes = computeRoutes(s);
+  const local = operationalDataCenters(s, routes).reduce(
+    (sum, n) => sum + DATA_CENTER_MODE_CONFIG[dataCenterMode(s, n.id)].cachePerTier * n.tier,
+    0,
+  );
+  const partner = interconnectOperational(s, routes) ? INTERCONNECT_CONFIG[s.interconnectPlan].cacheOffload : 0;
+  return Math.min(0.3, local + partner);
 }
 
 export function residentialSubs(state: GameState, districtId?: string) {
@@ -370,6 +533,21 @@ export function step(prev: GameState): GameState {
   if (expiredCampaigns.length) {
     for (const campaign of expiredCampaigns) {
       const district = s.districts.find((entry) => entry.id === campaign.districtId);
+      const customers = residentialSubs(s, campaign.districtId) + (district?.mobileSubs ?? 0);
+      const contracts = s.contracts.filter((contract) => contract.districtId === campaign.districtId).length;
+      s.campaignHistory = [
+        ...s.campaignHistory.slice(-39),
+        {
+          id: campaign.id,
+          districtId: campaign.districtId,
+          kind: campaign.kind,
+          completedAt: s.minutes,
+          cost: campaign.cost,
+          customerDelta: Math.round(customers - campaign.baselineCustomers),
+          satisfactionDelta: (district?.satisfaction ?? campaign.baselineSatisfaction) - campaign.baselineSatisfaction,
+          contractDelta: contracts - campaign.baselineContracts,
+        },
+      ];
       pushLog(s, `${district?.name ?? 'District'} campaign completed.`, 'info');
     }
     s.campaigns = s.campaigns.filter((campaign) => campaign.endsAt > s.minutes);
@@ -454,13 +632,7 @@ export function step(prev: GameState): GameState {
       },
     ];
   });
-  for (const node of s.nodes.filter(
-    (entry) =>
-      entry.kind === 'datacenter' &&
-      !entry.down &&
-      routes[entry.id] &&
-      Object.prototype.hasOwnProperty.call(s.dataCenterModes, entry.id),
-  )) {
+  for (const node of s.nodes.filter((entry) => entry.kind === 'datacenter' && !entry.down && routes[entry.id])) {
     const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(s, node.id)];
     services.push({
       id: `workload:${node.id}`,
@@ -473,12 +645,29 @@ export function step(prev: GameState): GameState {
   const load = loadServices(s, services, routes, mods.hasAutoBalance);
 
   const transit = TRANSIT_TIERS[s.transitTier];
-  const transitCap =
-    transit.capacity * (s.backupTransit ? 1.35 : 1) + INTERCONNECT_CONFIG[s.interconnectPlan].capacityBonus;
+  const activeInterconnect = interconnectOperational(s, routes)
+    ? INTERCONNECT_CONFIG[s.interconnectPlan]
+    : INTERCONNECT_CONFIG.transit;
+  const transitCap = transit.capacity * (s.backupTransit ? 1.35 : 1) + activeInterconnect.capacityBonus;
   const transitRaw = load.totalServed / Math.max(0.01, transitCap);
-  const transitServedFraction = transitRaw > 1 ? 1 / transitRaw : 1;
-  // Eased past the line - no local build relieves it, and it hits every district.
-  const transitPressure = transitRaw <= 1 ? transitRaw : 1 + (transitRaw - 1) * 0.45;
+  const serviceDemandGbps = emptyServiceTraffic();
+  const serviceOfferedUpstream = emptyServiceTraffic();
+  for (const service of services) {
+    const kind = trafficClassOf(service.id);
+    serviceDemandGbps[kind] += service.demandGbps;
+    serviceOfferedUpstream[kind] += service.demandGbps * (load.serviceServed[service.id] ?? 0);
+  }
+  const serviceServedGbps =
+    load.totalServed <= transitCap
+      ? { ...serviceOfferedUpstream }
+      : allocateTransit(serviceOfferedUpstream, priorities, transitCap);
+  const transitFraction = (kind: TrafficClass) =>
+    serviceOfferedUpstream[kind] > 0 ? clamp(serviceServedGbps[kind] / serviceOfferedUpstream[kind], 0, 1) : 1;
+  const transitPressureFor = (kind: TrafficClass) => {
+    const fraction = transitFraction(kind);
+    return fraction < 0.999 ? 1 / Math.max(0.001, fraction) : transitRaw;
+  };
+  const totalTransitServed = Object.values(serviceServedGbps).reduce((sum, value) => sum + value, 0);
 
   s.nodes = s.nodes.map((n) => {
     const traffic = load.nodeTraffic[n.id] ?? 0;
@@ -487,9 +676,7 @@ export function step(prev: GameState): GameState {
     // A tower is only worth as much as the spectrum you are allowed to run on it.
     const rated = effectiveNodeCapacity(n.kind, n.tier, s.spectrum, s.researchDone);
     const ddosMul = mods.ddosMul * staff.ddosImpactMul;
-    const effCap = degradation
-      ? rated * (degradation.kind === 'ddos' ? 0.35 + 0.3 * (1 - ddosMul) : 0.35)
-      : rated;
+    const effCap = degradation ? rated * (degradation.kind === 'ddos' ? 0.35 + 0.3 * (1 - ddosMul) : 0.35) : rated;
     const util = traffic / Math.max(0.01, effCap);
     // Kit does not stay new.
     const yearsSinceService = (s.minutes - (n.servicedAt ?? n.builtAt)) / (MINUTES_PER_DAY * 365);
@@ -516,26 +703,29 @@ export function step(prev: GameState): GameState {
     contractImpaired[d.id] =
       (businessDemand[d.id] ?? 0) > 0 &&
       ((load.serviceOutage[businessKey] ?? false) ||
-        (load.serviceServed[businessKey] ?? 1) * transitServedFraction < 0.995);
+        (load.serviceServed[businessKey] ?? 1) * transitFraction('business') < 0.995);
     if (fixedCustomers > 0) {
-      const fixedPressure = Math.max(load.servicePressure[fixedKey] ?? 0, transitPressure);
+      const fixedPressure = Math.max(load.servicePressure[fixedKey] ?? 0, transitPressureFor('residential'));
       weightedPressure += (fixedOutage ? 2.5 : fixedPressure) * fixedCustomers;
       weightTotal += fixedCustomers;
     }
     if (d.mobileSubs > 0) {
-      const mobilePressure = Math.max(load.servicePressure[mobileKey] ?? 0, transitPressure);
+      const mobilePressure = Math.max(load.servicePressure[mobileKey] ?? 0, transitPressureFor('mobile'));
       weightedPressure += (mobileOutage ? 2.5 : mobilePressure) * d.mobileSubs;
       weightTotal += d.mobileSubs;
     }
   }
   const pressure = weightTotal > 0 ? weightedPressure / weightTotal : 0;
   const packetLoss = clamp((pressure - 1) * 0.35, 0, 0.85) * mods.lossImpactMul;
-  const latency = Math.max(
-    4,
-    9 + Math.pow(Math.max(0, pressure - 0.7), 2) * 90 + INTERCONNECT_CONFIG[s.interconnectPlan].latencyDelta,
+  const latency = Math.max(4, 9 + Math.pow(Math.max(0, pressure - 0.7), 2) * 90 + activeInterconnect.latencyDelta);
+  const avgNodeHealth = s.nodes.length
+    ? s.nodes.reduce((a, n) => a + (n.down ? 0 : n.health), 0) / s.nodes.length
+    : 100;
+  const health = clamp(
+    avgNodeHealth * (1 - packetLoss * 0.8) - Object.values(outages).filter(Boolean).length * 6,
+    0,
+    100,
   );
-  const avgNodeHealth = s.nodes.length ? s.nodes.reduce((a, n) => a + (n.down ? 0 : n.health), 0) / s.nodes.length : 100;
-  const health = clamp(avgNodeHealth * (1 - packetLoss * 0.8) - Object.values(outages).filter(Boolean).length * 6, 0, 100);
 
   s.dayPeakDemand = Math.max(s.dayPeakDemand, load.totalDemand);
   s.stats = {
@@ -548,11 +738,13 @@ export function step(prev: GameState): GameState {
       Object.values(mobileDemand).reduce((sum, demand) => sum + demand, 0) +
       Object.values(wholesaleMobileDemand).reduce((sum, demand) => sum + demand, 0),
     transitGbps: load.totalServed,
-    servedGbps: load.totalServed * transitServedFraction,
+    servedGbps: totalTransitServed,
     coreUtilization: pressure,
     packetLoss,
     latencyMs: latency,
     health,
+    serviceDemandGbps,
+    serviceServedGbps,
     outages,
   };
 
@@ -571,7 +763,8 @@ export function step(prev: GameState): GameState {
     const dPressure = Math.max(
       load.servicePressure[`residential:${d.id}`] ?? 0,
       load.servicePressure[`mobile:${d.id}`] ?? 0,
-      transitPressure,
+      transitPressureFor('residential'),
+      transitPressureFor('mobile'),
     );
     const outage = outages[d.id];
     const pIndex = priceIndex(s);
@@ -584,7 +777,11 @@ export function step(prev: GameState): GameState {
       satTarget += staff.supportSatisfaction;
       if (activeCampaign(s, d.id, 'retention')) satTarget += 6;
     }
-    const satisfaction = approach(d.satisfaction, clamp(satTarget, 0, 100), outage ? 0.5 * dayFrac * 24 : 1.6 * dayFrac);
+    const satisfaction = approach(
+      d.satisfaction,
+      clamp(satTarget, 0, 100),
+      outage ? 0.5 * dayFrac * 24 : 1.6 * dayFrac,
+    );
 
     const mobileCoverage = approach(d.mobileCoverage, mobileCoverageTarget(s, d, liveTowers), 0.06 * dayFrac * 24);
 
@@ -638,16 +835,12 @@ export function step(prev: GameState): GameState {
 
   // 6. Reputation
   const outageCount = Object.values(outages).filter(Boolean).length;
-  const repTarget = clamp(
-    50 + (health - 70) * 0.7 + (averageSatisfaction(s) - 60) * 0.35 - outageCount * 8,
-    0,
-    100,
-  );
+  const repTarget = clamp(50 + (health - 70) * 0.7 + (averageSatisfaction(s) - 60) * 0.35 - outageCount * 8, 0, 100);
   s.reputation = approach(s.reputation, repTarget, 1.2 * dayFrac);
 
   // 7. Incidents, technicians, contracts
   tickIncidents(s, mods, diff, dt, rng, staff);
-  tickTechnicians(s, dt, mods);
+  tickTechnicians(s, dt);
   tickContracts(s, mods, dt, rng, contractImpaired);
 
   // 8. Research
@@ -687,7 +880,10 @@ export function step(prev: GameState): GameState {
     s.dayPeakDemand = 0;
     tickRegulator(s, rng);
     s.employees = s.employees.map((employee) =>
-      trainEmployee(employee, s.researchActive && (employee.role === 'network_engineer' || employee.role === 'noc_engineer') ? 2 : 1),
+      trainEmployee(
+        employee,
+        s.researchActive && (employee.role === 'network_engineer' || employee.role === 'noc_engineer') ? 2 : 1,
+      ),
     );
 
     const promoted = checkPromotion(s);
@@ -718,46 +914,104 @@ export function step(prev: GameState): GameState {
     recordOperatingMonth(s, money, completedRevenue, completedExpense, completedPenalties, debtPaid);
     s.monthAccumulator = { revenue: 0, expense: 0 };
     if (debtPaid > 0) pushLog(s, `Loan repayments of $${Math.round(debtPaid).toLocaleString()} went out.`, 'info');
-    for (const c of s.contracts) c.downtimeMinutes = 0;
+    s.contracts = s.contracts.map((contract) => ({ ...contract, downtimeMinutes: 0 }));
     s.finance = { ...s.finance, penalties: 0, costLoanPayments: debtPaid };
   }
 
   return s;
 }
 
-function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac: number, rng: Rng) {
+const CUSTOMER_ACQUISITION_RATE = 0.09;
+const CUSTOMER_MARKET_LOSS_RATE = 0.05;
+const STARTER_CUSTOMER_GRACE_DAYS = 7;
+const STARTER_CUSTOMER_RAMP_DAYS = 7;
+
+export interface CustomerGrowthSnapshot {
+  addressable: number;
+  current: number;
+  targetShare: number;
+  priceMultiplier: number;
+  satisfactionMultiplier: number;
+  reputationMultiplier: number;
+  demandMultiplier: number;
+  marketingMultiplier: number;
+  projectedDailyDelta: number;
+  marketLossExposure: number;
+}
+
+// One shared explanation of customer momentum for both simulation and UI.
+export function customerGrowthSnapshot(s: GameState, d: District): CustomerGrowthSnapshot {
   const pIndex = priceIndex(s);
   const staff = staffModifiers(s);
-  const marketingBoost = (1 + Math.min(1.2, s.marketingBudget / 25000)) * staff.customerGrowthMul;
+  const diff = DIFFICULTY[s.difficulty];
+  const targetShare = playerShareTarget(s, d);
+  const addressable = d.potential * targetShare;
+  const current = residentialSubs(s, d.id);
+  const priceMultiplier = clamp(1.55 - pIndex * 0.75, 0.2, 2);
+  const satisfactionMultiplier = clamp(d.satisfaction / 65, 0.15, 1.5);
+  const reputationMultiplier = clamp(0.6 + s.reputation / 110, 0.4, 1.6);
+  const demandMultiplier = 0.8 + d.demandFactor * 0.4;
+  const marketingMultiplier = (1 + Math.min(1.2, s.marketingBudget / 25000)) * staff.customerGrowthMul;
+  const appeal =
+    priceMultiplier *
+    satisfactionMultiplier *
+    reputationMultiplier *
+    demandMultiplier *
+    marketingMultiplier *
+    diff.growthMul;
+  const gap = addressable - current;
+  const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
+  const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention;
+  const companyAgeDays = Math.max(0, (s.minutes - 8 * 60) / MINUTES_PER_DAY);
+  const marketLossExposure = clamp((companyAgeDays - STARTER_CUSTOMER_GRACE_DAYS) / STARTER_CUSTOMER_RAMP_DAYS, 0, 1);
+  const marketLoss = gap < 0 ? -gap * CUSTOMER_MARKET_LOSS_RATE * retention * marketLossExposure : 0;
+  const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul * retention;
+  const unhappyLoss = current * churnRate;
+  const acquisition = activeCampaign(s, d.id, 'acquisition') ? 1.45 : 1;
+  const projectedDailyDelta =
+    (gap > 0 ? gap * CUSTOMER_ACQUISITION_RATE * appeal * acquisition : -marketLoss) - unhappyLoss;
+
+  return {
+    addressable,
+    current,
+    targetShare,
+    priceMultiplier,
+    satisfactionMultiplier,
+    reputationMultiplier,
+    demandMultiplier,
+    marketingMultiplier,
+    projectedDailyDelta,
+    marketLossExposure,
+  };
+}
+
+function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac: number, rng: Rng) {
   const changed = new Map<string, Building>();
 
   for (const d of s.districts) {
     if (!d.unlocked || d.coverage <= 0.001) continue;
-    const addressable = d.potential * playerShareTarget(s, d);
-    const current = residentialSubs(s, d.id);
-
-    const appeal =
-      clamp(1.35 - pIndex * 0.55, 0.25, 1.9) *
-      clamp(d.satisfaction / 65, 0.15, 1.5) *
-      clamp(0.6 + s.reputation / 110, 0.4, 1.6) *
-      (0.8 + d.demandFactor * 0.4) *
-      marketingBoost *
-      diff.growthMul;
-
-    const gap = addressable - current;
+    const growth = customerGrowthSnapshot(s, d);
+    const gap = growth.addressable - growth.current;
     const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
     const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention;
     // Two different ways to lose people.
-    const marketLoss = gap < 0 ? -gap * 0.05 * dayFrac * retention : 0;
+    const marketLoss = gap < 0 ? -gap * CUSTOMER_MARKET_LOSS_RATE * dayFrac * retention * growth.marketLossExposure : 0;
     const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul * retention;
-    const unhappyLoss = current * churnRate * dayFrac;
+    const unhappyLoss = growth.current * churnRate * dayFrac;
 
     const acquisition = activeCampaign(s, d.id, 'acquisition') ? 1.45 : 1;
-    let delta = gap > 0 ? gap * 0.09 * appeal * acquisition * dayFrac : -marketLoss;
+    const appeal =
+      growth.priceMultiplier *
+      growth.satisfactionMultiplier *
+      growth.reputationMultiplier *
+      growth.demandMultiplier *
+      growth.marketingMultiplier *
+      diff.growthMul;
+    let delta = gap > 0 ? gap * CUSTOMER_ACQUISITION_RATE * appeal * acquisition * dayFrac : -marketLoss;
     delta -= unhappyLoss;
 
     const lost = marketLoss + unhappyLoss;
-    if (lost > 0.0001) recordChurn(s, d, lost, pIndex, rng, marketLoss > unhappyLoss);
+    if (lost > 0.0001) recordChurn(s, d, lost, rng, marketLoss > unhappyLoss);
     if (Math.abs(delta) < 0.0001) continue;
     applyDelta(s, d.id, delta, rng, changed);
   }
@@ -860,8 +1114,7 @@ function growMobile(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac
     if (!d.unlocked || d.mobileCoverage <= 0.001) return d;
 
     const rivalRadio = s.competitors.reduce((sum, c) => sum + (c.mobileCoverage[d.id] ?? 0), 0);
-    const addressable =
-      d.population * MOBILE_MARKET_SHARE * d.mobileCoverage * clamp(1 - rivalRadio * 0.5, 0.15, 1);
+    const addressable = d.population * MOBILE_MARKET_SHARE * d.mobileCoverage * clamp(1 - rivalRadio * 0.5, 0.15, 1);
 
     const appeal =
       clamp(1.5 - avgPrice / 26, 0.25, 1.9) *
@@ -873,8 +1126,7 @@ function growMobile(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac
     const mobileCampaign = activeCampaign(s, d.id, 'mobile') ? 1.5 : 1;
     const retention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
     let delta = gap > 0 ? gap * 0.11 * appeal * mobileCampaign * dayFrac : gap * 0.06 * dayFrac;
-    delta -=
-      d.mobileSubs * clamp((62 - d.satisfaction) / 62, 0, 1) * 0.2 * diff.churnMul * retention * dayFrac;
+    delta -= d.mobileSubs * clamp((62 - d.satisfaction) / 62, 0, 1) * 0.2 * diff.churnMul * retention * dayFrac;
 
     if (Math.abs(delta) < 0.01) return d;
     changed = true;
@@ -903,18 +1155,36 @@ export function redistributeMobilePackages(s: GameState) {
 // ---------------------------------------------------------------------------
 
 // Customers leaving is more useful to a player as "who took them and why" than as a falling number.
-function recordChurn(s: GameState, d: District, count: number, pIndex: number, rng: Rng, toMarket: boolean) {
+function recordChurn(s: GameState, d: District, count: number, rng: Rng, toMarket: boolean) {
   const outage = s.stats.outages[d.id];
-  const pressure = s.stats.packetLoss > 0.02;
+  const residentialDemand = s.stats.serviceDemandGbps.residential;
+  const residentialDelivery = residentialDemand > 0 ? s.stats.serviceServedGbps.residential / residentialDemand : 1;
+  const pressure = s.stats.packetLoss > 0.02 || residentialDelivery < 0.97;
+  const pIndex = priceIndex(s);
+  const rivalPrice = s.competitors.length
+    ? s.competitors.reduce((sum, competitor) => sum + competitor.priceIndex, 0) / s.competitors.length
+    : 1;
+  const overpriced = pIndex > 1.03 && pIndex > rivalPrice * 1.08;
+  const playerReach = Math.max(d.coverage, d.mobileCoverage * 0.8);
+  const bestRivalReach = s.competitors.reduce(
+    (best, competitor) => Math.max(best, competitor.coverage[d.id] ?? 0, (competitor.mobileCoverage[d.id] ?? 0) * 0.8),
+    0,
+  );
+  const underCovered = playerReach + 0.05 < bestRivalReach;
+  const support = staffModifiers(s).supportSatisfaction;
   const reason: ChurnReason = outage
     ? 'outage'
     : pressure
       ? 'congestion'
-      : pIndex > 1.1
+      : overpriced
         ? 'price'
-        : s.employees.filter((e) => e.role === 'support').length === 0
-          ? 'support'
-          : 'price';
+        : toMarket
+          ? underCovered
+            ? 'coverage'
+            : 'competition'
+          : support < 1
+            ? 'support'
+            : 'satisfaction';
 
   const rival = strongestRival(s, d.id);
   // Losing ground to the market means somebody picked them up.
@@ -1008,7 +1278,9 @@ function autoScheduleMaintenance(s: GameState, mods: ResearchMods) {
 
 export function tickMaintenance(s: GameState, dt: number) {
   const unavailableNodes = new Set(
-    s.incidents.filter((incident) => !incident.resolved && incident.targetType === 'node').map((incident) => incident.targetId),
+    s.incidents
+      .filter((incident) => !incident.resolved && incident.targetType === 'node')
+      .map((incident) => incident.targetId),
   );
 
   for (const order of s.maintenanceOrders) {
@@ -1019,14 +1291,10 @@ export function tickMaintenance(s: GameState, dt: number) {
     const node = s.nodes.find((entry) => entry.id === order.nodeId && !entry.down);
     if (!technician || !node) continue;
     s.maintenanceOrders = s.maintenanceOrders.map((entry) =>
-      entry.id === order.id
-        ? { ...entry, status: 'active', startedAt: s.minutes, technicianId: technician.id }
-        : entry,
+      entry.id === order.id ? { ...entry, status: 'active', startedAt: s.minutes, technicianId: technician.id } : entry,
     );
     s.technicians = s.technicians.map((entry) =>
-      entry.id === technician.id
-        ? { ...entry, maintenanceId: order.id, state: 'driving' as const }
-        : entry,
+      entry.id === technician.id ? { ...entry, maintenanceId: order.id, state: 'driving' as const } : entry,
     );
     pushLog(s, `${technician.name} dispatched for planned work at ${node.name}.`, 'info');
   }
@@ -1062,7 +1330,8 @@ export function tickMaintenance(s: GameState, dt: number) {
 
   if (s.maintenanceOrders.length > 20) {
     s.maintenanceOrders = s.maintenanceOrders.filter(
-      (order) => order.status !== 'completed' || s.minutes - (order.startedAt ?? order.scheduledAt) < MINUTES_PER_DAY * 14,
+      (order) =>
+        order.status !== 'completed' || s.minutes - (order.startedAt ?? order.scheduledAt) < MINUTES_PER_DAY * 14,
     );
   }
 }
@@ -1144,13 +1413,7 @@ export function applyIncidentDown(s: GameState, inc: Incident, down: boolean) {
   }
 }
 
-export function dispatch(
-  s: GameState,
-  incidentId: string,
-  techId: string,
-  mode: RepairMode,
-  free = false,
-) {
+export function dispatch(s: GameState, incidentId: string, techId: string, mode: RepairMode, free = false) {
   const inc = s.incidents.find((i) => i.id === incidentId);
   const tech = s.technicians.find((t) => t.id === techId);
   if (
@@ -1166,15 +1429,17 @@ export function dispatch(
     return false;
   }
   const skillMul = 1 - (tech.skill - 1) * 0.12;
-  const minutes = Math.max(
-    30,
-    Math.round(inc.repairTotalMinutes * (mode === 'emergency' ? 0.28 : 1) * skillMul),
-  );
+  const minutes = Math.max(30, Math.round(inc.repairTotalMinutes * (mode === 'emergency' ? 0.28 : 1) * skillMul));
   const cost = repairCost(inc, mode);
   if (!free && mode === 'emergency' && s.money < cost) return false;
   if (!free) {
     s.money -= cost;
-    recordLedger(s, 'incident_response', `${mode === 'emergency' ? 'Emergency' : 'Scheduled'} repair: ${inc.title}`, -cost);
+    recordLedger(
+      s,
+      'incident_response',
+      `${mode === 'emergency' ? 'Emergency' : 'Scheduled'} repair: ${inc.title}`,
+      -cost,
+    );
   }
 
   s.incidents = s.incidents.map((i) =>
@@ -1203,7 +1468,7 @@ export function incidentLocation(s: GameState, inc: Incident): { gx: number; gy:
   return d ? d.center : { gx: 0, gy: 0 };
 }
 
-function tickTechnicians(s: GameState, dt: number, _mods: ResearchMods) {
+function tickTechnicians(s: GameState, dt: number) {
   const speed = 0.02 * dt; // grid units per game minute
   let changed = false;
   const next = s.technicians.map((t) => {
@@ -1274,15 +1539,10 @@ function moveToward(from: { gx: number; gy: number }, to: { gx: number; gy: numb
   return { gx: from.gx + (dx / dist) * speed, gy: from.gy + (dy / dist) * speed, arrived: false };
 }
 
-function tickContracts(
-  s: GameState,
-  mods: ResearchMods,
-  dt: number,
-  rng: Rng,
-  impaired: Record<string, boolean>,
-) {
-  const recoverySites = s.nodes.filter(
-    (node) => node.kind === 'datacenter' && !node.down && dataCenterMode(s, node.id) === 'recovery',
+function tickContracts(s: GameState, mods: ResearchMods, dt: number, rng: Rng, impaired: Record<string, boolean>) {
+  const routes = computeRoutes(s);
+  const recoverySites = operationalDataCenters(s, routes).filter(
+    (node) => dataCenterMode(s, node.id) === 'recovery',
   ).length;
   const recoveryMultiplier = Math.max(0.5, Math.pow(0.75, recoverySites));
   if (s.contracts.length) {
@@ -1294,10 +1554,7 @@ function tickContracts(
       const allowed = MINUTES_PER_MONTH * (1 - c.slaPercent / 100);
       // Owed so far this month, capped, so a bad month cannot cost unbounded money.
       const owed = (mins: number) =>
-        Math.min(
-          c.monthlyRevenue * SLA_PENALTY_CAP,
-          (Math.max(0, mins - allowed) / 60) * c.monthlyRevenue * 0.02,
-        );
+        Math.min(c.monthlyRevenue * SLA_PENALTY_CAP, (Math.max(0, mins - allowed) / 60) * c.monthlyRevenue * 0.02);
       const fee = owed(downtimeMinutes) - owed(c.downtimeMinutes);
       penalties += fee;
       return { ...c, downtimeMinutes, penaltyPaid: c.penaltyPaid + fee };
@@ -1372,8 +1629,7 @@ function tickContracts(
   )
     ? 1.75
     : 1;
-  const chance =
-    0.35 * (dt / MINUTES_PER_DAY) * (1 + s.reputation / 90) * staff.offerRateMul * businessCampaignBoost;
+  const chance = 0.35 * (dt / MINUTES_PER_DAY) * (1 + s.reputation / 90) * staff.offerRateMul * businessCampaignBoost;
   if (s.offers.length < maxOffers && rng() < chance) {
     const offer = makeOffer(s, mods, rng);
     if (offer) s.offers = [...s.offers, offer];
@@ -1545,7 +1801,6 @@ function maybeSocialPost(s: GameState, rng: Rng, packetLoss: number, outages: nu
   }
 }
 
-
 // The regulator only turns up once you are big enough to be worth regulating.
 function tickRegulator(s: GameState, rng: Rng) {
   for (const outcome of settleRegulations(s)) {
@@ -1601,7 +1856,9 @@ function growCity(s: GameState, rng: Rng) {
     return { ...b, floors: Math.min(10, b.floors + 1), households: b.households + extra };
   });
   s.districts = s.districts.map((x) =>
-    x.id === d.id ? { ...x, potential: Math.round(x.potential * 1.04), population: Math.round(x.population * 1.04) } : x,
+    x.id === d.id
+      ? { ...x, potential: Math.round(x.potential * 1.04), population: Math.round(x.population * 1.04) }
+      : x,
   );
   // Growth accelerates, so a network that was comfortable last year is not.
   const years = s.minutes / (MINUTES_PER_DAY * 365);
@@ -1611,7 +1868,6 @@ function growCity(s: GameState, rng: Rng) {
 }
 
 export { clamp } from './util';
-
 
 export function pushLog(s: GameState, text: string, tone: 'good' | 'bad' | 'info') {
   s.log = [{ id: uid('log'), at: s.minutes, text, tone }, ...s.log].slice(0, 60);

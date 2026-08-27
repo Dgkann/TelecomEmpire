@@ -5,9 +5,10 @@ import { researchModifiers } from '../../game/research';
 import { RANKS, cityShare, nextRank, rankOf } from '../../game/progression';
 import { creditLimit, daysUntilInsolvency, loanRate, monthlyDebtService, totalDebt } from '../../game/finance';
 import { currentMonthCashFlow } from '../../game/financeLedger';
-import { residentialSubs } from '../../game/simulation';
+import { customerGrowthSnapshot, residentialSubs, totalCustomers } from '../../game/simulation';
 import { contractRisk } from '../../game/operations';
 import { STAFF_ROLE_INFO, staffModifiers } from '../../game/staff';
+import { wholesaleRevenue } from '../../game/strategy';
 import { useGame } from '../../store/gameStore';
 import type { ChurnReason } from '../../game/types';
 import TrendChart from '../TrendChart';
@@ -17,6 +18,9 @@ const CHURN_REASON: Record<ChurnReason, string> = {
   outage: 'outage',
   congestion: 'slow at peak',
   support: 'poor support',
+  coverage: 'outside your reach',
+  competition: 'won by a rival',
+  satisfaction: 'low satisfaction',
 };
 
 const HIRE_ROLES = ['network_engineer', 'noc_engineer', 'support', 'sales', 'security'] as const;
@@ -26,6 +30,106 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: stri
     <div className="flex items-center justify-between py-1 text-sm">
       <span className="text-white/55">{label}</span>
       <span className={`num ${tone ?? 'text-white'}`}>{value}</span>
+    </div>
+  );
+}
+
+function GrowthDriver({ label, value, fill, tone }: { label: string; value: string; fill: number; tone: string }) {
+  return (
+    <div className="rounded-md border border-white/[0.07] bg-black/15 px-2.5 py-2">
+      <div className="flex items-center justify-between gap-2 text-[10px]">
+        <span className="text-white/45">{label}</span>
+        <span className="num font-semibold" style={{ color: tone }}>
+          {value}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.07]">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${Math.max(2, Math.min(100, fill))}%`, background: tone }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakdown> }) {
+  const network = money.costPower + money.costMaintenance + money.costTransit;
+  const growth = money.costMarketing + money.costRetention;
+  const other = Math.max(0, money.totalCost - network - money.costSalaries - growth);
+  const deductions = [
+    { label: 'Network', value: network, color: '#7199bd' },
+    { label: 'People', value: money.costSalaries, color: '#9183ad' },
+    { label: 'Growth', value: growth, color: '#d2a657' },
+    ...(other > 0.5 ? [{ label: 'Other', value: other, color: '#9aa7ad' }] : []),
+  ];
+  let remaining = money.totalRevenue;
+  const floor = Math.min(0, money.profit);
+  const ceiling = Math.max(1, money.totalRevenue);
+  const span = ceiling - floor;
+  const zeroLeft = ((0 - floor) / span) * 100;
+
+  return (
+    <div className="mt-4 border-t border-white/[0.07] pt-4" aria-label="Monthly profit bridge">
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <div className="stat-label">Monthly profit bridge</div>
+          <div className="text-[10px] text-white/40">Where recurring revenue is consumed</div>
+        </div>
+        <div className={`num text-sm font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
+          {money.profit >= 0 ? '+' : ''}
+          {fmtMoney(money.profit)}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <div className="grid grid-cols-[68px_minmax(0,1fr)_64px] items-center gap-2 text-[10px]">
+          <span className="text-white/55">Revenue</span>
+          <span className="relative h-2 overflow-hidden rounded-sm bg-white/[0.05]">
+            <i
+              className="absolute h-full rounded-sm bg-neon-lime/75"
+              style={{ left: `${((0 - floor) / span) * 100}%`, width: `${(money.totalRevenue / span) * 100}%` }}
+            />
+            <b className="absolute inset-y-0 w-px bg-white/25" style={{ left: `${zeroLeft}%` }} />
+          </span>
+          <span className="num text-right text-neon-lime">{fmtMoney(money.totalRevenue)}</span>
+        </div>
+        {deductions.map((item) => {
+          const after = remaining - item.value;
+          const left = ((Math.min(remaining, after) - floor) / span) * 100;
+          const width = (item.value / span) * 100;
+          remaining = after;
+          return (
+            <div key={item.label} className="grid grid-cols-[68px_minmax(0,1fr)_64px] items-center gap-2 text-[10px]">
+              <span className="text-white/55">{item.label}</span>
+              <span className="relative h-2 overflow-hidden rounded-sm bg-white/[0.05]">
+                <i
+                  className="absolute h-full rounded-sm"
+                  style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0.8, width)}%`, background: item.color }}
+                />
+                <b className="absolute inset-y-0 w-px bg-white/25" style={{ left: `${zeroLeft}%` }} />
+              </span>
+              <span className="num text-right text-white/55">−{fmtMoney(item.value)}</span>
+            </div>
+          );
+        })}
+        <div className="grid grid-cols-[68px_minmax(0,1fr)_64px] items-center gap-2 border-t border-white/[0.06] pt-1.5 text-[10px]">
+          <span className="font-semibold text-white/75">Net</span>
+          <span className="relative h-2 overflow-hidden rounded-sm bg-white/[0.05]">
+            <i
+              className={`absolute h-full rounded-sm ${money.profit >= 0 ? 'bg-neon-lime' : 'bg-neon-red'}`}
+              style={{
+                left: `${((Math.min(0, money.profit) - floor) / span) * 100}%`,
+                width: `${(Math.abs(money.profit) / span) * 100}%`,
+              }}
+            />
+            <b className="absolute inset-y-0 w-px bg-white/25" style={{ left: `${zeroLeft}%` }} />
+          </span>
+          <span className={`num text-right font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
+            {money.profit >= 0 ? '+' : ''}
+            {fmtMoney(money.profit)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -61,6 +165,24 @@ export default function CompanyScreen() {
   // Same amortisation the loan itself will use, just for the preview.
   const monthlyRate = loanRate(game) / 12;
   const estimatedPayment = (borrowAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -36));
+  const fixedWholesalePotential = wholesaleRevenue({ ...game, wholesaleFixed: true, mvnoEnabled: false });
+  const mvnoPotential = wholesaleRevenue({ ...game, wholesaleFixed: false, mvnoEnabled: true });
+  const growthDistricts = game.districts.filter((district) => district.unlocked && district.coverage > 0.001);
+  const growthProfiles = growthDistricts.map((district) => ({
+    district,
+    snapshot: customerGrowthSnapshot(game, district),
+  }));
+  const growthWeight = growthProfiles.reduce((sum, entry) => sum + entry.district.potential, 0) || 1;
+  const weightedGrowth = (value: (entry: (typeof growthProfiles)[number]) => number) =>
+    growthProfiles.reduce((sum, entry) => sum + value(entry) * entry.district.potential, 0) / growthWeight;
+  const averageCoverage = weightedGrowth((entry) => entry.district.coverage);
+  const averageSatisfaction = weightedGrowth((entry) => entry.district.satisfaction);
+  const averageTargetShare = weightedGrowth((entry) => entry.snapshot.targetShare);
+  const averagePriceEffect = weightedGrowth((entry) => entry.snapshot.priceMultiplier);
+  const projectedDailyNet = growthProfiles.reduce((sum, entry) => sum + entry.snapshot.projectedDailyDelta, 0);
+  const netWindowStart =
+    [...game.telemetry].reverse().find((point) => point.at <= game.minutes - 1440) ?? game.telemetry[0];
+  const customerNet24h = netWindowStart ? totalCustomers(game) - netWindowStart.customers : null;
 
   return (
     <div className="screen-shell">
@@ -69,11 +191,17 @@ export default function CompanyScreen() {
           <div>
             <div className="stat-label text-neon-cyan">Commercial control</div>
             <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">Operator performance</h1>
-            <p className="mt-1 text-[13px] text-white/45">Balance growth, service pricing and the cost of keeping the network alive.</p>
+            <p className="mt-1 text-[13px] text-white/45">
+              Balance growth, service pricing and the cost of keeping the network alive.
+            </p>
           </div>
-          <div className={`rounded-lg border px-3 py-2 text-right ${money.profit >= 0 ? 'border-neon-lime/20 bg-neon-lime/[0.05]' : 'border-neon-red/30 bg-neon-red/[0.07]'}`}>
+          <div
+            className={`rounded-lg border px-3 py-2 text-right ${money.profit >= 0 ? 'border-neon-lime/20 bg-neon-lime/[0.05]' : 'border-neon-red/30 bg-neon-red/[0.07]'}`}
+          >
             <div className="stat-label">Operating position</div>
-            <div className={`text-sm font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>{money.profit >= 0 ? 'Profitable' : 'Costs exceed revenue'}</div>
+            <div className={`text-sm font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
+              {money.profit >= 0 ? 'Profitable' : 'Costs exceed revenue'}
+            </div>
           </div>
         </div>
         <div className="panel p-5 lg:col-span-3">
@@ -93,7 +221,9 @@ export default function CompanyScreen() {
             </div>
             <div>
               <div className="stat-label">Free cash flow MTD</div>
-              <div className={`num text-2xl font-semibold ${cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
+              <div
+                className={`num text-2xl font-semibold ${cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
+              >
                 {cashFlow.freeCashFlow >= 0 ? '+' : ''}
                 {fmtMoney(cashFlow.freeCashFlow)}
               </div>
@@ -113,14 +243,33 @@ export default function CompanyScreen() {
           </div>
           <div className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">
             <div>
-              <div className="mb-1.5 flex justify-between"><span className="stat-label text-neon-lime">Monthly revenue</span><span className="num text-[12px] text-neon-lime">{fmtMoney(money.totalRevenue)}</span></div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div className="h-full rounded-full bg-neon-lime/80" animate={{ width: `${(money.totalRevenue / Math.max(1, money.totalRevenue, money.totalCost)) * 100}%` }} /></div>
+              <div className="mb-1.5 flex justify-between">
+                <span className="stat-label text-neon-lime">Monthly revenue</span>
+                <span className="num text-[12px] text-neon-lime">{fmtMoney(money.totalRevenue)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <motion.div
+                  className="h-full rounded-full bg-neon-lime/80"
+                  animate={{
+                    width: `${(money.totalRevenue / Math.max(1, money.totalRevenue, money.totalCost)) * 100}%`,
+                  }}
+                />
+              </div>
             </div>
             <div>
-              <div className="mb-1.5 flex justify-between"><span className="stat-label text-neon-red">Operating cost</span><span className="num text-[12px] text-neon-red">{fmtMoney(money.totalCost)}</span></div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div className="h-full rounded-full bg-neon-amber/80" animate={{ width: `${(money.totalCost / Math.max(1, money.totalRevenue, money.totalCost)) * 100}%` }} /></div>
+              <div className="mb-1.5 flex justify-between">
+                <span className="stat-label text-neon-red">Operating cost</span>
+                <span className="num text-[12px] text-neon-red">{fmtMoney(money.totalCost)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <motion.div
+                  className="h-full rounded-full bg-neon-amber/80"
+                  animate={{ width: `${(money.totalCost / Math.max(1, money.totalRevenue, money.totalCost)) * 100}%` }}
+                />
+              </div>
             </div>
           </div>
+          <ProfitBridge money={money} />
         </div>
 
         <div className="panel panel-tone-violet p-5 lg:col-span-3">
@@ -179,17 +328,57 @@ export default function CompanyScreen() {
 
         <div className="panel panel-tone-amber p-5 lg:col-span-3">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-            <div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Wholesale partnerships</h2><p className="mt-1 text-[11px] text-white/40">Sell spare reach to partner brands. Revenue arrives immediately; their traffic competes at the lowest priority.</p></div>
-            <div className="text-right"><div className="stat-label">Wholesale revenue</div><div className="num text-lg font-semibold text-neon-lime">{fmtMoney(money.revenueWholesale)}/mo</div></div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Wholesale partnerships</h2>
+              <p className="mt-1 text-[11px] text-white/40">
+                Sell spare reach to partner brands. Revenue arrives immediately; their traffic competes at the lowest
+                priority.
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="stat-label">Wholesale revenue</div>
+              <div className="num text-lg font-semibold text-neon-lime">{fmtMoney(money.revenueWholesale)}/mo</div>
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-3 ${game.wholesaleFixed ? 'border-neon-amber/40 bg-neon-amber/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}>
-              <div><div className="text-sm font-semibold">Fixed network access</div><div className="mt-1 text-[10px] leading-relaxed text-white/40">Monetise covered homes through reseller ISPs. Adds roughly 18% to fixed traffic.</div></div>
-              <input type="checkbox" checked={game.wholesaleFixed} onChange={toggleWholesaleFixed} className="h-4 w-4 shrink-0 accent-[#f3b843]" />
+            <label
+              className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-3 ${game.wholesaleFixed ? 'border-neon-amber/40 bg-neon-amber/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}
+            >
+              <div>
+                <div className="text-sm font-semibold">Fixed network access</div>
+                <div className="mt-1 text-[10px] leading-relaxed text-white/40">
+                  Monetise covered homes through reseller ISPs. Adds roughly 18% to fixed traffic.
+                </div>
+                <div className="num mt-1 text-[10px] text-neon-amber">
+                  Up to {fmtMoney(fixedWholesalePotential)}/mo at current delivery quality
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={game.wholesaleFixed}
+                onChange={toggleWholesaleFixed}
+                className="h-4 w-4 shrink-0 accent-[#f3b843]"
+              />
             </label>
-            <label className={`flex items-center justify-between gap-4 rounded-xl border p-3 ${game.mvnoEnabled ? 'border-neon-violet/40 bg-neon-violet/[0.07]' : 'border-white/10 bg-white/[0.03]'} ${mods.hasMobile && game.spectrum.length ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}>
-              <div><div className="text-sm font-semibold">MVNO radio access</div><div className="mt-1 text-[10px] leading-relaxed text-white/40">Host virtual mobile brands. Adds roughly 22% to mobile traffic and needs live spectrum.</div></div>
-              <input type="checkbox" disabled={!mods.hasMobile || !game.spectrum.length} checked={game.mvnoEnabled} onChange={toggleMvno} className="h-4 w-4 shrink-0 accent-[#a78bfa]" />
+            <label
+              className={`flex items-center justify-between gap-4 rounded-xl border p-3 ${game.mvnoEnabled ? 'border-neon-violet/40 bg-neon-violet/[0.07]' : 'border-white/10 bg-white/[0.03]'} ${mods.hasMobile && game.spectrum.length ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
+            >
+              <div>
+                <div className="text-sm font-semibold">MVNO radio access</div>
+                <div className="mt-1 text-[10px] leading-relaxed text-white/40">
+                  Host virtual mobile brands. Adds roughly 22% to mobile traffic and needs live spectrum.
+                </div>
+                <div className="num mt-1 text-[10px] text-neon-violet">
+                  Up to {fmtMoney(mvnoPotential)}/mo at current delivery quality
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                disabled={!mods.hasMobile || !game.spectrum.length}
+                checked={game.mvnoEnabled}
+                onChange={toggleMvno}
+                className="h-4 w-4 shrink-0 accent-[#a78bfa]"
+              />
             </label>
           </div>
         </div>
@@ -199,6 +388,72 @@ export default function CompanyScreen() {
           <p className="mb-4 text-[11px] text-white/40">
             Cheap gigabit wins customers fast, and fills your network just as fast.
           </p>
+
+          <div
+            className="mb-4 rounded-lg border border-neon-cyan/20 bg-neon-cyan/[0.035] p-3"
+            aria-label="Customer growth drivers"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.07] pb-3">
+              <div>
+                <div className="stat-label text-neon-cyan">Subscriber momentum</div>
+                <div className="mt-0.5 text-[10px] text-white/40">
+                  Price helps, but customers still need reach and reliable service.
+                </div>
+              </div>
+              <div className="flex gap-5 text-right">
+                <div>
+                  <div className="stat-label">Last 24h</div>
+                  <div
+                    className={`num text-lg font-semibold ${customerNet24h === null ? 'text-white/45' : customerNet24h >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
+                  >
+                    {customerNet24h === null ? '—' : `${customerNet24h >= 0 ? '+' : ''}${Math.round(customerNet24h)}`}
+                  </div>
+                </div>
+                <div>
+                  <div className="stat-label">Current pace</div>
+                  <div
+                    className={`num text-lg font-semibold ${projectedDailyNet >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
+                  >
+                    {projectedDailyNet >= 0 ? '+' : ''}
+                    {Math.round(projectedDailyNet)}/day
+                  </div>
+                </div>
+                <div>
+                  <div className="stat-label">Target share</div>
+                  <div className="num text-lg font-semibold text-neon-cyan">
+                    {Math.round(averageTargetShare * 100)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <GrowthDriver
+                label="Price pull"
+                value={`${averagePriceEffect.toFixed(2)}×`}
+                fill={(averagePriceEffect / 1.25) * 100}
+                tone={averagePriceEffect >= 1 ? '#76b98a' : averagePriceEffect >= 0.8 ? '#d2a657' : '#d36e76'}
+              />
+              <GrowthDriver
+                label="Coverage"
+                value={`${Math.round(averageCoverage * 100)}%`}
+                fill={averageCoverage * 100}
+                tone={averageCoverage >= 0.7 ? '#76b98a' : averageCoverage >= 0.45 ? '#d2a657' : '#d36e76'}
+              />
+              <GrowthDriver
+                label="Satisfaction"
+                value={`${Math.round(averageSatisfaction)}`}
+                fill={averageSatisfaction}
+                tone={averageSatisfaction >= 75 ? '#76b98a' : averageSatisfaction >= 62 ? '#d2a657' : '#d36e76'}
+              />
+              <GrowthDriver
+                label="Reputation"
+                value={`${Math.round(game.reputation)}`}
+                fill={game.reputation}
+                tone={game.reputation >= 70 ? '#76b98a' : game.reputation >= 50 ? '#d2a657' : '#d36e76'}
+              />
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-3">
             {game.packages
               .filter((p) => p.segment === 'residential')
@@ -210,6 +465,7 @@ export default function CompanyScreen() {
                       <span className="text-sm font-semibold">{p.name}</span>
                       <input
                         type="checkbox"
+                        aria-label={`${p.name} active`}
                         checked={p.active}
                         onChange={(e) => updatePackage(p.id, { active: e.target.checked })}
                         className="h-4 w-4 accent-[#3ee6d6]"
@@ -224,6 +480,7 @@ export default function CompanyScreen() {
                       </div>
                       <input
                         type="range"
+                        aria-label={`${p.name} monthly price`}
                         min={5}
                         max={140}
                         value={p.price}
@@ -267,6 +524,7 @@ export default function CompanyScreen() {
                           <span className="text-sm font-semibold">{p.name}</span>
                           <input
                             type="checkbox"
+                            aria-label={`${p.name} active`}
                             checked={p.active}
                             onChange={(e) => updatePackage(p.id, { active: e.target.checked })}
                             className="h-4 w-4 accent-[#a78bfa]"
@@ -279,6 +537,7 @@ export default function CompanyScreen() {
                         </div>
                         <input
                           type="range"
+                          aria-label={`${p.name} monthly price`}
                           min={4}
                           max={90}
                           value={p.price}
@@ -300,12 +559,15 @@ export default function CompanyScreen() {
             <div className="flex items-baseline justify-between">
               <div>
                 <h3 className="text-sm font-semibold">Marketing budget</h3>
-                <p className="text-[11px] text-white/40">Spending pulls in customers faster, whether or not you can carry them.</p>
+                <p className="text-[11px] text-white/40">
+                  Spending pulls in customers faster, whether or not you can carry them.
+                </p>
               </div>
               <span className="num text-lg font-semibold text-neon-cyan">{fmtMoney(game.marketingBudget)}/mo</span>
             </div>
             <input
               type="range"
+              aria-label="Monthly marketing budget"
               min={0}
               max={40000}
               step={500}
@@ -327,6 +589,7 @@ export default function CompanyScreen() {
             </div>
             <input
               type="range"
+              aria-label="Monthly retention budget"
               min={0}
               max={30000}
               step={500}
@@ -338,7 +601,9 @@ export default function CompanyScreen() {
         </div>
 
         <div className="panel panel-tone-green p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Monthly operating finances</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
+            Monthly operating finances
+          </h2>
           <div className="divide-y divide-white/5">
             <div className="pb-2">
               <div className="stat-label mb-1">Income</div>
@@ -364,7 +629,11 @@ export default function CompanyScreen() {
               <Row label="Marketing" value={fmtMoneyExact(-money.costMarketing)} tone="text-white/70" />
               <Row label="Retention" value={fmtMoneyExact(-money.costRetention)} tone="text-white/70" />
               {game.finance.costLoanPayments > 0 && (
-                <Row label="Last loan payment" value={fmtMoneyExact(-game.finance.costLoanPayments)} tone="text-white/70" />
+                <Row
+                  label="Last loan payment"
+                  value={fmtMoneyExact(-game.finance.costLoanPayments)}
+                  tone="text-white/70"
+                />
               )}
               {game.finance.penalties > 0 && (
                 <Row label="SLA penalties (MTD)" value={fmtMoneyExact(-game.finance.penalties)} tone="text-neon-red" />
@@ -383,21 +652,47 @@ export default function CompanyScreen() {
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
                 <div className="stat-label">Cash bridge · month to date</div>
-                <div className="mt-1 text-[10px] leading-snug text-white/35">Projects, licences, research, repairs, hiring, bonuses, and asset sales are included below.</div>
+                <div className="mt-1 text-[10px] leading-snug text-white/35">
+                  Projects, licences, research, repairs, hiring, bonuses, and asset sales are included below.
+                </div>
               </div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-neon-cyan">Actual cash</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-lg border border-white/[0.07] bg-black/15 p-3">
-                <Row label="Operating cash MTD" value={`${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.operatingCash)}`} tone={cashFlow.operatingCash >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
-                <Row label="Capital projects MTD" value={fmtMoneyExact(-cashFlow.capitalSpend)} tone="text-neon-amber" />
-                <Row label="Other one-offs MTD" value={`${cashFlow.otherOneOffNet >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.otherOneOffNet)}`} tone={cashFlow.otherOneOffNet >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
+                <Row
+                  label="Operating cash MTD"
+                  value={`${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.operatingCash)}`}
+                  tone={cashFlow.operatingCash >= 0 ? 'text-neon-lime' : 'text-neon-red'}
+                />
+                <Row
+                  label="Capital projects MTD"
+                  value={fmtMoneyExact(-cashFlow.capitalSpend)}
+                  tone="text-neon-amber"
+                />
+                <Row
+                  label="Other one-offs MTD"
+                  value={`${cashFlow.otherOneOffNet >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.otherOneOffNet)}`}
+                  tone={cashFlow.otherOneOffNet >= 0 ? 'text-neon-lime' : 'text-neon-red'}
+                />
               </div>
               <div className="rounded-lg border border-neon-cyan/15 bg-neon-cyan/[0.035] p-3">
-                <Row label="Free cash flow MTD" value={`${cashFlow.freeCashFlow >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.freeCashFlow)}`} tone={cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
-                <Row label="Loan financing MTD" value={`${cashFlow.financing >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.financing)}`} tone={cashFlow.financing >= 0 ? 'text-neon-cyan' : 'text-neon-red'} />
+                <Row
+                  label="Free cash flow MTD"
+                  value={`${cashFlow.freeCashFlow >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.freeCashFlow)}`}
+                  tone={cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}
+                />
+                <Row
+                  label="Loan financing MTD"
+                  value={`${cashFlow.financing >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.financing)}`}
+                  tone={cashFlow.financing >= 0 ? 'text-neon-cyan' : 'text-neon-red'}
+                />
                 <div className="mt-1 border-t border-white/[0.07] pt-1">
-                  <Row label="Net cash movement MTD" value={`${cashFlow.netCashMovement >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.netCashMovement)}`} tone={cashFlow.netCashMovement >= 0 ? 'text-neon-lime' : 'text-neon-red'} />
+                  <Row
+                    label="Net cash movement MTD"
+                    value={`${cashFlow.netCashMovement >= 0 ? '+' : ''}${fmtMoneyExact(cashFlow.netCashMovement)}`}
+                    tone={cashFlow.netCashMovement >= 0 ? 'text-neon-lime' : 'text-neon-red'}
+                  />
                 </div>
               </div>
             </div>
@@ -406,7 +701,12 @@ export default function CompanyScreen() {
           {game.history.length > 1 && (
             <div className="mt-4 border-t border-white/[0.07] pt-4">
               <div className="mb-3 flex items-center justify-between">
-                <div><div className="stat-label">Operating trend</div><div className="text-[11px] text-white/35">Last {Math.min(14, game.history.length)} completed months</div></div>
+                <div>
+                  <div className="stat-label">Operating trend</div>
+                  <div className="text-[11px] text-white/35">
+                    Last {Math.min(14, game.history.length)} completed months
+                  </div>
+                </div>
                 <span className="font-mono text-[10px] text-white/30">MONTHLY</span>
               </div>
               <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -424,7 +724,9 @@ export default function CompanyScreen() {
                   <TrendChart
                     height={86}
                     formatValue={fmtNum}
-                    series={[{ label: 'Customers', values: game.history.slice(-14).map((h) => h.customers), color: '#68a5ff' }]}
+                    series={[
+                      { label: 'Customers', values: game.history.slice(-14).map((h) => h.customers), color: '#68a5ff' },
+                    ]}
                   />
                 </div>
               </div>
@@ -434,18 +736,39 @@ export default function CompanyScreen() {
 
         <div className="panel panel-tone-green p-5 lg:col-span-2">
           <div className="mb-3 flex items-end justify-between gap-3">
-            <div><h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Finance ledger</h2><p className="mt-1 text-[11px] text-white/35">Operating income, network projects, service work, licences, research, staffing, spectrum, and financing in one place.</p></div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Finance ledger</h2>
+              <p className="mt-1 text-[11px] text-white/35">
+                Operating income, network projects, service work, licences, research, staffing, spectrum, and financing
+                in one place.
+              </p>
+            </div>
             <span className="num text-[10px] text-white/35">{game.ledger.length} entries</span>
           </div>
           {game.ledger.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-white/10 p-4 text-center text-[11px] text-white/40">The first completed month or cash transaction will appear here.</div>
+            <div className="rounded-lg border border-dashed border-white/10 p-4 text-center text-[11px] text-white/40">
+              The first completed month or cash transaction will appear here.
+            </div>
           ) : (
             <div className="scroll-thin max-h-[310px] overflow-y-auto rounded-lg border border-white/[0.07]">
               {game.ledger.slice(0, 40).map((entry) => (
-                <div key={entry.id} className="grid grid-cols-[58px_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.06] px-3 py-2 last:border-0">
+                <div
+                  key={entry.id}
+                  className="grid grid-cols-[58px_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.06] px-3 py-2 last:border-0"
+                >
                   <span className="num text-[9px] uppercase text-white/30">Day {Math.floor(entry.at / 1440) + 1}</span>
-                  <div className="min-w-0"><div className="truncate text-[12px] text-white/75">{entry.label}</div><div className="text-[9px] uppercase tracking-wider text-white/30">{entry.category.replace(/_/g, ' ')}</div></div>
-                  <span className={`num text-[12px] font-semibold ${entry.amount >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>{entry.amount >= 0 ? '+' : ''}{fmtMoneyExact(entry.amount)}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] text-white/75">{entry.label}</div>
+                    <div className="text-[9px] uppercase tracking-wider text-white/30">
+                      {entry.category.replace(/_/g, ' ')}
+                    </div>
+                  </div>
+                  <span
+                    className={`num text-[12px] font-semibold ${entry.amount >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
+                  >
+                    {entry.amount >= 0 ? '+' : ''}
+                    {fmtMoneyExact(entry.amount)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -457,8 +780,18 @@ export default function CompanyScreen() {
           {game.contracts.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/10 bg-black/10 p-5 text-center">
               <div className="text-sm text-white/60">No enterprise portfolio yet</div>
-              <div className="mt-1 text-[11px] text-white/35">Increase business-district coverage; qualified offers will appear in the map action stack.</div>
-              <button className="btn mt-3" onClick={() => { setOverlay('customers'); setScreen('map'); }}>Open customer map</button>
+              <div className="mt-1 text-[11px] text-white/35">
+                Increase business-district coverage; qualified offers will appear in the map action stack.
+              </div>
+              <button
+                className="btn mt-3"
+                onClick={() => {
+                  setOverlay('customers');
+                  setScreen('map');
+                }}
+              >
+                Open customer map
+              </button>
             </div>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -484,11 +817,45 @@ export default function CompanyScreen() {
                       <span className={`text-right ${breach ? 'text-neon-red' : 'text-white/50'}`}>
                         {Math.round(c.downtimeMinutes)}m down
                       </span>
+                      <span>Delivery {Math.round(risk.businessDelivery * 100)}%</span>
+                      <span className={`text-right ${c.penaltyPaid > 0 ? 'text-neon-red' : 'text-white/50'}`}>
+                        {fmtMoney(c.penaltyPaid)} penalties
+                      </span>
                     </div>
                     <div className="mt-2">
-                      <div className="flex justify-between text-[10px]"><span className="text-white/40">SLA allowance used</span><span className="num" style={{ color: riskTone }}>{Math.round(risk.usage * 100)}%</span></div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${Math.min(100, risk.usage * 100)}%`, background: riskTone }} /></div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2"><span className="text-[10px] text-white/[0.38]">{risk.districtOut ? 'District outage active' : risk.fragile ? 'Single-path exposure' : `${Math.round(risk.allowance)}m monthly allowance`}</span>{building && <button className="text-[9px] font-semibold uppercase tracking-wider text-neon-cyan" onClick={() => { setOverlay('customers'); focus(building.gx, building.gy); select({ type: 'building', id: building.id }); }}>Show on map →</button>}</div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-white/40">SLA allowance used</span>
+                        <span className="num" style={{ color: riskTone }}>
+                          {Math.round(risk.usage * 100)}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${Math.min(100, risk.usage * 100)}%`, background: riskTone }}
+                        />
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-white/[0.38]">
+                          {risk.districtOut
+                            ? 'District outage active'
+                            : risk.fragile
+                              ? 'Single-path exposure'
+                              : `${Math.round(risk.allowance)}m monthly allowance`}
+                        </span>
+                        {building && (
+                          <button
+                            className="text-[9px] font-semibold uppercase tracking-wider text-neon-cyan"
+                            onClick={() => {
+                              setOverlay('customers');
+                              focus(building.gx, building.gy);
+                              select({ type: 'building', id: building.id });
+                            }}
+                          >
+                            Show on map →
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -553,6 +920,7 @@ export default function CompanyScreen() {
             </div>
             <input
               type="range"
+              aria-label="Loan amount"
               min={0}
               max={Math.max(10000, headroom)}
               step={5000}
@@ -562,9 +930,7 @@ export default function CompanyScreen() {
             />
             <div className="num mt-1 flex justify-between text-[10px] text-white/35">
               <span>over 36 months</span>
-              <span>
-                about {fmtMoney(estimatedPayment)}/mo
-              </span>
+              <span>about {fmtMoney(estimatedPayment)}/mo</span>
             </div>
             <button
               className="btn-primary mt-2 w-full"
@@ -609,10 +975,22 @@ export default function CompanyScreen() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Staff</h2>
 
           <div className="mb-3 grid grid-cols-2 gap-2 text-[10px]">
-            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Maintenance saving</div><div className="num text-neon-lime">{Math.round((1 - staff.maintenanceCostMul) * 100)}%</div></div>
-            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Incident reduction</div><div className="num text-neon-lime">{Math.round((1 - staff.incidentRateMul) * 100)}%</div></div>
-            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Support bonus</div><div className="num text-neon-cyan">+{staff.supportSatisfaction.toFixed(1)}</div></div>
-            <div className="rounded-md bg-white/[0.03] p-2"><div className="text-white/35">Research per day</div><div className="num text-neon-cyan">+{staff.researchPointsPerDay} RP</div></div>
+            <div className="rounded-md bg-white/[0.03] p-2">
+              <div className="text-white/35">Maintenance saving</div>
+              <div className="num text-neon-lime">{Math.round((1 - staff.maintenanceCostMul) * 100)}%</div>
+            </div>
+            <div className="rounded-md bg-white/[0.03] p-2">
+              <div className="text-white/35">Incident reduction</div>
+              <div className="num text-neon-lime">{Math.round((1 - staff.incidentRateMul) * 100)}%</div>
+            </div>
+            <div className="rounded-md bg-white/[0.03] p-2">
+              <div className="text-white/35">Support bonus</div>
+              <div className="num text-neon-cyan">+{staff.supportSatisfaction.toFixed(1)}</div>
+            </div>
+            <div className="rounded-md bg-white/[0.03] p-2">
+              <div className="text-white/35">Research per day</div>
+              <div className="num text-neon-cyan">+{staff.researchPointsPerDay} RP</div>
+            </div>
           </div>
 
           <div className="mb-3 flex flex-col gap-1.5">
@@ -633,13 +1011,19 @@ export default function CompanyScreen() {
               </div>
             ))}
             {game.employees.map((e) => (
-              <div key={e.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2" title={STAFF_ROLE_INFO[e.role].effect}>
+              <div
+                key={e.id}
+                className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2"
+                title={STAFF_ROLE_INFO[e.role].effect}
+              >
                 <div>
                   <div className="text-sm">{e.name}</div>
                   <div className="num text-[10px] text-white/40">
                     {STAFF_ROLE_INFO[e.role].label} · skill {e.skill} · {e.experience} XP
                   </div>
-                  <div className="mt-0.5 max-w-[230px] text-[10px] leading-snug text-white/30">{STAFF_ROLE_INFO[e.role].effect}</div>
+                  <div className="mt-0.5 max-w-[230px] text-[10px] leading-snug text-white/30">
+                    {STAFF_ROLE_INFO[e.role].effect}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="num text-[11px] text-white/50">{fmtMoney(e.salary)}</span>
@@ -656,7 +1040,12 @@ export default function CompanyScreen() {
               Hire field crew · $4k
             </button>
             {HIRE_ROLES.map((role) => (
-              <button key={role} className="btn text-xs" title={STAFF_ROLE_INFO[role].effect} onClick={() => hireEmployee(role)}>
+              <button
+                key={role}
+                className="btn text-xs"
+                title={STAFF_ROLE_INFO[role].effect}
+                onClick={() => hireEmployee(role)}
+              >
                 Hire {STAFF_ROLE_INFO[role].label.toLowerCase()} · $6k
               </button>
             ))}

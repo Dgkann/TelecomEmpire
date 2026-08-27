@@ -7,7 +7,7 @@ import type { Competitor, District, GameState } from './types';
 // Rivals are not a drifting number.
 
 // Cheap looks good, expensive looks bad. Index 1 is the market average.
-const priceAttract = (index: number) => clamp(1.6 - index * 0.6, 0.2, 1.6);
+export const priceAttract = (index: number) => clamp(1.8 - index * 0.8, 0.2, 1.7);
 
 // Friction stands in for people who will not switch to anyone.
 const MARKET_FRICTION = 0.35;
@@ -87,8 +87,10 @@ function bestDefence(s: GameState, c: Competitor) {
 
 export function rivalPosture(s: GameState, c: Competitor) {
   const averageCoverage =
-    s.districts.reduce((sum, district) => sum + Math.max(c.coverage[district.id] ?? 0, c.mobileCoverage[district.id] ?? 0), 0) /
-    Math.max(1, s.districts.length);
+    s.districts.reduce(
+      (sum, district) => sum + Math.max(c.coverage[district.id] ?? 0, c.mobileCoverage[district.id] ?? 0),
+      0,
+    ) / Math.max(1, s.districts.length);
   if (c.cash < 0) return { label: 'Recovery', detail: 'Raising margin and pausing expansion.' };
   const defence = bestDefence(s, c);
   if (defence) return { label: 'Defending', detail: `Protecting market share in ${defence.name}.` };
@@ -136,11 +138,7 @@ export function tickCompetitors(s: GameState, rng: Rng, aggressionMul: number) {
         const reach = spectrumRadiusFactor(c.spectrum);
         const capacity = spectrumCapacityFactor(c.spectrum);
         const ceiling = clamp(0.35 + capacity * 0.12 + tech * 0.2, 0.35, 0.95);
-        mobileCoverage[d.id] = clamp(
-          (mobileCoverage[d.id] ?? 0) + 0.035 * reach * rand(rng, 0.5, 1.5),
-          0,
-          ceiling,
-        );
+        mobileCoverage[d.id] = clamp((mobileCoverage[d.id] ?? 0) + 0.035 * reach * rand(rng, 0.5, 1.5), 0, ceiling);
         lastMove = `expanding mobile coverage in ${d.name}`;
       }
     }

@@ -4,14 +4,7 @@ export type Difficulty = 'casual' | 'standard' | 'hard';
 export type Speed = 0 | 1 | 2 | 4;
 
 export type BuildingKind =
-  | 'house'
-  | 'apartment'
-  | 'office'
-  | 'shop'
-  | 'industrial'
-  | 'hospital'
-  | 'university'
-  | 'park';
+  'house' | 'apartment' | 'office' | 'shop' | 'industrial' | 'hospital' | 'university' | 'park';
 
 export type CustomerSegment = 'residential' | 'business' | 'enterprise';
 export type PackageSegment = CustomerSegment | 'mobile';
@@ -224,19 +217,27 @@ export interface DistrictCampaign {
   startedAt: number;
   endsAt: number;
   cost: number;
+  baselineCustomers: number;
+  baselineSatisfaction: number;
+  baselineContracts: number;
+}
+
+export interface CampaignResult {
+  id: string;
+  districtId: string;
+  kind: CampaignKind;
+  completedAt: number;
+  cost: number;
+  customerDelta: number;
+  satisfactionDelta: number;
+  contractDelta: number;
 }
 
 export type TrafficPolicy = 'balanced' | 'residential' | 'business' | 'mobile';
 export type InterconnectPlan = 'transit' | 'ixp' | 'cdn';
 export type DataCenterMode = 'cache' | 'colocation' | 'cloud' | 'recovery';
 
-export type StaffRole =
-  | 'network_engineer'
-  | 'noc_engineer'
-  | 'field_tech'
-  | 'support'
-  | 'sales'
-  | 'security';
+export type StaffRole = 'network_engineer' | 'noc_engineer' | 'field_tech' | 'support' | 'sales' | 'security';
 
 export interface Employee {
   id: string;
@@ -302,7 +303,7 @@ export interface Regulation {
   status: 'pending' | 'met' | 'failed';
 }
 
-export type ChurnReason = 'price' | 'outage' | 'congestion' | 'support';
+export type ChurnReason = 'price' | 'outage' | 'congestion' | 'support' | 'coverage' | 'competition' | 'satisfaction';
 
 export interface ChurnEvent {
   id: string;
@@ -394,9 +395,17 @@ export interface NetworkStats {
   packetLoss: number; // 0..1
   latencyMs: number;
   health: number; // 0..100
+  // End-to-end service accounting. Demand is what customers asked for; served is
+  // what survived both the local network and upstream transit.
+  serviceDemandGbps: ServiceTraffic;
+  serviceServedGbps: ServiceTraffic;
   // districtId -> true when the district currently has no live path to core.
   outages: Record<string, boolean>;
 }
+
+export type TrafficClass = 'residential' | 'business' | 'mobile' | 'wholesale' | 'workload';
+
+export type ServiceTraffic = Record<TrafficClass, number>;
 
 export interface TelemetryPoint {
   at: number;
@@ -457,6 +466,7 @@ export interface GameState {
   marketingBudget: number;
   retentionBudget: number;
   campaigns: DistrictCampaign[];
+  campaignHistory: CampaignResult[];
   churn: ChurnEvent[];
 
   trafficPolicy: TrafficPolicy;
@@ -464,6 +474,7 @@ export interface GameState {
   wholesaleFixed: boolean;
   mvnoEnabled: boolean;
   dataCenterModes: Record<string, DataCenterMode>;
+  dataCenterModeChangedAt: Record<string, number>;
 
   // Daily peak demand in Gbps, oldest first. Feeds the forecast.
   demandHistory: number[];

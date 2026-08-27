@@ -1,31 +1,96 @@
 import { pick, type Rng } from './rng';
 
 const FIRST = [
-  'Deniz', 'Elif', 'Mert', 'Aylin', 'Kaan', 'Zeynep', 'Emre', 'Selin', 'Burak', 'Nil',
-  'Onur', 'Ceren', 'Baran', 'Ece', 'Tolga', 'Melis', 'Arda', 'Sena', 'Kerem', 'İdil',
+  'Deniz',
+  'Elif',
+  'Mert',
+  'Aylin',
+  'Kaan',
+  'Zeynep',
+  'Emre',
+  'Selin',
+  'Burak',
+  'Nil',
+  'Onur',
+  'Ceren',
+  'Baran',
+  'Ece',
+  'Tolga',
+  'Melis',
+  'Arda',
+  'Sena',
+  'Kerem',
+  'İdil',
 ];
 const LAST = [
-  'Yılmaz', 'Demir', 'Kaya', 'Şahin', 'Çelik', 'Arslan', 'Doğan', 'Kurt', 'Aydın', 'Polat',
-  'Erdem', 'Koç', 'Tekin', 'Aksoy', 'Bulut', 'Yalçın',
+  'Yılmaz',
+  'Demir',
+  'Kaya',
+  'Şahin',
+  'Çelik',
+  'Arslan',
+  'Doğan',
+  'Kurt',
+  'Aydın',
+  'Polat',
+  'Erdem',
+  'Koç',
+  'Tekin',
+  'Aksoy',
+  'Bulut',
+  'Yalçın',
 ];
 
 export const personName = (rng: Rng) => `${pick(rng, FIRST)} ${pick(rng, LAST)}`;
 
-const CORP_A = ['Nova', 'Helix', 'Vertex', 'Aurora', 'Kestrel', 'Meridian', 'Solstice', 'Atlas', 'Cobalt', 'Lumen', 'Orbit', 'Vantage'];
+const CORP_A = [
+  'Nova',
+  'Helix',
+  'Vertex',
+  'Aurora',
+  'Kestrel',
+  'Meridian',
+  'Solstice',
+  'Atlas',
+  'Cobalt',
+  'Lumen',
+  'Orbit',
+  'Vantage',
+];
 const CORP_B = ['Tech', 'Works', 'Systems', 'Labs', 'Dynamics', 'Logistics', 'Media', 'Analytics', 'Robotics', 'Foods'];
 const CORP_C = ['Ltd.', 'A.Ş.', 'Group', 'Co.', 'Holdings'];
 
 export const companyName = (rng: Rng) => `${pick(rng, CORP_A)}${pick(rng, CORP_B)} ${pick(rng, CORP_C)}`;
 
 const ENTERPRISE = [
-  'MetroBank', 'Anadolu University', 'Central Hospital', 'City Transit Authority', 'Marmara Clinic',
-  'National Insurance', 'Grand Mall Group', 'Port Authority', 'State Archives', 'Bosphorus Media',
+  'MetroBank',
+  'Anadolu University',
+  'Central Hospital',
+  'City Transit Authority',
+  'Marmara Clinic',
+  'National Insurance',
+  'Grand Mall Group',
+  'Port Authority',
+  'State Archives',
+  'Bosphorus Media',
 ];
 export const enterpriseName = (rng: Rng) => pick(rng, ENTERPRISE);
 
 const HANDLES = [
-  'john92', 'sarah', 'mehmet_k', 'pixelnomad', 'ayse.dev', 'gamer_burak', 'nightowl', 'defne',
-  'streamqueen', 'ops_guy', 'remote_dad', 'lag_hater', 'kadikoy_kedi', 'techsevgi',
+  'john92',
+  'sarah',
+  'mehmet_k',
+  'pixelnomad',
+  'ayse.dev',
+  'gamer_burak',
+  'nightowl',
+  'defne',
+  'streamqueen',
+  'ops_guy',
+  'remote_dad',
+  'lag_hater',
+  'kadikoy_kedi',
+  'techsevgi',
 ];
 export const handleName = (rng: Rng) => pick(rng, HANDLES);
 
@@ -70,7 +135,12 @@ export const CITY_EVENTS = [
   { name: 'Arena Concert', mul: 2.0, hours: 4, blurb: 'Fifty thousand people all uploading the same song.' },
   { name: 'Public Holiday', mul: 1.5, hours: 14, blurb: 'Nobody is at work. Everybody is streaming.' },
   { name: 'Major Game Release', mul: 2.2, hours: 8, blurb: 'A 140 GB download landed at midnight.' },
-  { name: 'Storm Warning', mul: 1.3, hours: 10, blurb: 'The city is indoors and the weather is rough on infrastructure.' },
+  {
+    name: 'Storm Warning',
+    mul: 1.3,
+    hours: 10,
+    blurb: 'The city is indoors and the weather is rough on infrastructure.',
+  },
   { name: 'E-sports Tournament', mul: 2.4, hours: 7, blurb: 'Thousands of low-latency streams are live at once.' },
   { name: 'University Results Day', mul: 1.8, hours: 6, blurb: 'Every student is refreshing the same portal.' },
   { name: 'Cloud Migration Weekend', mul: 2.1, hours: 12, blurb: 'Businesses are moving years of data before Monday.' },

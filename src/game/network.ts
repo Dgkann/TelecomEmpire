@@ -106,7 +106,9 @@ export function servingCoverAfterLoss(state: GameState, nodeId: string): { other
   if (!node) return { others: 0, safe: true };
   const without = { ...state, nodes: state.nodes.map((n) => (n.id === nodeId ? { ...n, down: true } : n)) };
   const routes = computeRoutes(without);
-  const others = servingNodes(without, node.districtId).filter((n) => n.id !== nodeId && !n.down && routes[n.id]).length;
+  const others = servingNodes(without, node.districtId).filter(
+    (n) => n.id !== nodeId && !n.down && routes[n.id],
+  ).length;
   return { others, safe: others > 0 };
 }
 
@@ -115,9 +117,7 @@ export function servingNodes(
   districtId: string,
   kinds: NetNode['kind'][] = ['pop', 'access'],
 ): NetNode[] {
-  return state.nodes.filter(
-    (n) => n.districtId === districtId && kinds.includes(n.kind) && !n.down,
-  );
+  return state.nodes.filter((n) => n.districtId === districtId && kinds.includes(n.kind) && !n.down);
 }
 
 export interface LoadResult {
@@ -318,13 +318,11 @@ export function loadServices(
       recordPressure(offeredNodeTraffic[node.id], weightedNodeTraffic[node.id], node.capacityGbps, priority);
       for (const linkId of route.path) {
         const link = linkById[linkId];
-        if (link)
-          recordPressure(offeredLinkTraffic[linkId], weightedLinkTraffic[linkId], link.capacityGbps, priority);
+        if (link) recordPressure(offeredLinkTraffic[linkId], weightedLinkTraffic[linkId], link.capacityGbps, priority);
       }
       for (const hopId of route.hops) {
         const hop = nodeById[hopId];
-        if (hop)
-          recordPressure(offeredNodeTraffic[hopId], weightedNodeTraffic[hopId], hop.capacityGbps, priority);
+        if (hop) recordPressure(offeredNodeTraffic[hopId], weightedNodeTraffic[hopId], hop.capacityGbps, priority);
       }
     }
 

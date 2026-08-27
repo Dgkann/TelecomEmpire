@@ -31,9 +31,33 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
         ? packages
         : [
             ...packages,
-            { id: 'pkg_mob_lite', name: 'Mobile Lite', speedMbps: 40, price: 12, segment: 'mobile', active: true, subscribers: 0 },
-            { id: 'pkg_mob_std', name: 'Mobile Standard', speedMbps: 100, price: 22, segment: 'mobile', active: true, subscribers: 0 },
-            { id: 'pkg_mob_max', name: 'Mobile Unlimited', speedMbps: 300, price: 38, segment: 'mobile', active: true, subscribers: 0 },
+            {
+              id: 'pkg_mob_lite',
+              name: 'Mobile Lite',
+              speedMbps: 40,
+              price: 12,
+              segment: 'mobile',
+              active: true,
+              subscribers: 0,
+            },
+            {
+              id: 'pkg_mob_std',
+              name: 'Mobile Standard',
+              speedMbps: 100,
+              price: 22,
+              segment: 'mobile',
+              active: true,
+              subscribers: 0,
+            },
+            {
+              id: 'pkg_mob_max',
+              name: 'Mobile Unlimited',
+              speedMbps: 300,
+              price: 38,
+              segment: 'mobile',
+              active: true,
+              subscribers: 0,
+            },
           ],
     };
   },
@@ -106,7 +130,10 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   // Contracts signed before redundancy mattered keep their terms.
   12: (s) => ({
     ...s,
-    contracts: ((s.contracts ?? []) as any[]).map((c: any) => ({ ...c, requiresRedundancy: c.requiresRedundancy ?? false })),
+    contracts: ((s.contracts ?? []) as any[]).map((c: any) => ({
+      ...c,
+      requiresRedundancy: c.requiresRedundancy ?? false,
+    })),
     offers: ((s.offers ?? []) as any[]).map((o: any) => ({ ...o, requiresRedundancy: o.requiresRedundancy ?? false })),
   }),
   13: (s) => ({
@@ -148,6 +175,69 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
       ...((s.finance ?? {}) as object),
     },
   }),
+  // Service-class telemetry makes QoS and wholesale delivery observable. Older
+  // data centres are explicitly assigned their historical colocation default.
+  15: (s) => {
+    const nodes = Array.isArray(s.nodes) ? s.nodes : [];
+    const existingModes = isRecord(s.dataCenterModes) ? s.dataCenterModes : {};
+    const dataCenterModes = { ...existingModes };
+    for (const entry of nodes) {
+      if (
+        isRecord(entry) &&
+        entry.kind === 'datacenter' &&
+        typeof entry.id === 'string' &&
+        !(entry.id in dataCenterModes)
+      ) {
+        dataCenterModes[entry.id] = 'colocation';
+      }
+    }
+    const emptyTraffic = { residential: 0, business: 0, mobile: 0, wholesale: 0, workload: 0 };
+    const districts = Array.isArray(s.districts) ? s.districts : [];
+    const buildings = Array.isArray(s.buildings) ? s.buildings : [];
+    const contracts = Array.isArray(s.contracts) ? s.contracts : [];
+    const campaigns = (Array.isArray(s.campaigns) ? s.campaigns : []).map((entry) => {
+      if (!isRecord(entry) || typeof entry.districtId !== 'string') return entry;
+      const district = districts.find((candidate) => isRecord(candidate) && candidate.id === entry.districtId);
+      const fixed = buildings.reduce((sum, building) => {
+        if (!isRecord(building) || building.districtId !== entry.districtId || building.segment !== 'residential')
+          return sum;
+        return (
+          sum +
+          (typeof building.households === 'number' && typeof building.connected === 'number'
+            ? building.households * building.connected
+            : 0)
+        );
+      }, 0);
+      const mobile = isRecord(district) && typeof district.mobileSubs === 'number' ? district.mobileSubs : 0;
+      return {
+        ...entry,
+        baselineCustomers: entry.baselineCustomers ?? fixed + mobile,
+        baselineSatisfaction:
+          entry.baselineSatisfaction ??
+          (isRecord(district) && typeof district.satisfaction === 'number' ? district.satisfaction : 70),
+        baselineContracts:
+          entry.baselineContracts ??
+          contracts.filter((contract) => isRecord(contract) && contract.districtId === entry.districtId).length,
+      };
+    });
+    return {
+      ...s,
+      dataCenterModes,
+      dataCenterModeChangedAt: Object.fromEntries(
+        Object.keys(dataCenterModes).map((id) => [
+          id,
+          Math.max(0, (typeof s.minutes === 'number' ? s.minutes : 0) - 2880),
+        ]),
+      ),
+      campaigns,
+      campaignHistory: s.campaignHistory ?? [],
+      stats: {
+        ...((s.stats ?? {}) as object),
+        serviceDemandGbps: emptyTraffic,
+        serviceServedGbps: emptyTraffic,
+      },
+    };
+  },
 };
 
 const DEFAULTS = {
@@ -169,12 +259,14 @@ const DEFAULTS = {
   marketingBudget: 0,
   retentionBudget: 0,
   campaigns: [],
+  campaignHistory: [],
   churn: [],
   trafficPolicy: 'balanced',
   interconnectPlan: 'transit',
   wholesaleFixed: false,
   mvnoEnabled: false,
   dataCenterModes: {},
+  dataCenterModeChangedAt: {},
   rank: 0,
   victoryAt: null,
   regulations: [],
@@ -198,7 +290,16 @@ const DEFAULTS = {
 // Without these there is no game to resume.
 const REQUIRED = ['buildings', 'districts', 'nodes', 'links', 'packages'] as const;
 
-const BUILDING_KINDS = new Set(['house', 'apartment', 'office', 'shop', 'industrial', 'hospital', 'university', 'park']);
+const BUILDING_KINDS = new Set([
+  'house',
+  'apartment',
+  'office',
+  'shop',
+  'industrial',
+  'hospital',
+  'university',
+  'park',
+]);
 const CUSTOMER_SEGMENTS = new Set(['residential', 'business', 'enterprise']);
 const PACKAGE_SEGMENTS = new Set([...CUSTOMER_SEGMENTS, 'mobile']);
 const NODE_KINDS = new Set(Object.keys(NODE_SPECS));
@@ -215,7 +316,8 @@ const INCIDENT_KINDS = new Set([
   'overheating',
 ]);
 const STAFF_ROLES = new Set(['network_engineer', 'noc_engineer', 'field_tech', 'support', 'sales', 'security']);
-const CHURN_REASONS = new Set(['price', 'outage', 'congestion', 'support']);
+const CHURN_REASONS = new Set(['price', 'outage', 'congestion', 'support', 'coverage', 'competition', 'satisfaction']);
+const TRAFFIC_CLASSES = ['residential', 'business', 'mobile', 'wholesale', 'workload'] as const;
 const RESEARCH_IDS = new Set(RESEARCH.map((r) => r.id));
 const BAND_IDS = new Set(Object.keys(SPECTRUM_BANDS));
 const MAINTENANCE_MODES = new Set(['urgent', 'overnight', 'defer']);
@@ -292,6 +394,14 @@ function isBooleanRecord(value: unknown) {
     isRecord(value) &&
     Object.keys(value).length <= 500 &&
     Object.entries(value).every(([key, entry]) => isId(key) && isBool(entry))
+  );
+}
+
+function isNonNegativeNumberRecord(value: unknown) {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length <= 500 &&
+    Object.entries(value).every(([key, entry]) => isId(key) && isNumber(entry, 0))
   );
 }
 
@@ -496,7 +606,24 @@ function isCampaign(value: unknown) {
     isNumber(value.startedAt, 0) &&
     isNumber(value.endsAt, 0) &&
     value.endsAt > value.startedAt &&
-    isNumber(value.cost, 0)
+    isNumber(value.cost, 0) &&
+    isNumber(value.baselineCustomers, 0) &&
+    isNumber(value.baselineSatisfaction, 0, 100) &&
+    isInteger(value.baselineContracts, 0)
+  );
+}
+
+function isCampaignResult(value: unknown) {
+  return (
+    isRecord(value) &&
+    isId(value.id) &&
+    isId(value.districtId) &&
+    isEnum(value.kind, CAMPAIGN_KINDS) &&
+    isNumber(value.completedAt, 0) &&
+    isNumber(value.cost, 0) &&
+    isNumber(value.customerDelta) &&
+    isNumber(value.satisfactionDelta) &&
+    isInteger(value.contractDelta)
   );
 }
 
@@ -582,6 +709,14 @@ function isLedgerEntry(value: unknown) {
   );
 }
 
+function isServiceTraffic(value: unknown) {
+  return (
+    isRecord(value) &&
+    TRAFFIC_CLASSES.every((key) => isNumber(value[key], 0)) &&
+    Object.keys(value).every((key) => TRAFFIC_CLASSES.includes(key as (typeof TRAFFIC_CLASSES)[number]))
+  );
+}
+
 function isStats(value: unknown) {
   return (
     isRecord(value) &&
@@ -594,6 +729,8 @@ function isStats(value: unknown) {
     isNumber(value.packetLoss, 0, 1) &&
     isNumber(value.latencyMs, 0) &&
     isNumber(value.health, 0, 100) &&
+    isServiceTraffic(value.serviceDemandGbps) &&
+    isServiceTraffic(value.serviceServedGbps) &&
     isBooleanRecord(value.outages)
   );
 }
@@ -635,7 +772,8 @@ function isTelemetry(value: unknown) {
 }
 
 function isRegulation(value: unknown) {
-  if (!isRecord(value) || (value.kind !== 'coverage' && value.kind !== 'price_cap' && value.kind !== 'resilience')) return false;
+  if (!isRecord(value) || (value.kind !== 'coverage' && value.kind !== 'price_cap' && value.kind !== 'resilience'))
+    return false;
   return (
     isId(value.id) &&
     isText(value.title, 240) &&
@@ -673,12 +811,7 @@ function isSpectrumHolding(value: unknown) {
 }
 
 function isAuctionBid(value: unknown) {
-  return (
-    isRecord(value) &&
-    isId(value.bidderId) &&
-    isText(value.bidderName, 240) &&
-    isNumber(value.amount, 0)
-  );
+  return isRecord(value) && isId(value.bidderId) && isText(value.bidderName, 240) && isNumber(value.amount, 0);
 }
 
 function isAuction(value: unknown) {
@@ -744,8 +877,18 @@ function normalizeIncidentReferences(state: LegacyState): LegacyState {
     return { ...state, version: SAVE_VERSION, finance };
   }
 
-  const nodeIds = new Set(state.nodes.filter(isRecord).map((entry) => entry.id).filter(isId));
-  const linkIds = new Set(state.links.filter(isRecord).map((entry) => entry.id).filter(isId));
+  const nodeIds = new Set(
+    state.nodes
+      .filter(isRecord)
+      .map((entry) => entry.id)
+      .filter(isId),
+  );
+  const linkIds = new Set(
+    state.links
+      .filter(isRecord)
+      .map((entry) => entry.id)
+      .filter(isId),
+  );
   const incidents = state.incidents.filter((entry) => {
     if (!isRecord(entry) || !isId(entry.targetId)) return true;
     if (entry.targetType === 'node') return nodeIds.has(entry.targetId);
@@ -753,7 +896,10 @@ function normalizeIncidentReferences(state: LegacyState): LegacyState {
     return true;
   });
   const technicianById = new Map(
-    state.technicians.filter(isRecord).filter((entry) => isId(entry.id)).map((entry) => [entry.id as string, entry]),
+    state.technicians
+      .filter(isRecord)
+      .filter((entry) => isId(entry.id))
+      .map((entry) => [entry.id as string, entry]),
   );
   const validAssignments = new Map<string, string>();
   const normalizedIncidents = incidents.map((entry) => {
@@ -803,7 +949,9 @@ function normalizeIncidentReferences(state: LegacyState): LegacyState {
     if (
       hasValidIncident ||
       hasValidMaintenance ||
-      (entry.incidentId === null && entry.maintenanceId === null && (entry.state === 'idle' || entry.state === 'returning'))
+      (entry.incidentId === null &&
+        entry.maintenanceId === null &&
+        (entry.state === 'idle' || entry.state === 'returning'))
     ) {
       return entry;
     }
@@ -874,6 +1022,7 @@ function validateState(value: unknown): GameState | null {
     isArrayOf(value.ledger, isLedgerEntry, 1000) &&
     isArrayOf(value.churn, isChurn, 5000) &&
     isArrayOf(value.campaigns, isCampaign, 1000) &&
+    isArrayOf(value.campaignHistory, isCampaignResult, 1000) &&
     isArrayOf(value.demandHistory, (entry) => isNumber(entry, 0), 1000) &&
     isArrayOf(value.telemetry, isTelemetry, 10_000) &&
     isArrayOf(value.regulations, isRegulation, 1000) &&
@@ -885,6 +1034,7 @@ function validateState(value: unknown): GameState | null {
     isStats(value.stats) &&
     isFinance(value.finance) &&
     isDataCenterModeRecord(value.dataCenterModes) &&
+    isNonNegativeNumberRecord(value.dataCenterModeChangedAt) &&
     isRecord(value.monthAccumulator) &&
     isNumber(value.monthAccumulator.revenue, 0) &&
     isNumber(value.monthAccumulator.expense, 0) &&
@@ -1005,6 +1155,7 @@ function validateState(value: unknown): GameState | null {
     }) &&
     state.churn.every((entry) => districtIds.has(entry.districtId)) &&
     state.campaigns.every((entry) => districtIds.has(entry.districtId)) &&
+    state.campaignHistory.every((entry) => districtIds.has(entry.districtId)) &&
     state.regulations.every((entry) => entry.districtId === null || districtIds.has(entry.districtId)) &&
     Object.keys(state.stats.outages).every((id) => districtIds.has(id)) &&
     state.competitors.every(
@@ -1014,8 +1165,11 @@ function validateState(value: unknown): GameState | null {
         Object.keys(entry.mobileCoverage).every((id) => districtIds.has(id)) &&
         new Set(entry.spectrum.map((holding) => holding.band)).size === entry.spectrum.length,
     ) &&
-    Object.entries(state.dataCenterModes).every(
-      ([id]) => state.nodes.some((node) => node.id === id && node.kind === 'datacenter'),
+    Object.entries(state.dataCenterModes).every(([id]) =>
+      state.nodes.some((node) => node.id === id && node.kind === 'datacenter'),
+    ) &&
+    Object.keys(state.dataCenterModeChangedAt).every((id) =>
+      state.nodes.some((node) => node.id === id && node.kind === 'datacenter'),
     );
   if (!referencesValid) return null;
 
@@ -1038,7 +1192,8 @@ function validateState(value: unknown): GameState | null {
   }
   if (state.researchActive) {
     const node = RESEARCH.find((entry) => entry.id === state.researchActive?.id);
-    if (!node || state.researchDone.includes(node.id) || !node.requires.every((id) => state.researchDone.includes(id))) return null;
+    if (!node || state.researchDone.includes(node.id) || !node.requires.every((id) => state.researchDone.includes(id)))
+      return null;
   }
 
   return state;
@@ -1049,7 +1204,8 @@ function normalizeAndValidate(state: LegacyState) {
 }
 
 function parseSaveSlot(value: unknown): { version: number; savedAt: number; state: LegacyState } | null {
-  if (!isRecord(value) || !isVersion(value.version) || !isNumber(value.savedAt, 0) || !isRecord(value.state)) return null;
+  if (!isRecord(value) || !isVersion(value.version) || !isNumber(value.savedAt, 0) || !isRecord(value.state))
+    return null;
   return { version: value.version, savedAt: value.savedAt, state: value.state };
 }
 

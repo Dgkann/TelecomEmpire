@@ -1,4 +1,5 @@
 import { MINUTES_PER_DAY } from './constants';
+import { computeRoutes, type RouteInfo } from './network';
 import { clamp } from './util';
 import type {
   CampaignKind,
@@ -161,6 +162,12 @@ export const DATA_CENTER_MODE_CONFIG: Record<
   },
 };
 
+export const DATA_CENTER_MODE_COOLDOWN = MINUTES_PER_DAY * 2;
+
+export function dataCenterModeChangeCost(node: Pick<NetNode, 'tier' | 'capacityGbps'>) {
+  return Math.round((2500 + node.tier * 1750 + node.capacityGbps * 35) / 100) * 100;
+}
+
 export const MAINTENANCE_CONFIG: Record<
   MaintenanceMode,
   { label: string; description: string; costMultiplier: number; durationMinutes: number }
@@ -191,7 +198,8 @@ export function activeCampaign(
   kind?: CampaignKind,
 ): DistrictCampaign | undefined {
   return state.campaigns.find(
-    (campaign) => campaign.districtId === districtId && campaign.endsAt > state.minutes && (!kind || campaign.kind === kind),
+    (campaign) =>
+      campaign.districtId === districtId && campaign.endsAt > state.minutes && (!kind || campaign.kind === kind),
   );
 }
 
@@ -201,6 +209,21 @@ export function dataCenterMode(state: Pick<GameState, 'dataCenterModes'>, nodeId
 
 export function isLiveDataCenter(state: Pick<GameState, 'nodes'>) {
   return state.nodes.some((node) => node.kind === 'datacenter' && !node.down);
+}
+
+export function operationalDataCenters(
+  state: Pick<GameState, 'nodes' | 'links'>,
+  routes: Record<string, RouteInfo> = computeRoutes(state as GameState),
+) {
+  return state.nodes.filter((node) => node.kind === 'datacenter' && !node.down && Boolean(routes[node.id]));
+}
+
+export function interconnectOperational(
+  state: Pick<GameState, 'nodes' | 'links' | 'interconnectPlan'>,
+  routes?: Record<string, RouteInfo>,
+) {
+  const config = INTERCONNECT_CONFIG[state.interconnectPlan];
+  return !config.requiresDataCenter || operationalDataCenters(state, routes).length > 0;
 }
 
 export function maintenanceCost(node: NetNode, mode: MaintenanceMode) {
@@ -216,17 +239,24 @@ export function maintenanceStart(minutes: number, mode: MaintenanceMode) {
   return minutes + (minuteOfDay < twoAm ? twoAm - minuteOfDay : MINUTES_PER_DAY - minuteOfDay + twoAm);
 }
 
-export function wholesaleRevenue(state: Pick<GameState, 'districts' | 'wholesaleFixed' | 'mvnoEnabled'>) {
+export function wholesaleRevenue(state: Pick<GameState, 'districts' | 'wholesaleFixed' | 'mvnoEnabled' | 'stats'>) {
   const fixed = state.wholesaleFixed
     ? state.districts.reduce((sum, district) => sum + district.potential * district.coverage * 1.8, 0)
     : 0;
   const mobile = state.mvnoEnabled
     ? state.districts.reduce((sum, district) => sum + district.population * district.mobileCoverage * 0.42, 0)
     : 0;
-  return fixed + mobile;
+  const requested = state.stats.serviceDemandGbps.wholesale;
+  const delivered = state.stats.serviceServedGbps.wholesale;
+  const quality = requested > 0 ? clamp(delivered / requested, 0, 1) : 1;
+  return (fixed + mobile) * quality;
 }
 
-export function wholesaleDemand(state: Pick<GameState, 'wholesaleFixed' | 'mvnoEnabled'>, residential: number, mobile: number) {
+export function wholesaleDemand(
+  state: Pick<GameState, 'wholesaleFixed' | 'mvnoEnabled'>,
+  residential: number,
+  mobile: number,
+) {
   return {
     fixed: state.wholesaleFixed ? residential * 0.18 : 0,
     mobile: state.mvnoEnabled ? mobile * 0.22 : 0,

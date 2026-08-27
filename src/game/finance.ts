@@ -52,9 +52,7 @@ export function createLoan(s: GameState, principal: number, termMonths: number):
   const monthlyRate = rate / 12;
   // Standard amortisation, so the payment covers interest and capital.
   const payment =
-    monthlyRate > 0
-      ? (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths))
-      : principal / termMonths;
+    monthlyRate > 0 ? (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)) : principal / termMonths;
   return {
     id: uid('loan'),
     principal,

@@ -10,7 +10,13 @@ import {
 import type { GameState, Package } from './types';
 import type { ResearchMods } from './research';
 import { staffModifiers } from './staff';
-import { DATA_CENTER_MODE_CONFIG, INTERCONNECT_CONFIG, dataCenterMode, wholesaleRevenue } from './strategy';
+import {
+  DATA_CENTER_MODE_CONFIG,
+  INTERCONNECT_CONFIG,
+  dataCenterMode,
+  operationalDataCenters,
+  wholesaleRevenue,
+} from './strategy';
 
 export interface MonthlyBreakdown {
   revenueResidential: number;
@@ -126,14 +132,12 @@ export function averageSpeed(packages: Package[]) {
 
 // What the data centres bring in.
 export function hostingRevenue(state: GameState) {
-  return state.nodes
-    .filter((n) => n.kind === 'datacenter' && !n.down)
-    .reduce((sum, n) => {
-      const district = state.districts.find((d) => d.id === n.districtId);
-      const demand = 0.7 + (district?.businessDensity ?? 0.3);
-      const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(state, n.id)];
-      return sum + DATACENTER_HOSTING_BASE * (1 + (n.tier - 1) * 1.2) * demand * mode.revenueMultiplier;
-    }, 0);
+  return operationalDataCenters(state).reduce((sum, n) => {
+    const district = state.districts.find((d) => d.id === n.districtId);
+    const demand = 0.7 + (district?.businessDensity ?? 0.3);
+    const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(state, n.id)];
+    return sum + DATACENTER_HOSTING_BASE * (1 + (n.tier - 1) * 1.2) * demand * mode.revenueMultiplier;
+  }, 0);
 }
 
 // Below 1 means you are the cheap option against the market reference price.
@@ -152,8 +156,7 @@ export const fmtMoney = (n: number) => {
   return `${sign}$${Math.round(abs).toLocaleString('en-US')}`;
 };
 
-export const fmtMoneyExact = (n: number) =>
-  `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n)).toLocaleString('en-US')}`;
+export const fmtMoneyExact = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n)).toLocaleString('en-US')}`;
 
 export const fmtNum = (n: number) => {
   if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`;

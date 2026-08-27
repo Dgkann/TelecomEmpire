@@ -20,13 +20,49 @@ export interface ContractProfile {
 }
 
 const PROFILES: Record<BuildingKind, ContractProfile> = {
-  house: { label: 'Managed property network', bandwidthMul: 0.6, revenueMul: 0.85, slaFloor: 99, requiresRedundancy: false },
-  apartment: { label: 'Residential estate backhaul', bandwidthMul: 0.8, revenueMul: 0.9, slaFloor: 99, requiresRedundancy: false },
+  house: {
+    label: 'Managed property network',
+    bandwidthMul: 0.6,
+    revenueMul: 0.85,
+    slaFloor: 99,
+    requiresRedundancy: false,
+  },
+  apartment: {
+    label: 'Residential estate backhaul',
+    bandwidthMul: 0.8,
+    revenueMul: 0.9,
+    slaFloor: 99,
+    requiresRedundancy: false,
+  },
   office: { label: 'Cloud office WAN', bandwidthMul: 1, revenueMul: 1, slaFloor: 99.5, requiresRedundancy: false },
-  shop: { label: 'Retail payment network', bandwidthMul: 0.7, revenueMul: 1.1, slaFloor: 99.9, requiresRedundancy: false },
-  industrial: { label: 'Industrial telemetry link', bandwidthMul: 1.45, revenueMul: 1.2, slaFloor: 99.9, requiresRedundancy: true },
-  hospital: { label: 'Critical care network', bandwidthMul: 1.1, revenueMul: 1.4, slaFloor: 99.99, requiresRedundancy: true },
-  university: { label: 'Campus research backbone', bandwidthMul: 1.3, revenueMul: 1.15, slaFloor: 99.9, requiresRedundancy: true },
+  shop: {
+    label: 'Retail payment network',
+    bandwidthMul: 0.7,
+    revenueMul: 1.1,
+    slaFloor: 99.9,
+    requiresRedundancy: false,
+  },
+  industrial: {
+    label: 'Industrial telemetry link',
+    bandwidthMul: 1.45,
+    revenueMul: 1.2,
+    slaFloor: 99.9,
+    requiresRedundancy: true,
+  },
+  hospital: {
+    label: 'Critical care network',
+    bandwidthMul: 1.1,
+    revenueMul: 1.4,
+    slaFloor: 99.99,
+    requiresRedundancy: true,
+  },
+  university: {
+    label: 'Campus research backbone',
+    bandwidthMul: 1.3,
+    revenueMul: 1.15,
+    slaFloor: 99.9,
+    requiresRedundancy: true,
+  },
   park: { label: 'Public venue Wi-Fi', bandwidthMul: 0.5, revenueMul: 0.7, slaFloor: 99, requiresRedundancy: false },
 };
 
@@ -87,11 +123,7 @@ function negotiationRoll(state: GameState, offer: ContractOffer, mode: Negotiati
   return makeRng(hash)();
 }
 
-export function resolveNegotiation(
-  state: GameState,
-  offer: ContractOffer,
-  mode: NegotiationMode,
-): NegotiationResult {
+export function resolveNegotiation(state: GameState, offer: ContractOffer, mode: NegotiationMode): NegotiationResult {
   const terms = negotiatedTerms(offer, mode);
   const chance = mode === 'premium' ? premiumCounterChance(state, offer) : 1;
   return {

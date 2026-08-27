@@ -44,7 +44,12 @@ export function currentMonthCashFlow(state: GameState): CashFlowSummary {
     .filter((entry) => CAPITAL_CATEGORIES.has(entry.category) && entry.amount < 0)
     .reduce((sum, entry) => sum + entry.amount, 0);
   const otherOneOffNet = entries
-    .filter((entry) => !OPERATING_CATEGORIES.has(entry.category) && !CAPITAL_CATEGORIES.has(entry.category) && !FINANCING_CATEGORIES.has(entry.category))
+    .filter(
+      (entry) =>
+        !OPERATING_CATEGORIES.has(entry.category) &&
+        !CAPITAL_CATEGORIES.has(entry.category) &&
+        !FINANCING_CATEGORIES.has(entry.category),
+    )
     .reduce((sum, entry) => sum + entry.amount, 0);
   const financing = entries
     .filter((entry) => FINANCING_CATEGORIES.has(entry.category))

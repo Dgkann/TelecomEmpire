@@ -1,6 +1,7 @@
 import { BASELINE_ARPU, TRANSIT_TIERS } from './constants';
 import { priceIndex } from './economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil, servingCapacity } from './network';
+import { INTERCONNECT_CONFIG, interconnectOperational } from './strategy';
 import type { EnterpriseContract, GameState } from './types';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity';
@@ -28,8 +29,11 @@ export function contractRisk(state: GameState, contract: EnterpriseContract) {
   const routes = computeRoutes(state);
   const fragile = serving.length > 0 && serving.every((n) => !isRedundant(state, n.id, routes));
   const usage = contract.downtimeMinutes / allowance;
-  const score = Math.min(1, usage + (districtOut ? 0.55 : 0) + (fragile ? 0.18 : 0) + state.stats.packetLoss * 0.45);
-  return { allowance, usage, score, districtOut, fragile };
+  const businessDemand = state.stats.serviceDemandGbps.business;
+  const businessDelivery = businessDemand > 0 ? state.stats.serviceServedGbps.business / businessDemand : 1;
+  const deliveryRisk = Math.max(0, 1 - businessDelivery);
+  const score = Math.min(1, usage + (districtOut ? 0.55 : 0) + (fragile ? 0.18 : 0) + deliveryRisk * 0.8);
+  return { allowance, usage, score, districtOut, fragile, businessDelivery };
 }
 
 export function operationsInsights(state: GameState): OperationsInsight[] {
@@ -67,14 +71,19 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       id: `capacity-${item?.id}`,
       severity: Math.max(linkPressure, nodePressure) >= 0.95 ? 'critical' : 'warning',
       title: `${Math.round(Math.max(linkPressure, nodePressure) * 100)}% capacity pressure`,
-      detail: `${isLink ? 'Fibre span' : hottestNode?.name ?? 'Site'} is the current network bottleneck.`,
+      detail: `${isLink ? 'Fibre span' : (hottestNode?.name ?? 'Site')} is the current network bottleneck.`,
       action: 'Inspect bottleneck',
       target: { type: isLink ? 'link' : 'node', id: item!.id, gx: anchor?.gx ?? 0, gy: anchor?.gy ?? 0 },
     });
   }
 
   // The one bottleneck the map cannot draw.
-  const transitCap = TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1);
+  const routesForTransit = computeRoutes(state);
+  const interconnect = interconnectOperational(state, routesForTransit)
+    ? INTERCONNECT_CONFIG[state.interconnectPlan]
+    : INTERCONNECT_CONFIG.transit;
+  const transitCap =
+    TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1) + interconnect.capacityBonus;
   const peak = state.stats.transitGbps;
   const transitUse = peak / Math.max(0.01, transitCap);
   const nextTransit = TRANSIT_TIERS[state.transitTier + 1];
@@ -90,6 +99,58 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
         : `${peak.toFixed(1)} of ${transitCap.toFixed(0)} Gbps used. ${nextTransit.label} carries ${nextTransit.capacity} Gbps.`,
       action: 'Open transit',
       target: { type: 'screen', id: 'network', anchor: 'transit' },
+    });
+  }
+
+  if (state.interconnectPlan === 'cdn' && !interconnectOperational(state, routesForTransit)) {
+    insights.push({
+      id: 'cdn-suspended',
+      severity: 'warning',
+      title: 'CDN partnership is suspended',
+      detail: 'The monthly commitment remains due, but no routed data centre is available to deliver its benefits.',
+      action: 'Review interconnect',
+      target: { type: 'screen', id: 'network', anchor: 'interconnect' },
+    });
+  }
+
+  const wholesaleDemand = state.stats.serviceDemandGbps.wholesale;
+  const wholesaleDelivery =
+    wholesaleDemand > 0 ? state.stats.serviceServedGbps.wholesale / Math.max(0.001, wholesaleDemand) : 1;
+  if ((state.wholesaleFixed || state.mvnoEnabled) && wholesaleDemand > 0 && wholesaleDelivery < 0.9) {
+    insights.push({
+      id: 'wholesale-delivery',
+      severity: wholesaleDelivery < 0.65 ? 'critical' : 'warning',
+      title: `Wholesale delivery is ${Math.round(wholesaleDelivery * 100)}%`,
+      detail: 'Partner income scales with carried traffic. Add upstream headroom or change the traffic policy.',
+      action: 'Review service policy',
+      target: { type: 'screen', id: 'network', anchor: 'traffic-policy' },
+    });
+  }
+
+  const queuedMaintenance = state.maintenanceOrders.filter((order) => order.status === 'scheduled').length;
+  if (queuedMaintenance > 0 && state.technicians.every((technician) => technician.state !== 'idle')) {
+    insights.push({
+      id: 'maintenance-queue',
+      severity: 'warning',
+      title: `${queuedMaintenance} maintenance job${queuedMaintenance === 1 ? '' : 's'} waiting`,
+      detail: 'Every field crew is occupied, so planned work cannot begin on schedule.',
+      action: 'Review operations',
+      target: { type: 'screen', id: 'network', anchor: 'maintenance' },
+    });
+  }
+
+  const endingCampaign = [...state.campaigns].sort((a, b) => a.endsAt - b.endsAt)[0];
+  if (endingCampaign && endingCampaign.endsAt - state.minutes <= 2 * 1440) {
+    const district = state.districts.find((entry) => entry.id === endingCampaign.districtId);
+    insights.push({
+      id: `campaign-ending-${endingCampaign.id}`,
+      severity: 'opportunity',
+      title: `${district?.name ?? 'District'} campaign ends soon`,
+      detail: 'Review its live customer and satisfaction lift before committing the next budget.',
+      action: 'Review campaign',
+      target: district
+        ? { type: 'district', id: district.id, gx: district.center.gx, gy: district.center.gy }
+        : { type: 'screen', id: 'company' },
     });
   }
 
@@ -130,7 +191,9 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       id: `sla-${risky.contract.id}`,
       severity: risky.risk.score >= 0.65 ? 'critical' : 'warning',
       title: `${risky.contract.clientName} SLA at risk`,
-      detail: risky.risk.fragile ? 'The client depends on a single network path.' : 'Downtime is consuming this month’s SLA allowance.',
+      detail: risky.risk.fragile
+        ? 'The client depends on a single network path.'
+        : 'Downtime is consuming this month’s SLA allowance.',
       action: 'Review contract',
       target: building
         ? { type: 'building', id: building.id, gx: building.gx, gy: building.gy }
@@ -153,6 +216,10 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
   }
 
   return insights
-    .sort((a, b) => ({ critical: 0, warning: 1, opportunity: 2 })[a.severity] - ({ critical: 0, warning: 1, opportunity: 2 })[b.severity])
+    .sort(
+      (a, b) =>
+        ({ critical: 0, warning: 1, opportunity: 2 })[a.severity] -
+        { critical: 0, warning: 1, opportunity: 2 }[b.severity],
+    )
     .slice(0, 3);
 }

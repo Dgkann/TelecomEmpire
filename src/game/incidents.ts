@@ -83,7 +83,8 @@ const TEMPLATES: IncidentTemplate[] = [
     minutes: 120,
     weight: 8,
     degrade: true,
-    text: () => `Your resolvers are timing out. Customers say "the internet is broken", and technically they are right.`,
+    text: () =>
+      `Your resolvers are timing out. Customers say "the internet is broken", and technically they are right.`,
   },
   {
     kind: 'bgp_leak',
@@ -129,9 +130,7 @@ export function rollIncident(
     if (template.target === 'link') return state.links.some((link) => !link.down);
     return state.nodes.some(
       (node) =>
-        !node.down &&
-        !maintenanceNodes.has(node.id) &&
-        (!template.nodeKinds || template.nodeKinds.includes(node.kind)),
+        !node.down && !maintenanceNodes.has(node.id) && (!template.nodeKinds || template.nodeKinds.includes(node.kind)),
     );
   }).map((template) => ({
     template,

@@ -13,12 +13,7 @@ import { computeRoutes, districtRedundancy } from '../game/network';
 import { repairCost, type RepairMode } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
 import { recordLedger } from '../game/financeLedger';
-import {
-  fibreConnectionCost,
-  fibreConnectionIssue,
-  nodePlacementCost,
-  nodePlacementIssue,
-} from '../game/placement';
+import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
 import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/save';
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
 import {
@@ -27,6 +22,7 @@ import {
   pushLog,
   redistributeMobilePackages,
   redistributePackages,
+  residentialSubs,
   step,
   type NewGameOptions,
 } from '../game/simulation';
@@ -36,10 +32,12 @@ import { makeRng } from '../game/rng';
 import {
   CAMPAIGN_CONFIG,
   DATA_CENTER_MODE_CONFIG,
+  DATA_CENTER_MODE_COOLDOWN,
   INTERCONNECT_CONFIG,
   MAINTENANCE_CONFIG,
   maintenanceCost,
   maintenanceStart,
+  dataCenterModeChangeCost,
 } from '../game/strategy';
 import type {
   CampaignKind,
@@ -333,7 +331,11 @@ export const useGame = create<Store>((set, get) => ({
           servicedAt: draft.minutes,
         },
       ];
-      if (kind === 'datacenter') draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: 'colocation' };
+      if (kind === 'datacenter') {
+        draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: 'colocation' };
+        // Zero marks a newly built site whose initial workload can be changed immediately.
+        draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: 0 };
+      }
       pushLog(draft, `${spec.label} built in ${district.name}.`, 'good');
     });
     s.toast(`${spec.label} built`, 'good', gx, gy);
@@ -397,7 +399,9 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const node = g.nodes.find((n) => n.id === id);
     if (!node) return;
-    if (g.incidents.some((incident) => !incident.resolved && incident.targetType === 'node' && incident.targetId === id)) {
+    if (
+      g.incidents.some((incident) => !incident.resolved && incident.targetType === 'node' && incident.targetId === id)
+    ) {
       s.toast('Resolve the site fault before upgrading it.', 'bad');
       return;
     }
@@ -407,8 +411,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     const mods = researchModifiers(g.researchDone);
     const spec = NODE_SPECS[node.kind];
-    const maxTier =
-      node.kind === 'core' ? mods.maxCoreTier : node.kind === 'tower' ? mods.maxTowerTier : spec.maxTier;
+    const maxTier = node.kind === 'core' ? mods.maxCoreTier : node.kind === 'tower' ? mods.maxTowerTier : spec.maxTier;
     if (node.tier >= maxTier) {
       s.toast('Needs new research to go further.', 'bad');
       return;
@@ -551,8 +554,12 @@ export const useGame = create<Store>((set, get) => ({
       recordLedger(draft, 'asset_sale', `Decommissioned: ${node.name}`, refund);
       draft.nodes = draft.nodes.filter((n) => n.id !== id);
       draft.links = draft.links.filter((l) => l.aId !== id && l.bId !== id);
-      const { [id]: _removedMode, ...remainingModes } = draft.dataCenterModes;
-      draft.dataCenterModes = remainingModes;
+      draft.dataCenterModes = Object.fromEntries(
+        Object.entries(draft.dataCenterModes).filter(([nodeId]) => nodeId !== id),
+      );
+      draft.dataCenterModeChangedAt = Object.fromEntries(
+        Object.entries(draft.dataCenterModeChangedAt).filter(([nodeId]) => nodeId !== id),
+      );
       pushLog(draft, `${node.name} decommissioned (+$${refund.toLocaleString()}).`, 'info');
     });
     set({ selection: null });
@@ -586,7 +593,11 @@ export const useGame = create<Store>((set, get) => ({
 
   sellLink: (id) => {
     const s = get();
-    if (s.game?.incidents.some((incident) => !incident.resolved && incident.targetType === 'link' && incident.targetId === id)) {
+    if (
+      s.game?.incidents.some(
+        (incident) => !incident.resolved && incident.targetType === 'link' && incident.targetId === id,
+      )
+    ) {
       s.toast('Resolve the fault before removing this fibre span.', 'bad');
       return;
     }
@@ -808,9 +819,14 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       const rng = makeRng(Math.floor(Math.random() * 1e9));
-      const salary = { network_engineer: 4600, noc_engineer: 4200, field_tech: 2600, support: 2500, sales: 3800, security: 5200 }[
-        role
-      ];
+      const salary = {
+        network_engineer: 4600,
+        noc_engineer: 4200,
+        field_tech: 2600,
+        support: 2500,
+        sales: 3800,
+        security: 5200,
+      }[role];
       draft.money -= cost;
       recordLedger(draft, 'staff', `${role.replace(/_/g, ' ')} recruitment`, -cost);
       draft.employees = [
@@ -896,6 +912,9 @@ export const useGame = create<Store>((set, get) => ({
           startedAt: draft.minutes,
           endsAt: draft.minutes + config.durationDays * MINUTES_PER_DAY,
           cost: config.cost,
+          baselineCustomers: residentialSubs(draft, districtId) + district.mobileSubs,
+          baselineSatisfaction: district.satisfaction,
+          baselineContracts: draft.contracts.filter((contract) => contract.districtId === districtId).length,
         },
       ];
       pushLog(draft, `${config.label} started in ${district.name}.`, 'good');
@@ -967,12 +986,26 @@ export const useGame = create<Store>((set, get) => ({
     const g = s.game;
     const node = g?.nodes.find((entry) => entry.id === nodeId && entry.kind === 'datacenter');
     if (!g || !node || g.dataCenterModes[nodeId] === mode) return;
+    const changedAt = g.dataCenterModeChangedAt[nodeId] ?? 0;
+    const availableAt = changedAt > 0 ? changedAt + DATA_CENTER_MODE_COOLDOWN : -Infinity;
+    if (g.minutes < availableAt) {
+      s.toast(`Workload change available in ${Math.ceil((availableAt - g.minutes) / MINUTES_PER_DAY)} day(s).`, 'bad');
+      return;
+    }
     const config = DATA_CENTER_MODE_CONFIG[mode];
+    const cost = dataCenterModeChangeCost(node);
+    if (g.money < cost) {
+      s.toast('Not enough cash to reconfigure this data centre.', 'bad');
+      return;
+    }
     withGame(set, (draft) => {
+      draft.money -= cost;
+      recordLedger(draft, 'network_service', `${node.name}: ${config.label} reconfiguration`, -cost);
       draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: mode };
+      draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: draft.minutes };
       pushLog(draft, `${node.name} switched to ${config.label}.`, 'info');
     });
-    s.toast(`${config.label} workload applied`, 'good');
+    s.toast(`${config.label} workload applied · $${cost.toLocaleString()}`, 'good');
   },
 
   takeLoan: (principal, termMonths) => {

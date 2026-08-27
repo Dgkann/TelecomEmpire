@@ -11,9 +11,10 @@ export function makeRng(seed: number) {
 
 export type Rng = () => number;
 
-export const pick = <T,>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length) % arr.length];
+export const pick = <T>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length) % arr.length];
 export const rand = (rng: Rng, min: number, max: number) => min + rng() * (max - min);
 export const randInt = (rng: Rng, min: number, max: number) => Math.floor(rand(rng, min, max + 1));
 
 let idCounter = 0;
-export const uid = (prefix = 'id') => `${prefix}_${(idCounter++).toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+export const uid = (prefix = 'id') =>
+  `${prefix}_${(idCounter++).toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
