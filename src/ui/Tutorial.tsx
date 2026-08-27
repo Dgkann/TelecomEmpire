@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { residentialSubs } from '../game/simulation';
 import { computeRoutes, isRedundant } from '../game/network';
 import { useGame } from '../store/gameStore';
@@ -53,6 +53,7 @@ export default function Tutorial() {
   const advance = useGame((s) => s.advanceTutorial);
   const skip = useGame((s) => s.skipTutorial);
   const selection = useGame((s) => s.selection);
+  const [expanded, setExpanded] = useState(false);
   const stepIndex = game.tutorialStep;
   const step = STEPS[stepIndex];
 
@@ -65,6 +66,8 @@ export default function Tutorial() {
     if (stepIndex >= STEPS.length && !game.tutorialDone) skip();
   }, [stepIndex, game.tutorialDone, skip]);
 
+  useEffect(() => setExpanded(false), [stepIndex]);
+
   if (game.tutorialDone || !step) return null;
 
   return (
@@ -74,7 +77,7 @@ export default function Tutorial() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className={`panel absolute right-4 top-4 z-20 w-[400px] max-w-[calc(100%-32px)] border-neon-cyan/25 px-4 py-3 xl:w-[520px] ${selection ? 'hidden' : ''}`}
+        className={`panel absolute right-2 top-12 z-20 w-[calc(100%-16px)] border-neon-cyan/25 px-3 py-2.5 sm:right-4 sm:top-4 sm:w-[400px] sm:px-4 sm:py-3 xl:w-[520px] ${selection ? 'hidden' : ''}`}
       >
         <div className="flex items-start gap-3">
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-neon-cyan/35 bg-neon-cyan/10 font-mono text-xs font-semibold text-neon-cyan">
@@ -83,15 +86,33 @@ export default function Tutorial() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-neon-cyan">Commissioning guide</div>
+                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-neon-cyan">
+                  Commissioning guide
+                </div>
                 <div className="text-sm font-semibold">{step.title}</div>
               </div>
-              <button className="shrink-0 text-[11px] text-white/35 hover:text-white" onClick={skip}>Skip guide</button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  className="text-[11px] text-neon-cyan sm:hidden"
+                  aria-expanded={expanded}
+                  onClick={() => setExpanded((value) => !value)}
+                >
+                  {expanded ? 'Less' : 'Details'}
+                </button>
+                <button className="text-[11px] text-white/45 hover:text-white" onClick={skip}>
+                  Skip guide
+                </button>
+              </div>
             </div>
-            <p className="mt-0.5 text-[12px] leading-snug text-white/55">{step.body}</p>
-            <div className="mt-2 flex gap-1">
+            <p className={`${expanded ? 'block' : 'hidden'} mt-1 text-[12px] leading-snug text-white/60 sm:block`}>
+              {step.body}
+            </p>
+            <div className="mt-2 hidden gap-1 sm:flex">
               {STEPS.map((_, i) => (
-                <div key={i} className={`h-0.5 flex-1 rounded-full ${i < stepIndex ? 'bg-neon-cyan' : i === stepIndex ? 'bg-neon-cyan/55' : 'bg-white/10'}`} />
+                <div
+                  key={i}
+                  className={`h-0.5 flex-1 rounded-full ${i < stepIndex ? 'bg-neon-cyan' : i === stepIndex ? 'bg-neon-cyan/55' : 'bg-white/10'}`}
+                />
               ))}
             </div>
           </div>
