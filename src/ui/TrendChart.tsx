@@ -31,12 +31,34 @@ export default function TrendChart({
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
+  const summary = series
+    .map((item) => {
+      const first = item.values[0] ?? 0;
+      const last = item.values[item.values.length - 1] ?? 0;
+      const direction = last > first ? 'up' : last < first ? 'down' : 'flat';
+      return `${item.label}: ${formatValue(first)} to ${formatValue(last)}, ${direction}`;
+    })
+    .join('. ');
 
   return (
     <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full overflow-visible" preserveAspectRatio="none" aria-hidden="true">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-auto w-full overflow-visible"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={summary}
+      >
         {[0.25, 0.5, 0.75].map((p) => (
-          <line key={p} x1={padX} x2={width - padX} y1={height * p} y2={height * p} stroke="rgba(255,255,255,.07)" strokeWidth={1} />
+          <line
+            key={p}
+            x1={padX}
+            x2={width - padX}
+            y1={height * p}
+            y2={height * p}
+            stroke="rgba(255,255,255,.07)"
+            strokeWidth={1}
+          />
         ))}
         {series.map((s) => (
           <polyline
