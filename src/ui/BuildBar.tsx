@@ -9,13 +9,53 @@ import SiteIcon from './SiteIcon';
 
 type ToolGroup = 'fixed' | 'advanced';
 
-const TOOLS: Array<{ id: BuildTool; group: ToolGroup; label: string; icon?: string; nodeKind?: NodeKind; cost: (mods: ReturnType<typeof researchModifiers>) => string; locked?: string }> = [
+const TOOLS: Array<{
+  id: BuildTool;
+  group: ToolGroup;
+  label: string;
+  icon?: string;
+  nodeKind?: NodeKind;
+  cost: (mods: ReturnType<typeof researchModifiers>) => string;
+  locked?: string;
+}> = [
   { id: 'fiber', group: 'fixed', label: 'Fibre', icon: '⌁', cost: () => 'per km' },
-  { id: 'pop', group: 'fixed', label: 'POP', nodeKind: 'pop', cost: () => `$${(NODE_SPECS.pop.baseCost / 1000).toFixed(0)}k` },
-  { id: 'access', group: 'fixed', label: 'Access', nodeKind: 'access', cost: (m) => `$${((NODE_SPECS.access.baseCost * m.accessCostMul) / 1000).toFixed(1)}k` },
-  { id: 'core', group: 'fixed', label: 'Core', nodeKind: 'core', cost: () => `$${(NODE_SPECS.core.baseCost / 1000).toFixed(0)}k` },
-  { id: 'tower', group: 'advanced', label: 'Tower', nodeKind: 'tower', cost: () => `$${(NODE_SPECS.tower.baseCost / 1000).toFixed(0)}k`, locked: 'mobile_4g' },
-  { id: 'datacenter', group: 'advanced', label: 'Data Centre', nodeKind: 'datacenter', cost: () => `$${(NODE_SPECS.datacenter.baseCost / 1000).toFixed(0)}k`, locked: 'edge_compute' },
+  {
+    id: 'pop',
+    group: 'fixed',
+    label: 'POP',
+    nodeKind: 'pop',
+    cost: () => `$${(NODE_SPECS.pop.baseCost / 1000).toFixed(0)}k`,
+  },
+  {
+    id: 'access',
+    group: 'fixed',
+    label: 'Access',
+    nodeKind: 'access',
+    cost: (m) => `$${((NODE_SPECS.access.baseCost * m.accessCostMul) / 1000).toFixed(1)}k`,
+  },
+  {
+    id: 'core',
+    group: 'fixed',
+    label: 'Core',
+    nodeKind: 'core',
+    cost: () => `$${(NODE_SPECS.core.baseCost / 1000).toFixed(0)}k`,
+  },
+  {
+    id: 'tower',
+    group: 'advanced',
+    label: 'Tower',
+    nodeKind: 'tower',
+    cost: () => `$${(NODE_SPECS.tower.baseCost / 1000).toFixed(0)}k`,
+    locked: 'mobile_4g',
+  },
+  {
+    id: 'datacenter',
+    group: 'advanced',
+    label: 'Data Centre',
+    nodeKind: 'datacenter',
+    cost: () => `$${(NODE_SPECS.datacenter.baseCost / 1000).toFixed(0)}k`,
+    locked: 'edge_compute',
+  },
 ];
 
 const OVERLAYS: Array<{ id: OverlayMode; label: string; hint: string }> = [
@@ -37,9 +77,8 @@ export default function BuildBar() {
   const [layersOpen, setLayersOpen] = useState(false);
   const mods = researchModifiers(game.researchDone);
   const activeNodeTool = tool && tool !== 'fiber' ? NODE_SPECS[tool] : null;
-  const activeNodeCapacity = tool && tool !== 'fiber'
-    ? effectiveNodeCapacity(tool, 1, game.spectrum, game.researchDone)
-    : 0;
+  const activeNodeCapacity =
+    tool && tool !== 'fiber' ? effectiveNodeCapacity(tool, 1, game.spectrum, game.researchDone) : 0;
   const linkFromName = linkFrom ? game.nodes.find((node) => node.id === linkFrom)?.name : null;
 
   return (
@@ -86,13 +125,20 @@ export default function BuildBar() {
             {TOOLS.filter((t) => t.group === group).map((t) => {
               const locked = t.locked ? !game.researchDone.includes(t.locked) : false;
               const active = tool === t.id;
-              const tutorialTarget = (game.tutorialStep === 0 && t.id === 'pop') || (game.tutorialStep === 1 && t.id === 'fiber');
+              const tutorialTarget =
+                (game.tutorialStep === 0 && t.id === 'pop') || (game.tutorialStep === 1 && t.id === 'fiber');
               return (
                 <button
                   key={t.id}
                   disabled={locked}
                   onClick={() => setTool(t.id)}
-                  title={locked ? 'Unlock with research' : t.id === 'fiber' ? 'Connect two sites with a fibre span' : NODE_SPECS[t.id as NodeKind].description}
+                  title={
+                    locked
+                      ? 'Unlock with research'
+                      : t.id === 'fiber'
+                        ? 'Connect two sites with a fibre span'
+                        : NODE_SPECS[t.id as NodeKind].description
+                  }
                   className={`relative flex h-[54px] min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-md border px-1 transition-all sm:h-[58px] sm:min-w-[72px] sm:px-2 ${
                     active
                       ? 'border-neon-cyan/45 bg-neon-cyan/10 text-[#a6ceca]'
@@ -101,11 +147,15 @@ export default function BuildBar() {
                         : 'border-transparent bg-white/[0.035] text-white/70 hover:border-white/15 hover:bg-white/[0.08]'
                   } ${tutorialTarget ? 'ring-2 ring-neon-cyan/60 ring-offset-2 ring-offset-ink-800' : ''}`}
                 >
-                  {tutorialTarget && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 animate-ping rounded-full bg-neon-cyan" />}
+                  {tutorialTarget && (
+                    <span className="absolute -right-1 -top-1 h-2.5 w-2.5 animate-ping rounded-full bg-neon-cyan" />
+                  )}
                   <span className="grid h-6 place-items-center text-lg leading-none">
                     {locked ? '—' : t.nodeKind ? <SiteIcon kind={t.nodeKind} tier={1} className="h-6 w-6" /> : t.icon}
                   </span>
-                  <span className="font-display text-[10px] font-semibold uppercase tracking-wide leading-none sm:text-[12px]">{t.label}</span>
+                  <span className="font-display text-[10px] font-semibold uppercase tracking-wide leading-none sm:text-[12px]">
+                    {t.label}
+                  </span>
                   <span className="num text-[10px] leading-none text-white/40">{locked ? 'Locked' : t.cost(mods)}</span>
                 </button>
               );
@@ -120,7 +170,10 @@ export default function BuildBar() {
               {OVERLAYS.map((o) => (
                 <button
                   key={o.id}
-                  onClick={() => { setOverlay(o.id); setLayersOpen(false); }}
+                  onClick={() => {
+                    setOverlay(o.id);
+                    setLayersOpen(false);
+                  }}
                   className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left transition-colors ${overlay === o.id ? 'bg-neon-cyan/[0.12] text-neon-cyan' : 'text-white/60 hover:bg-white/[0.06]'}`}
                 >
                   <span className="text-[12px] font-semibold">{o.label}</span>
@@ -135,7 +188,9 @@ export default function BuildBar() {
             aria-expanded={layersOpen}
           >
             <LayersIcon className="h-4 w-4" />
-            <span className="hidden font-display text-[12px] font-semibold uppercase tracking-wider sm:inline">{OVERLAYS.find((o) => o.id === overlay)?.label}</span>
+            <span className="hidden font-display text-[12px] font-semibold uppercase tracking-wider sm:inline">
+              {OVERLAYS.find((o) => o.id === overlay)?.label}
+            </span>
           </button>
         </div>
       </div>
