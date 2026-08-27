@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
 import { useGame } from './store/gameStore';
@@ -42,7 +42,11 @@ function useIncidentSound() {
 function useActionSounds() {
   const nodes = useGame((s) => s.game?.nodes.length ?? 0);
   const links = useGame((s) => s.game?.links.length ?? 0);
-  const tiers = useGame((s) => (s.game?.nodes.reduce((sum, n) => sum + n.tier, 0) ?? 0) + (s.game?.links.reduce((sum, l) => sum + l.tier, 0) ?? 0));
+  const tiers = useGame(
+    (s) =>
+      (s.game?.nodes.reduce((sum, n) => sum + n.tier, 0) ?? 0) +
+      (s.game?.links.reduce((sum, l) => sum + l.tier, 0) ?? 0),
+  );
   const contracts = useGame((s) => s.game?.contracts.length ?? 0);
   const soundOn = useGame((s) => s.soundOn);
   const prev = useRef({ nodes, links, tiers, contracts });
@@ -84,7 +88,11 @@ function useHotkeys() {
 function CornerToasts() {
   const toasts = useGame((s) => s.toasts).filter((t) => t.gx === undefined);
   return (
-    <div className="pointer-events-none absolute bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div
+      className="pointer-events-none absolute bottom-4 right-4 z-40 flex flex-col items-end gap-2"
+      aria-live="polite"
+      aria-atomic="false"
+    >
       <AnimatePresence>
         {toasts.map((t) => (
           <motion.div
@@ -93,7 +101,11 @@ function CornerToasts() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 24 }}
             className={`panel px-3 py-2 text-xs font-medium ${
-              t.tone === 'good' ? 'border-neon-lime/40 text-neon-lime' : t.tone === 'bad' ? 'border-neon-red/40 text-neon-red' : ''
+              t.tone === 'good'
+                ? 'border-neon-lime/40 text-neon-lime'
+                : t.tone === 'bad'
+                  ? 'border-neon-red/40 text-neon-red'
+                  : ''
             }`}
           >
             {t.text}
@@ -101,6 +113,47 @@ function CornerToasts() {
         ))}
       </AnimatePresence>
     </div>
+  );
+}
+
+function CriticalEventFlash() {
+  const latest = useGame((s) => s.game?.log[0] ?? null);
+  const previousId = useRef(latest?.id);
+  const timeoutRef = useRef<number | null>(null);
+  const [event, setEvent] = useState<typeof latest>(null);
+
+  useEffect(() => {
+    if (!latest || latest.id === previousId.current) return;
+    previousId.current = latest.id;
+    if (latest.tone !== 'bad') return;
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    setEvent(latest);
+    timeoutRef.current = window.setTimeout(() => {
+      setEvent(null);
+      timeoutRef.current = null;
+    }, 3900);
+  }, [latest]);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
+
+  return (
+    <AnimatePresence>
+      {event && (
+        <div
+          key={event.id}
+          role="alert"
+          className="critical-event pointer-events-none absolute left-1/2 top-3 z-50 w-[min(520px,calc(100%-24px))] -translate-x-1/2 rounded-md border border-neon-red/55 bg-[#281319]/95 px-4 py-3 shadow-2xl backdrop-blur"
+        >
+          <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-neon-red">Critical event</div>
+          <div className="mt-0.5 text-sm font-semibold text-white/90">{event.text}</div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -116,13 +169,16 @@ function GameShell() {
     <div className="flex h-full flex-col">
       <TopBar />
       {persistenceError && (
-        <div className="z-50 border-b border-neon-red/40 bg-[#35151d] px-3 py-2 text-center text-xs font-medium text-neon-red" role="alert">
+        <div
+          className="z-50 border-b border-neon-red/40 bg-[#35151d] px-3 py-2 text-center text-xs font-medium text-neon-red"
+          role="alert"
+        >
           {persistenceError}
         </div>
       )}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <NavigationRail />
-        <div className="relative min-w-0 flex-1">
+        <div className="relative order-1 min-h-0 min-w-0 flex-1 sm:order-none">
           {screen === 'map' && (
             <>
               <MapView />
@@ -143,6 +199,7 @@ function GameShell() {
           <VictoryOverlay />
           <SaveManager />
           <CornerToasts />
+          <CriticalEventFlash />
         </div>
       </div>
     </div>

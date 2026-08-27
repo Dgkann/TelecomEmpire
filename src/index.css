@@ -4,6 +4,14 @@
 
 :root {
   color-scheme: dark;
+  --noc-bg: #081118;
+  --noc-panel: #111b23;
+  --noc-text: #e3eaee;
+  --noc-muted: #93a3ac;
+  --noc-live: #62c7bd;
+  --noc-good: #76b98a;
+  --noc-warn: #d2a657;
+  --noc-bad: #d36e76;
 }
 
 html,
@@ -28,14 +36,16 @@ input {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid #72aaa4;
   outline-offset: 2px;
 }
 
 @layer components {
   .panel {
-    @apply rounded-md border border-white/[0.09] shadow-panel;
+    @apply rounded-md border border-white/[0.1] shadow-panel;
     background: rgba(17, 27, 35, 0.97);
   }
   .chip {
@@ -56,7 +66,7 @@ input:focus-visible {
            text-neon-red transition-colors hover:bg-neon-red/20;
   }
   .stat-label {
-    @apply font-sans text-[10px] font-medium tracking-[0.035em] text-white/45;
+    @apply font-sans text-[10px] font-medium tracking-[0.035em] text-white/55;
   }
   .num {
     @apply font-mono tabular-nums;
@@ -112,6 +122,46 @@ input:focus-visible {
   overflow: hidden;
 }
 
+.screen-shell .text-white\/35 {
+  color: rgba(227, 234, 238, 0.5);
+}
+
+.screen-shell .text-white\/40 {
+  color: rgba(227, 234, 238, 0.56);
+}
+
+.screen-shell .text-white\/45 {
+  color: rgba(227, 234, 238, 0.62);
+}
+
+.screen-shell .panel-tone-blue,
+.screen-shell .panel-tone-violet,
+.screen-shell .panel-tone-amber,
+.screen-shell .panel-tone-green,
+.screen-shell .panel-tone-red {
+  border-left-width: 2px;
+}
+
+.screen-shell .panel-tone-blue {
+  border-left-color: rgba(113, 153, 189, 0.52);
+}
+
+.screen-shell .panel-tone-violet {
+  border-left-color: rgba(145, 131, 173, 0.52);
+}
+
+.screen-shell .panel-tone-amber {
+  border-left-color: rgba(210, 166, 87, 0.58);
+}
+
+.screen-shell .panel-tone-green {
+  border-left-color: rgba(118, 185, 138, 0.52);
+}
+
+.screen-shell .panel-tone-red {
+  border-left-color: rgba(211, 110, 118, 0.58);
+}
+
 .screen-shell .panel::after {
   content: none;
 }
@@ -140,7 +190,9 @@ input:focus-visible {
 .screen-shell .panel-tone-violet > h2,
 .screen-shell .panel-tone-amber > h2,
 .screen-shell .panel-tone-green > h2,
-.screen-shell .panel-tone-red > h2 { color: rgba(213, 221, 226, 0.78); }
+.screen-shell .panel-tone-red > h2 {
+  color: rgba(213, 221, 226, 0.78);
+}
 
 /* Keep the interface readable like an operations console, not a poster. */
 .font-display {
@@ -180,8 +232,17 @@ input:focus-visible {
   transform-origin: center;
 }
 
-@keyframes route-signal { to { stroke-dashoffset: -24; } }
-@keyframes contract-pulse { 50% { opacity: .55; transform: scale(1.12); } }
+@keyframes route-signal {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes contract-pulse {
+  50% {
+    opacity: 0.55;
+    transform: scale(1.12);
+  }
+}
 
 @keyframes softpulse {
   0%,
@@ -211,6 +272,47 @@ input:focus-visible {
   animation: alertblink 1s ease-in-out infinite;
 }
 
+@keyframes district-state-pulse {
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
+
+.district-state-pulse {
+  animation: district-state-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes capacity-pulse {
+  50% {
+    stroke-width: 7px;
+    opacity: 0.42;
+  }
+}
+
+.capacity-pulse {
+  animation: capacity-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes critical-arrival {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -14px) scale(0.97);
+  }
+  12%,
+  86% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.98);
+  }
+}
+
+.critical-event {
+  animation: critical-arrival 3.8s ease both;
+}
+
 @keyframes towerblink {
   0%,
   92%,
@@ -230,6 +332,17 @@ input:focus-visible {
   cursor: grab;
   touch-action: none;
   user-select: none;
+}
+.map-surface .map-interactive:focus {
+  outline: none;
+}
+.map-focus-ring {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.map-interactive:focus .map-focus-ring {
+  opacity: 0.9;
 }
 .map-surface.dragging {
   cursor: grabbing;
