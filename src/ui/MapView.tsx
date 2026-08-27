@@ -32,18 +32,33 @@ const SLATE = ['#3c4d63', '#47596f', '#53667d', '#5f7288', '#6b7f95'];
 const GroundLayer = memo(function GroundLayer({
   districts,
   night,
+  selectedId,
+  outageIds,
+  obligationIds,
 }: {
   districts: District[];
   night: number;
+  selectedId: string | null;
+  outageIds: string[];
+  obligationIds: string[];
 }) {
   const tiles: JSX.Element[] = [];
   const marks: JSX.Element[] = [];
   const junctions: JSX.Element[] = [];
+  const outages = new Set(outageIds);
+  const obligations = new Set(obligationIds);
 
   districts.forEach((d, di) => {
     // Alternating value, not hue, so five districts read apart without turning the city into a colour chart.
     const plate = mix(mix(di % 2 === 0 ? MAP.ground : MAP.groundAlt, d.color, 0.1), '#000000', night * 0.3);
-    const surface = d.unlocked ? plate : mix(MAP.locked, '#000000', night * 0.3);
+    const statePlate = outages.has(d.id)
+      ? mix(plate, '#d36e76', 0.3)
+      : obligations.has(d.id)
+        ? mix(plate, '#d2a657', 0.16)
+        : selectedId === d.id
+          ? mix(plate, COMPANY, 0.2)
+          : plate;
+    const surface = d.unlocked ? statePlate : mix(MAP.locked, '#000000', night * 0.3);
     const road = mix(MAP.road, '#000000', night * 0.3);
 
     for (const c of d.cells) {
@@ -71,12 +86,7 @@ const GroundLayer = memo(function GroundLayer({
         );
       } else {
         marks.push(
-          <polygon
-            key={`m${c.gx}_${c.gy}`}
-            points={tileDiamond(c.gx, c.gy, 0.86)}
-            fill={MAP.roadMark}
-            opacity={0.8}
-          />,
+          <polygon key={`m${c.gx}_${c.gy}`} points={tileDiamond(c.gx, c.gy, 0.86)} fill={MAP.roadMark} opacity={0.8} />,
         );
       }
     }
@@ -113,8 +123,16 @@ const GroundLayer = memo(function GroundLayer({
       }
     }
 
+    const stateColor = outages.has(d.id)
+      ? '#d36e76'
+      : obligations.has(d.id)
+        ? '#d2a657'
+        : selectedId === d.id
+          ? COMPANY
+          : d.color;
+    const stateActive = outages.has(d.id) || obligations.has(d.id) || selectedId === d.id;
     return (
-      <g key={`o${d.id}`}>
+      <g key={`o${d.id}`} className={stateActive ? 'district-state-pulse' : undefined}>
         {segments.map(([x1, y1, x2, y2], i) => (
           <line
             key={i}
@@ -122,9 +140,10 @@ const GroundLayer = memo(function GroundLayer({
             y1={y1}
             x2={x2}
             y2={y2}
-            stroke={d.color}
-            strokeWidth={d.unlocked ? 1 : 0.7}
-            opacity={d.unlocked ? 0.3 : 0.16}
+            stroke={stateColor}
+            strokeWidth={stateActive ? 1.8 : d.unlocked ? 1 : 0.7}
+            strokeDasharray={!d.unlocked ? '4 4' : undefined}
+            opacity={stateActive ? 0.78 : d.unlocked ? 0.3 : 0.16}
           />
         ))}
       </g>
@@ -220,7 +239,13 @@ function BuildingGlyph({
       />
       {windows}
       {connected > 0.02 && (
-        <circle cx={cx} cy={cy - h - hh - 2} r={0.9 + connected * 0.7} fill={COMPANY} opacity={0.3 + connected * 0.28} />
+        <circle
+          cx={cx}
+          cy={cy - h - hh - 2}
+          r={0.9 + connected * 0.7}
+          fill={COMPANY}
+          opacity={0.3 + connected * 0.28}
+        />
       )}
       {justConnected && (
         <circle cx={cx} cy={cy - h} r={16} fill="none" stroke={COMPANY} strokeWidth={1.5} opacity={0.9}>
@@ -323,7 +348,12 @@ const CoverageLayer = memo(function CoverageLayer({
       if (best <= 0.02) continue;
       const color = best > 0.66 ? '#4ade80' : best > 0.38 ? '#facc15' : '#fb923c';
       tiles.push(
-        <polygon key={`c${c.gx}_${c.gy}`} points={tileDiamond(c.gx, c.gy, 0.02)} fill={color} opacity={0.14 + best * 0.3} />,
+        <polygon
+          key={`c${c.gx}_${c.gy}`}
+          points={tileDiamond(c.gx, c.gy, 0.02)}
+          fill={color}
+          opacity={0.14 + best * 0.3}
+        />,
       );
     }
   }
@@ -381,8 +411,19 @@ const CustomersLayer = memo(function CustomersLayer({ game }: { game: GameState 
             />
             {contract && (
               <g className="contract-beacon">
-                <circle cx={isoX(b.gx, b.gy)} cy={isoY(b.gx, b.gy) - b.floors * FLOOR_H - 10} r={7} fill="#07101c" stroke={color} strokeWidth={2} />
-                <path d={`M ${isoX(b.gx, b.gy) - 3} ${isoY(b.gx, b.gy) - b.floors * FLOOR_H - 10} h 6`} stroke={color} strokeWidth={1.5} />
+                <circle
+                  cx={isoX(b.gx, b.gy)}
+                  cy={isoY(b.gx, b.gy) - b.floors * FLOOR_H - 10}
+                  r={7}
+                  fill="#07101c"
+                  stroke={color}
+                  strokeWidth={2}
+                />
+                <path
+                  d={`M ${isoX(b.gx, b.gy) - 3} ${isoY(b.gx, b.gy) - b.floors * FLOOR_H - 10} h 6`}
+                  stroke={color}
+                  strokeWidth={1.5}
+                />
               </g>
             )}
           </g>
@@ -422,8 +463,34 @@ function LinkGlyph({
   const dur = Math.max(0.6, 5 - util * 4.2);
 
   return (
-    <g data-map-placement-blocker="true" onClick={(e) => (e.stopPropagation(), onSelect())} style={{ cursor: 'pointer' }}>
+    <g
+      className="map-interactive"
+      data-map-placement-blocker="true"
+      role="button"
+      tabIndex={0}
+      aria-label={`${a.name} to ${b.name} fibre, tier ${link.tier}, ${Math.round(util * 100)} percent load${link.down ? ', down' : ''}`}
+      onClick={(e) => (e.stopPropagation(), onSelect())}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect();
+        }
+      }}
+      style={{ cursor: 'pointer' }}
+    >
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={12} />
+      <line
+        className="map-focus-ring"
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke="#f4f8ff"
+        strokeWidth={width + 6}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
       <line
         x1={x1}
         y1={y1}
@@ -445,7 +512,7 @@ function LinkGlyph({
         opacity={link.down ? 0.9 : 0.75}
         strokeLinecap="round"
         strokeDasharray={link.down ? '5 5' : undefined}
-        className={link.down ? 'alert-blink' : traced ? 'network-route' : undefined}
+        className={link.down ? 'alert-blink' : bottleneck ? 'capacity-pulse' : traced ? 'network-route' : undefined}
       />
       {!link.down && (
         <>
@@ -469,7 +536,16 @@ function LinkGlyph({
         />
       )}
       {selected && (
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth={width + 5} opacity={0.15} />
+        <line
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke="#fff"
+          strokeWidth={width + 5}
+          strokeLinecap="round"
+          opacity={0.15}
+        />
       )}
     </g>
   );
@@ -506,8 +582,26 @@ function NodeGlyph({
   const circumference = 2 * Math.PI * ringR;
 
   return (
-    <g data-map-placement-blocker="true" onClick={(e) => (e.stopPropagation(), onSelect())} style={{ cursor: 'pointer' }}>
+    <g
+      className="map-interactive"
+      data-map-placement-blocker="true"
+      role="button"
+      tabIndex={0}
+      aria-label={`${node.name}, ${visual.label}, tier ${node.tier}, ${Math.round(util * 100)} percent load${node.down ? ', down' : ''}`}
+      onClick={(e) => (e.stopPropagation(), onSelect())}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect();
+        }
+      }}
+      style={{ cursor: 'pointer' }}
+    >
       <title>{`${node.name} · ${visual.label} · Tier ${node.tier} · ${Math.round(util * 100)}% load`}</title>
+      <g className="map-focus-ring" aria-hidden="true">
+        <SitePlate kind={node.kind} cx={cx} cy={my} size={r + 10} fill="none" stroke="#f4f8ff" strokeWidth={2.2} />
+      </g>
       {node.kind === 'tower' && (
         <>
           <line x1={cx} y1={cy} x2={cx} y2={cy - mast} stroke={visual.accent} strokeWidth={1.8} strokeOpacity={0.72} />
@@ -542,7 +636,14 @@ function NodeGlyph({
           opacity={fiberState === 'blocked' ? 0.34 : fiberState === 'source' ? 0.95 : 0.58}
         />
       )}
-      <SitePlate kind={node.kind} cx={cx} cy={my} size={r} fill={node.down ? '#32131b' : mix('#0c1726', visual.accent, 0.1)} stroke={node.down ? '#ff6577' : visual.accent} />
+      <SitePlate
+        kind={node.kind}
+        cx={cx}
+        cy={my}
+        size={r}
+        fill={node.down ? '#32131b' : mix('#0c1726', visual.accent, 0.1)}
+        stroke={node.down ? '#ff6577' : visual.accent}
+      />
 
       <circle cx={cx} cy={my} r={ringR} fill="none" stroke="#1d2c40" strokeWidth={2.4} opacity={0.9} />
       <circle
@@ -574,19 +675,51 @@ function NodeGlyph({
 
       <g transform={`translate(${cx + r * 0.42} ${my + r * 0.48})`} style={{ pointerEvents: 'none' }}>
         <rect width={17} height={9} rx={2.4} fill="#050b14" stroke={visual.accent} strokeWidth={0.8} />
-        <text x={8.5} y={6.4} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontSize={5.7} fontWeight={800} fill={visual.accent}>
+        <text
+          x={8.5}
+          y={6.4}
+          textAnchor="middle"
+          fontFamily="IBM Plex Mono, monospace"
+          fontSize={5.7}
+          fontWeight={800}
+          fill={visual.accent}
+        >
           T{node.tier}
         </text>
       </g>
 
-
-
       {(selected || linking) && (
         <>
-          <SitePlate kind={node.kind} cx={cx} cy={my} size={r + 6} fill="none" stroke={linking ? COMPANY : '#e8eef7'} strokeWidth={1.2} />
+          <SitePlate
+            kind={node.kind}
+            cx={cx}
+            cy={my}
+            size={r + 6}
+            fill="none"
+            stroke={linking ? COMPANY : '#e8eef7'}
+            strokeWidth={1.2}
+          />
           <g transform={`translate(${cx} ${my - r - 18})`} style={{ pointerEvents: 'none' }}>
-            <rect x={-33} y={-8} width={66} height={15} rx={3} fill="#07111d" stroke={visual.accent} strokeWidth={0.7} strokeOpacity={0.78} />
-            <text y={2.5} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontSize={6.8} fontWeight={700} letterSpacing={0.5} fill="#e8eef7">
+            <rect
+              x={-33}
+              y={-8}
+              width={66}
+              height={15}
+              rx={3}
+              fill="#07111d"
+              stroke={visual.accent}
+              strokeWidth={0.7}
+              strokeOpacity={0.78}
+            />
+            <text
+              y={2.5}
+              textAnchor="middle"
+              fontFamily="IBM Plex Mono, monospace"
+              fontSize={6.8}
+              fontWeight={700}
+              letterSpacing={0.5}
+              fill="#e8eef7"
+            >
               {visual.label.toUpperCase()} · T{node.tier}
             </text>
           </g>
@@ -614,9 +747,7 @@ function TechnicianGlyph({ t }: { t: Technician }) {
       <rect x={cx - 7} y={cy - 12} width={8} height={4} rx={1.5} fill="#ffdc8f" />
       <circle cx={cx - 4} cy={cy - 1} r={2} fill="#1b2330" />
       <circle cx={cx + 4} cy={cy - 1} r={2} fill="#1b2330" />
-      {t.state === 'working' && (
-        <circle cx={cx} cy={cy - 18} r={4} fill="#ffc857" className="alert-blink" />
-      )}
+      {t.state === 'working' && <circle cx={cx} cy={cy - 18} r={4} fill="#ffc857" className="alert-blink" />}
     </g>
   );
 }
@@ -667,11 +798,17 @@ export default function MapView() {
       maxY = Math.max(maxY, y + padY);
     };
     for (const district of game.districts) {
-      for (const cell of district.cells) include(isoX(cell.gx, cell.gy), isoY(cell.gx, cell.gy), TILE_W / 2, TILE_H / 2);
+      for (const cell of district.cells)
+        include(isoX(cell.gx, cell.gy), isoY(cell.gx, cell.gy), TILE_W / 2, TILE_H / 2);
       include(isoX(district.center.gx, district.center.gy), isoY(district.center.gx, district.center.gy) - 78, 60, 18);
     }
     for (const building of game.buildings) {
-      include(isoX(building.gx, building.gy), isoY(building.gx, building.gy) - building.floors * FLOOR_H, TILE_W / 2, 24);
+      include(
+        isoX(building.gx, building.gy),
+        isoY(building.gx, building.gy) - building.floors * FLOOR_H,
+        TILE_W / 2,
+        24,
+      );
     }
     for (const node of game.nodes) {
       const mast = node.kind === 'tower' ? 26 + node.tier * 3 : 0;
@@ -730,7 +867,12 @@ export default function MapView() {
 
   useEffect(() => {
     if (!focusOn) return;
-    setCam((c) => ({ ...c, x: -isoX(focusOn.gx, focusOn.gy), y: -isoY(focusOn.gx, focusOn.gy), zoom: Math.max(c.zoom, 1.1) }));
+    setCam((c) => ({
+      ...c,
+      x: -isoX(focusOn.gx, focusOn.gy),
+      y: -isoY(focusOn.gx, focusOn.gy),
+      zoom: Math.max(c.zoom, 1.1),
+    }));
   }, [focusOn]);
 
   // Quantised so the day/night value only changes a few dozen times per game day.
@@ -764,10 +906,11 @@ export default function MapView() {
     const route = computeRoutes(game)[selection.id];
     if (!route) return { route: null, links: new Set<string>(), bottleneck: null as string | null };
     const links = new Set(route.path);
-    const bottleneck = route.path
-      .map((id) => game.links.find((l) => l.id === id))
-      .filter((l): l is NetLink => Boolean(l))
-      .sort((a, b) => linkUtil(b) - linkUtil(a))[0]?.id ?? null;
+    const bottleneck =
+      route.path
+        .map((id) => game.links.find((l) => l.id === id))
+        .filter((l): l is NetLink => Boolean(l))
+        .sort((a, b) => linkUtil(b) - linkUtil(a))[0]?.id ?? null;
     return { route, links, bottleneck };
   }, [game, selection]);
 
@@ -863,13 +1006,20 @@ export default function MapView() {
   };
 
   const linkFromNode = linkFrom ? nodeById[linkFrom] : null;
-  const hoveredNode = hover ? nodeGrid.get(`${hover.gx},${hover.gy}`) ?? null : null;
+  const hoveredNode = hover ? (nodeGrid.get(`${hover.gx},${hover.gy}`) ?? null) : null;
   const placementIssue = tool && tool !== 'fiber' && hover ? nodePlacementIssue(game, tool, hover.gx, hover.gy) : null;
   const placementCost = tool && tool !== 'fiber' ? nodePlacementCost(game, tool) : null;
   const placementColor = placementIssue ? '#ff6577' : COMPANY;
   const fibreIssue = linkFromNode && hoveredNode ? fibreConnectionIssue(game, linkFromNode.id, hoveredNode.id) : null;
   const fibreCost = linkFromNode && hoveredNode ? fibreConnectionCost(game, linkFromNode.id, hoveredNode.id) : 0;
   const fibreColor = hoveredNode && !fibreIssue ? COMPANY : '#ff6577';
+  const selectedDistrictId = selection?.type === 'district' ? selection.id : null;
+  const outageDistrictIds = Object.entries(game.stats.outages)
+    .filter(([, down]) => down)
+    .map(([id]) => id);
+  const obligationDistrictIds = game.regulations
+    .filter((regulation) => regulation.status === 'pending' && regulation.districtId)
+    .map((regulation) => regulation.districtId!);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-ink-900">
@@ -885,6 +1035,8 @@ export default function MapView() {
       />
       <svg
         ref={svgRef}
+        role="application"
+        aria-label="Interactive telecom network map. Use the site and fibre controls in the tab order, or the zoom buttons."
         className={`map-surface relative h-full w-full ${drag.current ? 'dragging' : ''} ${tool ? 'building' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -902,7 +1054,13 @@ export default function MapView() {
           </filter>
         </defs>
         <g transform={`translate(${size.w / 2} ${size.h / 2}) scale(${cam.zoom}) translate(${cam.x} ${cam.y})`}>
-          <GroundLayer districts={game.districts} night={night} />
+          <GroundLayer
+            districts={game.districts}
+            night={night}
+            selectedId={selectedDistrictId}
+            outageIds={outageDistrictIds}
+            obligationIds={obligationDistrictIds}
+          />
 
           {overlay === 'coverage' && (
             <CoverageLayer nodes={game.nodes} districts={game.districts} spectrum={game.spectrum} />
@@ -922,7 +1080,14 @@ export default function MapView() {
           {tool && tool !== 'fiber' && hover && (
             <g opacity={0.92} style={{ pointerEvents: 'none' }}>
               <polygon points={tileDiamond(hover.gx, hover.gy, 0)} fill={placementColor} opacity={0.3} />
-              <circle cx={isoX(hover.gx, hover.gy)} cy={isoY(hover.gx, hover.gy) - 8} r={11} fill="#0f1622" stroke={placementColor} strokeWidth={2} />
+              <circle
+                cx={isoX(hover.gx, hover.gy)}
+                cy={isoY(hover.gx, hover.gy) - 8}
+                r={11}
+                fill="#0f1622"
+                stroke={placementColor}
+                strokeWidth={2}
+              />
               <rect
                 x={isoX(hover.gx, hover.gy) - 76}
                 y={isoY(hover.gx, hover.gy) - 49}
@@ -960,8 +1125,18 @@ export default function MapView() {
                 opacity={0.8}
               />
               <rect
-                x={(isoX(linkFromNode.gx, linkFromNode.gy) + isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2 - 64}
-                y={(isoY(linkFromNode.gx, linkFromNode.gy) + isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2 - 29}
+                x={
+                  (isoX(linkFromNode.gx, linkFromNode.gy) +
+                    isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) /
+                    2 -
+                  64
+                }
+                y={
+                  (isoY(linkFromNode.gx, linkFromNode.gy) +
+                    isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) /
+                    2 -
+                  29
+                }
                 width={128}
                 height={16}
                 rx={4}
@@ -970,15 +1145,24 @@ export default function MapView() {
                 strokeWidth={0.8}
               />
               <text
-                x={(isoX(linkFromNode.gx, linkFromNode.gy) + isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2}
-                y={(isoY(linkFromNode.gx, linkFromNode.gy) + isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) / 2 - 18}
+                x={
+                  (isoX(linkFromNode.gx, linkFromNode.gy) +
+                    isoX(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) /
+                  2
+                }
+                y={
+                  (isoY(linkFromNode.gx, linkFromNode.gy) +
+                    isoY(hoveredNode?.gx ?? hover.gx, hoveredNode?.gy ?? hover.gy)) /
+                    2 -
+                  18
+                }
                 textAnchor="middle"
                 fontSize={7.3}
                 fontWeight={700}
                 fill={fibreColor}
                 className="num"
               >
-                {hoveredNode ? fibreIssue ?? `READY · $${fibreCost.toLocaleString()}` : 'CHOOSE A DESTINATION SITE'}
+                {hoveredNode ? (fibreIssue ?? `READY · $${fibreCost.toLocaleString()}`) : 'CHOOSE A DESTINATION SITE'}
               </text>
             </g>
           )}
@@ -1029,9 +1213,11 @@ export default function MapView() {
               />
             ))}
 
-          {game.technicians.filter((t) => t.state !== 'idle').map((t) => (
-            <TechnicianGlyph key={t.id} t={t} />
-          ))}
+          {game.technicians
+            .filter((t) => t.state !== 'idle')
+            .map((t) => (
+              <TechnicianGlyph key={t.id} t={t} />
+            ))}
 
           {game.incidents
             .filter((i) => !i.resolved && i.targetType === 'link')
@@ -1063,13 +1249,23 @@ export default function MapView() {
           {game.districts.map((d) => {
             const lx = isoX(d.center.gx, d.center.gy);
             const ly = isoY(d.center.gx, d.center.gy) - 104;
+            const outage = outageDistrictIds.includes(d.id);
+            const obligation = obligationDistrictIds.includes(d.id);
+            const selected = selectedDistrictId === d.id;
+            const status = outage
+              ? 'OUTAGE'
+              : obligation
+                ? `OBLIGATION · ${Math.round(d.coverage * 100)}% COVERAGE`
+                : selected
+                  ? `${Math.round(d.coverage * 100)}% COVERAGE`
+                  : null;
             return (
               <g key={`lbl${d.id}`} style={{ pointerEvents: 'none' }}>
                 <rect
                   x={lx - 62}
                   y={ly - 13}
                   width={124}
-                  height={d.unlocked ? 20 : 34}
+                  height={d.unlocked && !status ? 20 : 34}
                   rx={3}
                   fill="#050b14"
                   opacity={0.6}
@@ -1092,7 +1288,7 @@ export default function MapView() {
                   y1={ly + 5}
                   x2={lx + 22}
                   y2={ly + 5}
-                  stroke={d.color}
+                  stroke={outage ? '#d36e76' : obligation ? '#d2a657' : selected ? COMPANY : d.color}
                   strokeWidth={1}
                   opacity={d.unlocked ? 0.5 : 0.25}
                 />
@@ -1107,6 +1303,19 @@ export default function MapView() {
                     opacity={0.75}
                   >
                     LICENCE ${d.entryCost.toLocaleString()}
+                  </text>
+                )}
+                {d.unlocked && status && (
+                  <text
+                    x={lx}
+                    y={ly + 19}
+                    textAnchor="middle"
+                    className="font-mono"
+                    fontSize={8.5}
+                    fontWeight={700}
+                    fill={outage ? '#d36e76' : obligation ? '#d2a657' : COMPANY}
+                  >
+                    {status}
                   </text>
                 )}
               </g>
@@ -1167,13 +1376,29 @@ export default function MapView() {
         <div className="panel pointer-events-none absolute bottom-[92px] right-4 w-[230px] p-3">
           <div className="flex items-center justify-between">
             <span className="section-title text-neon-cyan">Route trace</span>
-            <span className={`h-2 w-2 rounded-full ${selectedRoute.route ? 'bg-neon-lime shadow-[0_0_9px_#7ee787]' : 'bg-neon-red shadow-[0_0_9px_#ff5d73]'}`} />
+            <span
+              className={`h-2 w-2 rounded-full ${selectedRoute.route ? 'bg-neon-lime shadow-[0_0_9px_#7ee787]' : 'bg-neon-red shadow-[0_0_9px_#ff5d73]'}`}
+            />
           </div>
           {selectedRoute.route ? (
             <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-              <div><div className="num text-sm text-white">{selectedRoute.route.path.length}</div><div className="stat-label">Hops</div></div>
-              <div><div className="num text-sm text-white">{selectedRoute.route.distance.toFixed(1)}</div><div className="stat-label">Distance</div></div>
-              <div><div className="num text-sm text-neon-amber">{selectedRoute.bottleneck ? Math.round(linkUtil(game.links.find((l) => l.id === selectedRoute.bottleneck)!) * 100) : 0}%</div><div className="stat-label">Peak</div></div>
+              <div>
+                <div className="num text-sm text-white">{selectedRoute.route.path.length}</div>
+                <div className="stat-label">Hops</div>
+              </div>
+              <div>
+                <div className="num text-sm text-white">{selectedRoute.route.distance.toFixed(1)}</div>
+                <div className="stat-label">Distance</div>
+              </div>
+              <div>
+                <div className="num text-sm text-neon-amber">
+                  {selectedRoute.bottleneck
+                    ? Math.round(linkUtil(game.links.find((l) => l.id === selectedRoute.bottleneck)!) * 100)
+                    : 0}
+                  %
+                </div>
+                <div className="stat-label">Peak</div>
+              </div>
               <div className="col-span-3 border-t border-white/[0.07] pt-2 text-left text-[10px] text-white/45">
                 Cyan spans show the active path. Amber-red marks its tightest link.
               </div>
@@ -1185,7 +1410,9 @@ export default function MapView() {
       )}
 
       <div className="panel pointer-events-none absolute bottom-4 left-4 hidden items-center gap-3 px-3 py-2 lg:flex">
-        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.18em] text-white/35">Site key</span>
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.18em] text-white/35">
+          Site key
+        </span>
         <div className="h-5 w-px bg-white/10" />
         {(['core', 'pop', 'access', 'tower', 'datacenter'] as NetNode['kind'][]).map((kind) => {
           const visual = SITE_VISUAL[kind];

@@ -1,4 +1,3 @@
-
 export const TILE_W = 44;
 export const TILE_H = 22;
 // Pixels of vertical lift per building floor.
@@ -41,7 +40,13 @@ function parseColor(color: string): [number, number, number] {
     return [0, 0, 0];
   }
   const h = color.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
   const n = parseInt(full, 16);
   if (Number.isNaN(n)) return [0, 0, 0];
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
