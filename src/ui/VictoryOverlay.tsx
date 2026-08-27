@@ -4,12 +4,14 @@ import { fmtMoney, fmtNum } from '../game/economy';
 import { cityShare, customerCount, rankOf } from '../game/progression';
 import { fmtDate } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 // Reaching the top rung is the win.
 export default function VictoryOverlay() {
   const game = useGame((s) => s.game)!;
   const [dismissed, setDismissed] = useState(false);
   const show = game.victoryAt !== null && !dismissed && !game.gameOver;
+  const dialogRef = useDialogAccessibility(show, () => setDismissed(true));
 
   return (
     <AnimatePresence>
@@ -21,6 +23,11 @@ export default function VictoryOverlay() {
           exit={{ opacity: 0 }}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Victory"
+            tabIndex={-1}
             className="panel w-[460px] overflow-hidden border-neon-lime/40"
             initial={{ scale: 0.94, y: 14 }}
             animate={{ scale: 1, y: 0 }}
@@ -28,7 +35,9 @@ export default function VictoryOverlay() {
           >
             <div className="border-b border-neon-lime/25 bg-neon-lime/10 px-6 py-5">
               <div className="text-[10px] uppercase tracking-[0.25em] text-neon-lime">Top of the ladder</div>
-              <div className="text-2xl font-bold">{game.companyName} is a {rankOf(game).name}</div>
+              <div className="text-2xl font-bold">
+                {game.companyName} is a {rankOf(game).name}
+              </div>
               <div className="num mt-1 text-[11px] text-white/50">{fmtDate(game.victoryAt!)}</div>
             </div>
 

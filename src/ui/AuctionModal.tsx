@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { SPECTRUM_BANDS } from '../game/constants';
 import { fmtMoney, fmtMoneyExact } from '../game/economy';
 import { useGame } from '../store/gameStore';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 // Sealed bid: one number, no second chances, no idea what the others wrote down.
 export default function AuctionModal() {
@@ -13,6 +14,7 @@ export default function AuctionModal() {
 
   const [bid, setBid] = useState(0);
   const [open, setOpen] = useState(false);
+  const dialogRef = useDialogAccessibility(Boolean(auction && open), () => setOpen(false));
 
   const spec = auction ? SPECTRUM_BANDS[auction.band] : null;
 
@@ -22,14 +24,13 @@ export default function AuctionModal() {
       setOpen(true);
     }
     if (auction?.result) setOpen(true);
-  }, [auction?.id, auction?.result]);
+  }, [auction]);
 
   if (!auction || !spec || !open) return null;
 
   const result = auction.result;
   const won = result?.winnerId === 'player';
   const hoursLeft = Math.max(0, Math.round((auction.closesAt - game.minutes) / 60));
-
   return (
     <AnimatePresence>
       <motion.div
@@ -39,6 +40,11 @@ export default function AuctionModal() {
         exit={{ opacity: 0 }}
       >
         <motion.div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Spectrum auction"
+          tabIndex={-1}
           className="panel max-h-[calc(100dvh-2rem)] w-[470px] max-w-[calc(100%-2rem)] overflow-y-auto"
           initial={{ scale: 0.94, y: 14 }}
           animate={{ scale: 1, y: 0 }}
@@ -82,6 +88,7 @@ export default function AuctionModal() {
                     </div>
                     <input
                       type="range"
+                      aria-label="Spectrum auction bid"
                       min={auction.reserve}
                       max={Math.max(auction.reserve * 4, 100000)}
                       step={5000}
@@ -134,9 +141,7 @@ export default function AuctionModal() {
                         : `${result.winnerName} won the lot`}
                   </div>
                   {result.winnerId !== 'none' && (
-                    <div className="num mt-0.5 text-xs text-white/50">
-                      Hammer price {fmtMoneyExact(result.price)}
-                    </div>
+                    <div className="num mt-0.5 text-xs text-white/50">Hammer price {fmtMoneyExact(result.price)}</div>
                   )}
                 </div>
 

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { repairOptions } from '../game/incidents';
 import { fmtMoneyExact } from '../game/economy';
 import { useGame } from '../store/gameStore';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 export default function IncidentModal() {
   const game = useGame((s) => s.game)!;
@@ -16,6 +17,7 @@ export default function IncidentModal() {
   const assigned = incident?.assignedTechId
     ? game.technicians.find((t) => t.id === incident.assignedTechId)
     : undefined;
+  const dialogRef = useDialogAccessibility(Boolean(incident), () => close(null));
 
   return (
     <AnimatePresence>
@@ -28,6 +30,11 @@ export default function IncidentModal() {
           onClick={() => close(null)}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Network incident"
+            tabIndex={-1}
             className="panel max-h-[calc(100dvh-2rem)] w-[440px] max-w-[calc(100%-2rem)] overflow-y-auto"
             initial={{ scale: 0.94, y: 12 }}
             animate={{ scale: 1, y: 0 }}

@@ -3,11 +3,13 @@ import { fmtMoney, fmtNum } from '../game/economy';
 import { totalDebt } from '../game/finance';
 import { fmtDate, totalCustomers } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 export default function GameOverOverlay() {
   const game = useGame((s) => s.game)!;
   const quit = useGame((s) => s.quitToMenu);
   const over = game.gameOver;
+  const dialogRef = useDialogAccessibility(Boolean(over));
 
   return (
     <AnimatePresence>
@@ -19,6 +21,11 @@ export default function GameOverOverlay() {
           exit={{ opacity: 0 }}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Game over"
+            tabIndex={-1}
             className="panel max-h-[calc(100dvh-2rem)] w-[440px] max-w-[calc(100%-2rem)] overflow-y-auto border-neon-red/40"
             initial={{ scale: 0.94, y: 14 }}
             animate={{ scale: 1, y: 0 }}
@@ -53,8 +60,8 @@ export default function GameOverOverlay() {
               </div>
 
               <p className="text-[11px] leading-snug text-white/40">
-                Borrowing buys time to build. It does not pay for itself unless the network you build with it
-                carries more customers than the interest costs.
+                Borrowing buys time to build. It does not pay for itself unless the network you build with it carries
+                more customers than the interest costs.
               </p>
 
               <button className="btn-primary w-full" onClick={quit}>

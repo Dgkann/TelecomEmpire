@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGame } from '../store/gameStore';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 const SECTIONS = [
   {
@@ -37,6 +38,7 @@ const SECTIONS = [
 export default function HelpOverlay() {
   const show = useGame((s) => s.showHelp);
   const setShow = useGame((s) => s.setShowHelp);
+  const dialogRef = useDialogAccessibility(show, () => setShow(false));
 
   return (
     <AnimatePresence>
@@ -49,13 +51,20 @@ export default function HelpOverlay() {
           onClick={() => setShow(false)}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-title"
+            tabIndex={-1}
             className="panel max-h-[calc(100dvh-2rem)] w-[560px] max-w-[calc(100%-2rem)] overflow-y-auto p-4 sm:p-6"
             initial={{ scale: 0.95, y: 10 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.97, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold">How to play</h2>
+            <h2 id="help-title" className="text-xl font-bold">
+              How to play
+            </h2>
             <div className="mt-4 space-y-5">
               {SECTIONS.map((s) => (
                 <div key={s.title}>
