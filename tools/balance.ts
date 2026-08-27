@@ -1,6 +1,13 @@
 // Plays a year with a rough sensible-player policy and prints the economy.
 import { createNewGame, step, residentialSubs, totalCustomers } from '../src/game/simulation';
-import { nodeCapacity, MINUTES_PER_DAY, NODE_SPECS, FIBER_COST_PER_UNIT, TRANSIT_TIERS, linkCapacity } from '../src/game/constants';
+import {
+  nodeCapacity,
+  MINUTES_PER_DAY,
+  NODE_SPECS,
+  FIBER_COST_PER_UNIT,
+  TRANSIT_TIERS,
+  linkCapacity,
+} from '../src/game/constants';
 import { monthlyBreakdown } from '../src/game/economy';
 import { RESEARCH, researchModifiers } from '../src/game/research';
 import { operationsInsights } from '../src/game/operations';
@@ -8,9 +15,15 @@ import type { GameState } from '../src/game/types';
 
 (globalThis as any).localStorage = {
   store: new Map<string, string>(),
-  getItem(k: string) { return this.store.get(k) ?? null; },
-  setItem(k: string, v: string) { this.store.set(k, v); },
-  removeItem(k: string) { this.store.delete(k); },
+  getItem(k: string) {
+    return this.store.get(k) ?? null;
+  },
+  setItem(k: string, v: string) {
+    this.store.set(k, v);
+  },
+  removeItem(k: string) {
+    this.store.delete(k);
+  },
 };
 
 let g: GameState = createNewGame({
@@ -33,23 +46,49 @@ function buildPop(g: GameState, districtId: string) {
   if (!cell) return false;
   g.money -= cost;
   const id = `pop_${uidc++}`;
-  g.nodes = [...g.nodes, {
-    id, kind: 'pop', name: `${d.name} POP ${uidc}`, gx: cell.gx, gy: cell.gy, districtId: d.id,
-    tier: 1, capacityGbps: nodeCapacity('pop', 1), trafficGbps: 0, health: 100, down: false, builtAt: g.minutes,
-  }];
+  g.nodes = [
+    ...g.nodes,
+    {
+      id,
+      kind: 'pop',
+      name: `${d.name} POP ${uidc}`,
+      gx: cell.gx,
+      gy: cell.gy,
+      districtId: d.id,
+      tier: 1,
+      capacityGbps: nodeCapacity('pop', 1),
+      trafficGbps: 0,
+      health: 100,
+      down: false,
+      builtAt: g.minutes,
+    },
+  ];
   const others = g.nodes.filter((n) => n.id !== id && (n.kind === 'core' || n.kind === 'pop'));
   let best = others[0];
   let bd = Infinity;
   for (const o of others) {
     const dist = Math.hypot(o.gx - cell.gx, o.gy - cell.gy);
-    if (dist < bd) { bd = dist; best = o; }
+    if (dist < bd) {
+      bd = dist;
+      best = o;
+    }
   }
   if (best) {
     g.money -= bd * FIBER_COST_PER_UNIT;
-    g.links = [...g.links, {
-      id: `l_${uidc++}`, aId: id, bId: best.id, capacityGbps: linkCapacity(1), trafficGbps: 0,
-      down: false, tier: 1, length: bd, builtAt: g.minutes,
-    }];
+    g.links = [
+      ...g.links,
+      {
+        id: `l_${uidc++}`,
+        aId: id,
+        bId: best.id,
+        capacityGbps: linkCapacity(1),
+        trafficGbps: 0,
+        down: false,
+        tier: 1,
+        length: bd,
+        builtAt: g.minutes,
+      },
+    ];
   }
   return true;
 }
@@ -69,7 +108,9 @@ for (let day = 0; day < DAYS; day++) {
       const cost = Math.round(NODE_SPECS[n.kind].baseCost * Math.pow(NODE_SPECS[n.kind].tierCostMul, n.tier - 1) * 0.8);
       if (g.money > cost * 2) {
         g.money -= cost;
-        g.nodes = g.nodes.map((x) => x.id === n.id ? { ...x, tier: x.tier + 1, capacityGbps: nodeCapacity(x.kind, x.tier + 1) } : x);
+        g.nodes = g.nodes.map((x) =>
+          x.id === n.id ? { ...x, tier: x.tier + 1, capacityGbps: nodeCapacity(x.kind, x.tier + 1) } : x,
+        );
       }
     }
   }
@@ -78,7 +119,9 @@ for (let day = 0; day < DAYS; day++) {
       const cost = Math.round(l.length * 2200 * l.tier);
       if (g.money > cost * 2) {
         g.money -= cost;
-        g.links = g.links.map((x) => x.id === l.id ? { ...x, tier: x.tier + 1, capacityGbps: linkCapacity(x.tier + 1) } : x);
+        g.links = g.links.map((x) =>
+          x.id === l.id ? { ...x, tier: x.tier + 1, capacityGbps: linkCapacity(x.tier + 1) } : x,
+        );
       }
     }
   }
@@ -92,12 +135,17 @@ for (let day = 0; day < DAYS; day++) {
     if (canRush) g.money -= rush;
     else g.money -= Math.round((300 + inc.repairTotalMinutes * 5) / 100) * 100;
     const minutes = Math.round(inc.repairTotalMinutes * (canRush ? 0.28 : 1));
-    g.incidents = g.incidents.map((x) => x.id === inc.id ? { ...x, repairMinutesLeft: minutes, assignedTechId: t.id } : x);
-    g.technicians = g.technicians.map((x) => x.id === t.id ? { ...x, incidentId: inc.id, state: 'driving' as const } : x);
+    g.incidents = g.incidents.map((x) =>
+      x.id === inc.id ? { ...x, repairMinutesLeft: minutes, assignedTechId: t.id } : x,
+    );
+    g.technicians = g.technicians.map((x) =>
+      x.id === t.id ? { ...x, incidentId: inc.id, state: 'driving' as const } : x,
+    );
   }
   // 3. sign offers only while there is spare capacity to carry them
-  const headroom = g.nodes.filter((n) => n.kind === 'pop' || n.kind === 'access')
-    .reduce((s, n) => s + n.capacityGbps, 0) - g.stats.demandGbps;
+  const headroom =
+    g.nodes.filter((n) => n.kind === 'pop' || n.kind === 'access').reduce((s, n) => s + n.capacityGbps, 0) -
+    g.stats.demandGbps;
   for (const o of g.offers) {
     if (headroom > o.bandwidthGbps * 0.2) {
       g.money += o.signingBonus;
@@ -124,7 +172,7 @@ for (let day = 0; day < DAYS; day++) {
   const locked = g.districts.find((d) => !d.unlocked);
   if (locked && g.money > locked.entryCost * 3) {
     g.money -= locked.entryCost;
-    g.districts = g.districts.map((d) => d.id === locked.id ? { ...d, unlocked: true } : d);
+    g.districts = g.districts.map((d) => (d.id === locked.id ? { ...d, unlocked: true } : d));
   }
   const thin = g.districts.filter((d) => d.unlocked && d.coverage < 0.55).sort((a, b) => a.coverage - b.coverage)[0];
   if (thin && day % 3 === 0) buildPop(g, thin.id);
@@ -133,10 +181,10 @@ for (let day = 0; day < DAYS; day++) {
     const m = monthlyBreakdown(g, researchModifiers(g.researchDone));
     rows.push(
       `d${String(day).padStart(3)} | cash ${fmt(g.money)} | cust ${String(Math.round(residentialSubs(g))).padStart(6)}` +
-      ` | contracts ${String(g.contracts.length).padStart(2)} | rev/mo ${fmt(m.totalRevenue)} | cost/mo ${fmt(m.totalCost)}` +
-      ` | profit ${fmt(m.profit)} | rep ${g.reputation.toFixed(0)} | health ${g.stats.health.toFixed(0)}` +
-      ` | demand ${g.stats.demandGbps.toFixed(1)}G | loss ${(g.stats.packetLoss * 100).toFixed(1)}%` +
-      ` | nodes ${g.nodes.length} | inc ${g.incidents.filter((i) => !i.resolved).length}`,
+        ` | contracts ${String(g.contracts.length).padStart(2)} | rev/mo ${fmt(m.totalRevenue)} | cost/mo ${fmt(m.totalCost)}` +
+        ` | profit ${fmt(m.profit)} | rep ${g.reputation.toFixed(0)} | health ${g.stats.health.toFixed(0)}` +
+        ` | demand ${g.stats.demandGbps.toFixed(1)}G | loss ${(g.stats.packetLoss * 100).toFixed(1)}%` +
+        ` | nodes ${g.nodes.length} | inc ${g.incidents.filter((i) => !i.resolved).length}`,
     );
   }
 }
@@ -155,6 +203,9 @@ console.log('total customers:', totalCustomers(g));
 console.log('districts unlocked:', g.districts.filter((d) => d.unlocked).length);
 console.log('transit:', TRANSIT_TIERS[g.transitTier].label, `(${TRANSIT_TIERS[g.transitTier].capacity}G)`);
 console.log('research done:', g.researchDone.join(', ') || 'none');
-console.log('coverage:', g.districts.map((d) => `${d.name} ${(d.coverage * 100).toFixed(0)}% sat ${d.satisfaction.toFixed(0)}`).join(' | '));
+console.log(
+  'coverage:',
+  g.districts.map((d) => `${d.name} ${(d.coverage * 100).toFixed(0)}% sat ${d.satisfaction.toFixed(0)}`).join(' | '),
+);
 console.log('incidents total seen:', g.incidents.length);
 console.log('posts:', g.posts.length, '| log:', g.log.length);
