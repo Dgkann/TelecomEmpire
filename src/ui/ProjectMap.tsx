@@ -1,6 +1,7 @@
 import { TENDER_PROGRAMMES, ACCEPTANCE_MINUTES } from '../game/procurement';
 import type { GameState } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { isoX, isoY, tileDiamond } from './iso';
 
 export function ProjectFootprint({ game }: { game: GameState }) {
@@ -41,6 +42,7 @@ export function ProjectMapLabel({ game }: { game: GameState }) {
   );
 }
 export function DistrictProjectCard({ districtId }: { districtId: string }) {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const setScreen = useGame((s) => s.setScreen);
   const tender = game.procurement.tenders.find(
@@ -68,7 +70,7 @@ export function DistrictProjectCard({ districtId }: { districtId: string }) {
         </>
       )}
       <button className="btn mt-3 w-full text-xs" onClick={() => setScreen('projects')}>
-        Open project brief
+        {t(locale, 'openProjectBrief')}
       </button>
     </section>
   );
