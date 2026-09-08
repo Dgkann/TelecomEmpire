@@ -87,7 +87,7 @@ export default function AuctionModal() {
                 {auction.playerBid === null ? (
                   <div>
                     <div className="flex items-baseline justify-between">
-                      <span className="stat-label">Your sealed bid</span>
+                      <span className="stat-label">{t(locale, 'yourSealedBid')}</span>
                       <span className="num text-lg font-semibold text-neon-cyan">{fmtMoneyExact(bid)}</span>
                     </div>
                     <input

@@ -80,7 +80,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                 }}
               >
                 <label className="block text-xs text-white/60">
-                  Company name
+                  {t(locale, 'companyName')}
                   <input
                     className="mt-1 block w-full rounded border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
                     value={name}

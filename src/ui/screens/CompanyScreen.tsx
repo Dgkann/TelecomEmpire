@@ -1051,7 +1051,7 @@ export default function CompanyScreen() {
 
           <div className="flex flex-wrap gap-2">
             <button className="btn-primary text-xs" onClick={hireTechnician}>
-              Hire field crew · $4k
+              {t(locale, 'hireFieldCrew')} · $4k
             </button>
             {HIRE_ROLES.map((role) => (
               <button

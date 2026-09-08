@@ -476,7 +476,7 @@ export default function SidePanel() {
                           <div className="text-sm font-semibold">{o.clientName}</div>
                           {service && <div className="mt-0.5 text-[10px] text-neon-cyan/70">{service.label}</div>}
                           <div className="num mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-white/55">
-                            <span>Bandwidth</span>
+                            <span>{t(locale, 'bandwidth')}</span>
                             <span className="text-right text-white">{o.bandwidthGbps} Gbps</span>
                             <span>Revenue</span>
                             <span className="text-right text-neon-lime">{fmtMoney(o.monthlyRevenue)}/mo</span>

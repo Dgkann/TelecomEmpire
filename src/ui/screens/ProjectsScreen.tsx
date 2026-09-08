@@ -363,7 +363,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                   <tr>
                     <th className="pb-2">Operator</th>
                     <th className="pb-2 text-right">Payment</th>
-                    <th className="pb-2 text-right">Reputation</th>
+                    <th className="pb-2 text-right">{t(locale, 'reputation')}</th>
                     <th className="pb-2 text-right">Score</th>
                   </tr>
                 </thead>
