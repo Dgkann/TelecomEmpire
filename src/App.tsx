@@ -1,3 +1,6 @@
+import MarketScreen from './ui/screens/MarketScreen';
+import ProjectsScreen from './ui/screens/ProjectsScreen';
+import { SmartPauseBanner } from './ui/SmartPause';
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
@@ -18,7 +21,7 @@ import Tutorial from './ui/Tutorial';
 import CompanyScreen from './ui/screens/CompanyScreen';
 import NetworkScreen from './ui/screens/NetworkScreen';
 import ResearchScreen from './ui/screens/ResearchScreen';
-import { playSound } from './ui/sound';
+import { playSound, prepareAudio } from './ui/sound';
 import SaveManager from './ui/SaveManager';
 
 function useGameClock() {
@@ -66,6 +69,13 @@ function useHotkeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      if (e.key === 'Escape') {
+        useGame.getState().endFailureDrill();
+        cancelBuild();
+        select(null);
+        return;
+      }
       if (target.isContentEditable || target.closest('input, textarea, select, button, a, [role="button"]')) return;
       const g = useGame.getState().game;
       if (!g) return;
@@ -121,6 +131,7 @@ function CriticalEventFlash() {
   const previousId = useRef(latest?.id);
   const timeoutRef = useRef<number | null>(null);
   const [event, setEvent] = useState<typeof latest>(null);
+  const tr = useGame((s) => s.locale) === 'tr';
 
   useEffect(() => {
     if (!latest || latest.id === previousId.current) return;
@@ -149,7 +160,7 @@ function CriticalEventFlash() {
           role="alert"
           className="critical-event pointer-events-none absolute left-1/2 top-3 z-50 w-[min(520px,calc(100%-24px))] -translate-x-1/2 rounded-md border border-neon-red/55 bg-[#281319]/95 px-4 py-3 shadow-2xl backdrop-blur"
         >
-          <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-neon-red">Critical event</div>
+          <div className="text-[11px] font-semibold text-neon-red">{tr ? 'Önemli gelişme' : 'Critical event'}</div>
           <div className="mt-0.5 text-sm font-semibold text-white/90">{event.text}</div>
         </div>
       )}
@@ -159,6 +170,7 @@ function CriticalEventFlash() {
 
 function GameShell() {
   const screen = useGame((s) => s.screen);
+  const drillTarget = useGame((s) => s.drillTarget);
   const persistenceError = useGame((s) => s.persistenceError);
   useGameClock();
   useHotkeys();
@@ -168,6 +180,7 @@ function GameShell() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
+      <SmartPauseBanner />
       {persistenceError && (
         <div
           className="z-50 border-b border-neon-red/40 bg-[#35151d] px-3 py-2 text-center text-xs font-medium text-neon-red"
@@ -182,15 +195,21 @@ function GameShell() {
           {screen === 'map' && (
             <>
               <MapView />
-              <SidePanel />
-              <ContextPanel />
-              <BuildBar />
-              <Tutorial />
+              {!drillTarget && (
+                <>
+                  <SidePanel />
+                  <ContextPanel />
+                  <BuildBar />
+                  <Tutorial />
+                </>
+              )}
             </>
           )}
           {screen === 'network' && <NetworkScreen />}
           {screen === 'company' && <CompanyScreen />}
           {screen === 'research' && <ResearchScreen />}
+          {screen === 'projects' && <ProjectsScreen />}
+          {screen === 'market' && <MarketScreen />}
 
           <IncidentModal />
           <AuctionModal />
@@ -208,6 +227,17 @@ function GameShell() {
 
 export default function App() {
   const started = useGame((s) => s.started);
-  const game = useGame((s) => s.game);
-  return <div className="h-full w-full">{started && game ? <GameShell /> : <MainMenu />}</div>;
+  const hasGame = useGame((s) => s.game !== null);
+  useEffect(() => {
+    const warm = (event: Event) => {
+      if (event.isTrusted && useGame.getState().soundOn) prepareAudio();
+    };
+    document.addEventListener('pointerdown', warm, { passive: true });
+    document.addEventListener('keydown', warm);
+    return () => {
+      document.removeEventListener('pointerdown', warm);
+      document.removeEventListener('keydown', warm);
+    };
+  }, []);
+  return <div className="h-full w-full">{started && hasGame ? <GameShell /> : <MainMenu />}</div>;
 }
