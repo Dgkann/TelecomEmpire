@@ -6,6 +6,9 @@ import { useGame, type BuildTool } from '../store/gameStore';
 import type { NodeKind, OverlayMode } from '../game/types';
 import { LayersIcon } from './icons';
 import SiteIcon from './SiteIcon';
+import InvestmentPreview from './InvestmentPreview';
+import BlueprintBar from './BlueprintBar';
+import { t as translate, type TranslationKey } from './i18n';
 
 type ToolGroup = 'fixed' | 'advanced';
 
@@ -13,16 +16,18 @@ const TOOLS: Array<{
   id: BuildTool;
   group: ToolGroup;
   label: string;
+  labelKey: TranslationKey;
   icon?: string;
   nodeKind?: NodeKind;
   cost: (mods: ReturnType<typeof researchModifiers>) => string;
   locked?: string;
 }> = [
-  { id: 'fiber', group: 'fixed', label: 'Fibre', icon: '⌁', cost: () => 'per km' },
+  { id: 'fiber', group: 'fixed', label: 'Fibre', labelKey: 'fibre', icon: '⌁', cost: () => 'per km' },
   {
     id: 'pop',
     group: 'fixed',
     label: 'POP',
+    labelKey: 'pop',
     nodeKind: 'pop',
     cost: () => `$${(NODE_SPECS.pop.baseCost / 1000).toFixed(0)}k`,
   },
@@ -30,6 +35,7 @@ const TOOLS: Array<{
     id: 'access',
     group: 'fixed',
     label: 'Access',
+    labelKey: 'access',
     nodeKind: 'access',
     cost: (m) => `$${((NODE_SPECS.access.baseCost * m.accessCostMul) / 1000).toFixed(1)}k`,
   },
@@ -37,6 +43,7 @@ const TOOLS: Array<{
     id: 'core',
     group: 'fixed',
     label: 'Core',
+    labelKey: 'core',
     nodeKind: 'core',
     cost: () => `$${(NODE_SPECS.core.baseCost / 1000).toFixed(0)}k`,
   },
@@ -44,6 +51,7 @@ const TOOLS: Array<{
     id: 'tower',
     group: 'advanced',
     label: 'Tower',
+    labelKey: 'tower',
     nodeKind: 'tower',
     cost: () => `$${(NODE_SPECS.tower.baseCost / 1000).toFixed(0)}k`,
     locked: 'mobile_4g',
@@ -52,6 +60,7 @@ const TOOLS: Array<{
     id: 'datacenter',
     group: 'advanced',
     label: 'Data Centre',
+    labelKey: 'dataCentre',
     nodeKind: 'datacenter',
     cost: () => `$${(NODE_SPECS.datacenter.baseCost / 1000).toFixed(0)}k`,
     locked: 'edge_compute',
@@ -69,12 +78,33 @@ const OVERLAYS: Array<{ id: OverlayMode; label: string; hint: string }> = [
 export default function BuildBar() {
   const game = useGame((s) => s.game)!;
   const tool = useGame((s) => s.tool);
+  const autoConnect = useGame((s) => s.autoConnect);
+  const setAutoConnect = useGame((s) => s.setAutoConnect);
+  const planning = useGame((s) => s.planning);
+  const beginBlueprint = useGame((s) => s.beginBlueprint);
   const setTool = useGame((s) => s.setTool);
   const overlay = useGame((s) => s.overlay);
   const setOverlay = useGame((s) => s.setOverlay);
   const linkFrom = useGame((s) => s.linkFrom);
   const [group, setGroup] = useState<ToolGroup>('fixed');
   const [layersOpen, setLayersOpen] = useState(false);
+  const locale = useGame((s) => s.locale);
+  const tr = locale === 'tr';
+  const setSpeed = useGame((s) => s.setSpeed);
+  const layerName = (id: OverlayMode) =>
+    tr
+      ? { normal: 'Şehir', load: 'Yük', coverage: 'Kapsama', rivals: 'Rakipler', customers: 'Müşteriler' }[id]
+      : OVERLAYS.find((o) => o.id === id)!.label;
+  const layerHint = (id: OverlayMode) =>
+    tr
+      ? {
+          normal: 'Şehir ve şebeke',
+          load: 'Kapasite baskısı',
+          coverage: 'Hizmet alanı',
+          rivals: 'Rakiplerin varlığı',
+          customers: 'Aboneler ve sözleşmeler',
+        }[id]
+      : OVERLAYS.find((o) => o.id === id)!.hint;
   const mods = researchModifiers(game.researchDone);
   const activeNodeTool = tool && tool !== 'fiber' ? NODE_SPECS[tool] : null;
   const activeNodeCapacity =
@@ -83,18 +113,42 @@ export default function BuildBar() {
 
   return (
     <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex flex-col items-center gap-1.5 p-2 sm:gap-2 sm:p-3">
+      {planning && <BlueprintBar />}
+      {!planning && tool && tool !== 'fiber' && (
+        <div className="panel pointer-events-auto w-[min(440px,100%)] px-3 py-2">
+          <InvestmentPreview kind={tool} />
+          {tool !== 'core' && (
+            <label className="mt-2 flex cursor-pointer items-center gap-2 border-t border-white/10 pt-2 text-xs">
+              <input
+                type="checkbox"
+                className="accent-teal-400"
+                checked={autoConnect}
+                onChange={(e) => setAutoConnect(e.target.checked)}
+              />
+              Include fibre to nearest live site
+              <span className="ml-auto text-neon-cyan">{autoConnect ? 'One-click build' : 'Optional'}</span>
+            </label>
+          )}
+        </div>
+      )}
       {tool && (
         <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-hidden rounded-lg border border-neon-cyan/30 bg-ink-800/95 px-3 py-2 text-[11px] text-white/65 shadow-panel sm:gap-3 sm:px-4 sm:text-[12px]">
           <span className="h-1.5 w-1.5 rounded-full bg-neon-cyan" />
           <span className="truncate font-medium">
             {tool === 'fiber'
               ? linkFrom
-                ? `Source: ${linkFromName ?? 'site'} · select destination`
-                : 'Step 1 of 2 · select the source site'
-              : 'Place a Tier 1 site inside a licensed district'}
+                ? tr
+                  ? `Kaynak: ${linkFromName ?? 'nokta'} · hedefi seç`
+                  : `Source: ${linkFromName ?? 'site'} · select destination`
+                : tr
+                  ? '1/2 · kaynak noktasını seç'
+                  : 'Step 1 of 2 · select the source site'
+              : tr
+                ? 'Lisanslı ilçeye bir T1 noktası yerleştir'
+                : 'Place a Tier 1 site inside a licensed district'}
           </span>
           {activeNodeTool && (
-            <span className="flex items-center gap-2 border-l border-white/10 pl-3 font-mono text-[10px] text-white/45">
+            <span className="hidden items-center gap-2 border-l border-white/10 pl-3 font-mono text-[10px] text-white/45 sm:flex">
               <b className="font-normal text-neon-cyan">{activeNodeCapacity.toFixed(1)}G</b>
               <span className="font-semibold text-white/60">T1</span>
               <span>{activeNodeTool.powerKw} kW</span>
@@ -102,13 +156,34 @@ export default function BuildBar() {
             </span>
           )}
           <span className="text-white/25">•</span>
-          <kbd className="font-mono text-[10px] text-neon-cyan">ESC cancels</kbd>
+          <button
+            disabled={planning}
+            className="shrink-0 text-xs text-neon-cyan disabled:opacity-40"
+            onClick={() => setSpeed(game.speed === 0 ? 1 : 0)}
+          >
+            {game.speed === 0 ? (tr ? 'Devam et' : 'Resume') : tr ? 'Duraklat' : 'Pause'}
+          </button>
+          <button
+            className="shrink-0 text-xs text-white/65"
+            onClick={() => setTool(null)}
+            aria-label={tr ? 'İnşayı iptal et' : 'Cancel construction'}
+          >
+            ✕
+          </button>
         </div>
       )}
 
       <div className="pointer-events-auto flex max-w-full items-end gap-1 sm:gap-2">
         <div className="panel min-w-0 overflow-hidden p-1 sm:p-1.5">
           <div className="mb-1 flex items-center gap-1 px-0.5">
+            {!planning && (
+              <button
+                className="rounded border border-neon-amber/30 px-2 py-1 text-[11px] font-semibold text-neon-amber"
+                onClick={beginBlueprint}
+              >
+                {tr ? 'Ağ planla' : 'Plan network'}
+              </button>
+            )}
             {(['fixed', 'advanced'] as ToolGroup[]).map((id) => (
               <button
                 key={id}
@@ -117,7 +192,7 @@ export default function BuildBar() {
                   group === id ? 'bg-white/10 text-white/80' : 'text-white/35 hover:text-white/65'
                 }`}
               >
-                {id === 'fixed' ? 'Fixed network' : 'Advanced'}
+                {id === 'fixed' ? translate(locale, 'fixedNetwork') : translate(locale, 'advanced')}
               </button>
             ))}
           </div>
@@ -154,9 +229,11 @@ export default function BuildBar() {
                     {locked ? '—' : t.nodeKind ? <SiteIcon kind={t.nodeKind} tier={1} className="h-6 w-6" /> : t.icon}
                   </span>
                   <span className="font-display text-[10px] font-semibold uppercase tracking-wide leading-none sm:text-[12px]">
-                    {t.label}
+                    {translate(locale, t.labelKey)}
                   </span>
-                  <span className="num text-[10px] leading-none text-white/40">{locked ? 'Locked' : t.cost(mods)}</span>
+                  <span className="num text-[10px] leading-none text-white/40">
+                    {locked ? translate(locale, 'locked') : tr && t.id === 'fiber' ? 'km başına' : t.cost(mods)}
+                  </span>
                 </button>
               );
             })}
@@ -166,7 +243,7 @@ export default function BuildBar() {
         <div className="relative">
           {layersOpen && (
             <div className="panel absolute bottom-[52px] right-0 w-[220px] p-2">
-              <div className="stat-label mb-1.5 px-2">Map layers</div>
+              <div className="stat-label mb-1.5 px-2">{tr ? 'Harita katmanları' : 'Map layers'}</div>
               {OVERLAYS.map((o) => (
                 <button
                   key={o.id}
@@ -176,8 +253,8 @@ export default function BuildBar() {
                   }}
                   className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left transition-colors ${overlay === o.id ? 'bg-neon-cyan/[0.12] text-neon-cyan' : 'text-white/60 hover:bg-white/[0.06]'}`}
                 >
-                  <span className="text-[12px] font-semibold">{o.label}</span>
-                  <span className="text-[10px] text-white/35">{o.hint}</span>
+                  <span className="text-[12px] font-semibold">{layerName(o.id)}</span>
+                  <span className="text-[10px] text-white/55">{layerHint(o.id)}</span>
                 </button>
               ))}
             </div>
@@ -186,10 +263,11 @@ export default function BuildBar() {
             className={`flex h-11 w-11 items-center justify-center gap-2 rounded-lg border px-2 shadow-panel transition-colors sm:w-auto sm:justify-start sm:px-3 ${layersOpen || overlay !== 'normal' ? 'border-neon-blue/40 bg-neon-blue/15 text-neon-blue' : 'border-white/10 bg-ink-800/95 text-white/60 hover:bg-ink-700'}`}
             onClick={() => setLayersOpen((v) => !v)}
             aria-expanded={layersOpen}
+            aria-label={tr ? 'Harita katmanları' : 'Map layers'}
           >
             <LayersIcon className="h-4 w-4" />
             <span className="hidden font-display text-[12px] font-semibold uppercase tracking-wider sm:inline">
-              {OVERLAYS.find((o) => o.id === overlay)?.label}
+              {layerName(overlay)}
             </span>
           </button>
         </div>
