@@ -1,3 +1,4 @@
+import { marketEffects, rivalMarketEffects } from './competition';
 import { BASELINE_ARPU, spectrumCapacityFactor, spectrumRadiusFactor } from './constants';
 import { priceIndex } from './economy';
 import { clamp } from './util';
@@ -32,11 +33,16 @@ export function districtPull(s: GameState, d: District): DistrictPull {
     priceAttract(priceIndex(s)) *
     clamp(0.5 + s.reputation / 100, 0.3, 1.5) *
     clamp(d.satisfaction / 70, 0.2, 1.4) *
-    HOME_ADVANTAGE;
+    HOME_ADVANTAGE *
+    marketEffects(s, d.id).appeal;
 
   const rivals = s.competitors.map((c) => {
     const reach = Math.max(c.coverage[d.id] ?? 0, (c.mobileCoverage[d.id] ?? 0) * 0.8);
-    return { id: c.id, pull: reach * priceAttract(c.priceIndex) * (0.75 + c.tech * 0.45) };
+    const effect = rivalMarketEffects(s, c.id, d.id);
+    return {
+      id: c.id,
+      pull: reach * priceAttract(c.priceIndex * effect.price) * (0.75 + c.tech * 0.45) * effect.appeal,
+    };
   });
 
   const total = player + rivals.reduce((sum, r) => sum + r.pull, 0) + MARKET_FRICTION;

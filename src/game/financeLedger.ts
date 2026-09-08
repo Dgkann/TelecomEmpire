@@ -19,6 +19,7 @@ const OPERATING_CATEGORIES = new Set<FinanceCategory>([
 ]);
 
 const CAPITAL_CATEGORIES = new Set<FinanceCategory>([
+  'company_acquisition',
   'network_build',
   'network_upgrade',
   'district_licence',

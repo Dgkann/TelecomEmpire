@@ -1,3 +1,4 @@
+import type { MilestoneId } from './milestones';
 // Pure data only, no React and no DOM. The sim turns one GameState into the next.
 
 export type Difficulty = 'casual' | 'standard' | 'hard';
@@ -367,6 +368,8 @@ export type FinanceCategory =
   | 'spectrum'
   | 'research'
   | 'staff'
+  | 'strategic_investment'
+  | 'company_acquisition'
   | 'network_build'
   | 'network_upgrade'
   | 'network_service'
@@ -375,7 +378,11 @@ export type FinanceCategory =
   | 'contract_bonus'
   | 'campaign'
   | 'asset_sale'
-  | 'regulatory_fine';
+  | 'milestone_reward'
+  | 'regulatory_fine'
+  | 'market_operation'
+  | 'tender_bond'
+  | 'tender_payment';
 
 export interface FinanceLedgerEntry {
   id: string;
@@ -418,7 +425,9 @@ export interface TelemetryPoint {
 }
 
 export type OverlayMode = 'normal' | 'load' | 'coverage' | 'rivals' | 'customers';
-export type Screen = 'map' | 'network' | 'company' | 'research';
+export type Screen = 'map' | 'network' | 'company' | 'research' | 'projects' | 'market';
+export type GameMode = 'sandbox' | 'campaign';
+export type ScenarioId = 'freeplay' | 'rapid_expansion' | 'service_standard' | 'debt_free' | 'market_leader';
 
 export interface GameState {
   version: number;
@@ -426,6 +435,10 @@ export interface GameState {
   logo: string;
   difficulty: Difficulty;
   cityName: string;
+  mode: GameMode;
+  scenarioId: ScenarioId;
+  scenarioCompletedAt: number | null;
+  campaignStage: number;
 
   // Total elapsed game minutes since the start date.
   minutes: number;
@@ -507,7 +520,83 @@ export interface GameState {
   nextGrowthAt: number;
 
   tutorialStep: number;
+  claimedMilestones: MilestoneId[];
+  strategy: StrategyState;
+  procurement: ProcurementState;
+  competition: CompetitionState;
   tutorialDone: boolean;
   autosaveAt: number;
   rngSeed: number;
+}
+
+export interface StrategyState {
+  decision: { id: string; kind: 'renewal' | 'festival' | 'training'; districtId: string; dueAt: number } | null;
+  nextDecisionAt: number;
+  history: Array<{ id: string; at: number; text: string; textTr: string }>;
+  acquisitions: Array<{ rivalId: string; name: string; at: number; cost: number }>;
+  developments: Array<{ districtId: string; at: number; buildingIds: string[]; households: number }>;
+  challenge: { kind: 'resilience' | 'enterprise' | 'mobile'; target: number; dueAt: number } | null;
+  challengesCompleted: number;
+  nextChallengeAt: number;
+}
+
+export interface CityTender {
+  id: string;
+  kind: 'schools' | 'emergency' | 'gigabit';
+  districtId: string;
+  budget: number;
+  openedAt: number;
+  closesAt: number;
+  playerBid: { price: number; quality: number } | null;
+  bond: number;
+  rivals: Array<{ id: string; name: string; price: number; quality: number }>;
+  status: 'open' | 'delivery' | 'completed' | 'failed' | 'lost';
+  winnerId: string | null;
+  awardedAt: number | null;
+  dueAt: number | null;
+  qualifyingMinutes: number;
+  finishedAt: number | null;
+}
+export interface ProcurementState {
+  nextTenderAt: number;
+  sequence: number;
+  tenders: CityTender[];
+}
+
+export type MarketTactic = 'switchers' | 'loyalty' | 'service';
+export interface MarketOperation {
+  id: string;
+  districtId: string;
+  kind: MarketTactic;
+  startedAt: number;
+  endsAt: number;
+  cost: number;
+  baselineCustomers: number;
+  qualifiedMinutes: number;
+}
+export interface MarketResult extends MarketOperation {
+  finishedAt: number;
+  cancelled: boolean;
+  customerDelta: number;
+  reputationDelta: number;
+}
+export interface RivalMove {
+  id: string;
+  rivalId: string;
+  districtId: string;
+  kind: 'discount' | 'publicity' | 'rollout';
+  startedAt: number;
+  endsAt: number;
+  cost: number;
+}
+export interface CompetitionState {
+  operations: MarketOperation[];
+  history: MarketResult[];
+  moves: RivalMove[];
+  snapshots: Array<{
+    at: number;
+    districts: Array<{ id: string; customers: number; coverage: number; satisfaction: number }>;
+  }>;
+  nextMoveAt: number;
+  sequence: number;
 }

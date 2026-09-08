@@ -1,3 +1,7 @@
+import { initialCompetition, tickCompetition, marketEffects } from './competition';
+import { initialProcurement, tickProcurement } from './procurement';
+import { fixedCoverageTarget } from './reach';
+import { initialStrategy, tickBoard, developDistrict } from './board';
 import {
   CONTRACT_CONTENTION,
   DIFFICULTY,
@@ -28,11 +32,21 @@ import { checkPromotion, customerCount, isTopRank } from './progression';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
-import { repairCost, rollIncident, type RepairMode } from './incidents';
+import {
+  repairCost,
+  repairMinutes,
+  incidentLocation,
+  dispatchCandidates,
+  pendingIncidents,
+  CREW_SPEED,
+  rollIncident,
+  type RepairMode,
+} from './incidents';
 import { contractProfile } from './contracts';
 import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
 import { computeRoutes, loadServices, servingNodes, type TrafficService } from './network';
 import { researchModifiers, type ResearchMods } from './research';
+import { CAMPAIGN_STAGES, scenarioStatus } from './scenarios';
 import { staffModifiers, trainEmployee, trainTechnician } from './staff';
 import {
   DATA_CENTER_MODE_CONFIG,
@@ -69,7 +83,7 @@ const emptyServiceTraffic = (): ServiceTraffic => ({
   workload: 0,
 });
 
-const trafficClassOf = (serviceId: string): TrafficClass => {
+export const trafficClassOf = (serviceId: string): TrafficClass => {
   if (serviceId.startsWith('residential:')) return 'residential';
   if (serviceId.startsWith('business:')) return 'business';
   if (serviceId.startsWith('mobile:')) return 'mobile';
@@ -79,7 +93,7 @@ const trafficClassOf = (serviceId: string): TrafficClass => {
 
 // Weighted max-min allocation keeps priority meaningful at the upstream edge
 // without leaving capacity idle when a protected class asks for very little.
-function allocateTransit(
+export function allocateTransit(
   offered: ServiceTraffic,
   priorities: Record<TrafficClass, number>,
   capacity: number,
@@ -151,12 +165,20 @@ export interface NewGameOptions {
   difficulty: Difficulty;
   cityName: string;
   seed?: number;
+  mode?: GameState['mode'];
+  scenarioId?: GameState['scenarioId'];
+  campaignStage?: number;
 }
 
 export function createNewGame(opts: NewGameOptions): GameState {
   const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
   const rng = makeRng(seed);
-  const { districts, buildings } = generateCity(seed);
+  const mode = opts.mode ?? 'sandbox';
+  const campaignStage = Math.max(0, Math.min(CAMPAIGN_STAGES.length - 1, opts.campaignStage ?? 0));
+  const campaign = CAMPAIGN_STAGES[campaignStage];
+  const cityName = mode === 'campaign' ? campaign.cityName : opts.cityName;
+  const scenarioId = mode === 'campaign' ? campaign.scenarioId : (opts.scenarioId ?? 'freeplay');
+  const { districts, buildings } = generateCity(seed, cityName);
   const diff = DIFFICULTY[opts.difficulty];
 
   const home = districts[0];
@@ -215,7 +237,11 @@ export function createNewGame(opts: NewGameOptions): GameState {
     companyName: opts.companyName,
     logo: opts.logo,
     difficulty: opts.difficulty,
-    cityName: opts.cityName,
+    cityName,
+    mode,
+    scenarioId,
+    scenarioCompletedAt: null,
+    campaignStage,
     minutes: 8 * 60,
     speed: 1,
     money: diff.startMoney,
@@ -406,6 +432,10 @@ export function createNewGame(opts: NewGameOptions): GameState {
     nextEventAt: MINUTES_PER_DAY * randInt(rng, 6, 12),
     nextGrowthAt: MINUTES_PER_DAY * 20,
     tutorialStep: 0,
+    claimedMilestones: [],
+    strategy: initialStrategy(8 * 60),
+    procurement: initialProcurement(8 * 60),
+    competition: initialCompetition(8 * 60),
     tutorialDone: false,
     autosaveAt: 0,
     rngSeed: seed,
@@ -424,6 +454,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
   }
 
   seedStartingCustomers(state, 200, home.id);
+  tickProcurement(state, 0);
   return state;
 }
 
@@ -511,57 +542,11 @@ function ensureActiveTariffs(s: GameState) {
   if (mobileRestored) redistributeMobilePackages(s);
 }
 
-export function step(prev: GameState): GameState {
-  if (prev.gameOver) return prev;
-  const s: GameState = { ...prev };
-  ensureActiveTariffs(s);
-  const rng = makeRng((s.minutes * 2654435761 + s.rngSeed) >>> 0);
-  const mods = researchModifiers(s.researchDone);
-  const staff = staffModifiers(s);
-  const diff = DIFFICULTY[s.difficulty];
-  const dt = MINUTES_PER_STEP;
-  const dayFrac = dt / MINUTES_PER_DAY;
-  const monthFrac = dt / MINUTES_PER_MONTH;
-
-  const prevDay = Math.floor(s.minutes / MINUTES_PER_DAY);
-  const prevMonth = Math.floor(s.minutes / MINUTES_PER_MONTH);
-  s.minutes += dt;
-  const newDay = Math.floor(s.minutes / MINUTES_PER_DAY) > prevDay;
-  const newMonth = Math.floor(s.minutes / MINUTES_PER_MONTH) > prevMonth;
-
-  const expiredCampaigns = s.campaigns.filter((campaign) => campaign.endsAt <= s.minutes);
-  if (expiredCampaigns.length) {
-    for (const campaign of expiredCampaigns) {
-      const district = s.districts.find((entry) => entry.id === campaign.districtId);
-      const customers = residentialSubs(s, campaign.districtId) + (district?.mobileSubs ?? 0);
-      const contracts = s.contracts.filter((contract) => contract.districtId === campaign.districtId).length;
-      s.campaignHistory = [
-        ...s.campaignHistory.slice(-39),
-        {
-          id: campaign.id,
-          districtId: campaign.districtId,
-          kind: campaign.kind,
-          completedAt: s.minutes,
-          cost: campaign.cost,
-          customerDelta: Math.round(customers - campaign.baselineCustomers),
-          satisfactionDelta: (district?.satisfaction ?? campaign.baselineSatisfaction) - campaign.baselineSatisfaction,
-          contractDelta: contracts - campaign.baselineContracts,
-        },
-      ];
-      pushLog(s, `${district?.name ?? 'District'} campaign completed.`, 'info');
-    }
-    s.campaigns = s.campaigns.filter((campaign) => campaign.endsAt > s.minutes);
-  }
-  autoScheduleMaintenance(s, mods);
-  tickMaintenance(s, dt);
-
-  // 1. Demand
-  const eventMul = s.activeEvent && s.minutes < s.activeEvent.endsAt ? s.activeEvent.mul : 1;
-  if (s.activeEvent && s.minutes >= s.activeEvent.endsAt) {
-    pushLog(s, `${s.activeEvent.name} is over. Traffic is settling back down.`, 'info');
-    s.activeEvent = null;
-  }
-  const curve = demandCurve(s.minutes) * eventMul;
+// Shared offered-load model for live simulation and the capacity planning lab.
+export function offeredTraffic(
+  s: GameState,
+  curve = demandCurve(s.minutes) * (s.activeEvent && s.minutes < s.activeEvent.endsAt ? s.activeEvent.mul : 1),
+) {
   const avgSpeed = averageSpeed(s.packages);
 
   // Edge caches serve popular traffic locally, so it never touches the network.
@@ -642,6 +627,83 @@ export function step(prev: GameState): GameState {
       priority: priorities.workload,
     });
   }
+  return {
+    avgSpeed,
+    services,
+    routes,
+    priorities,
+    liveTowers,
+    residentialDemand,
+    businessDemand,
+    mobileDemand,
+    wholesaleFixedDemand,
+    wholesaleMobileDemand,
+  };
+}
+
+export function step(prev: GameState): GameState {
+  if (prev.gameOver) return prev;
+  const s: GameState = { ...prev };
+  ensureActiveTariffs(s);
+  const rng = makeRng((s.minutes * 2654435761 + s.rngSeed) >>> 0);
+  const mods = researchModifiers(s.researchDone);
+  const staff = staffModifiers(s);
+  const diff = DIFFICULTY[s.difficulty];
+  const dt = MINUTES_PER_STEP;
+  const dayFrac = dt / MINUTES_PER_DAY;
+  const monthFrac = dt / MINUTES_PER_MONTH;
+
+  const prevDay = Math.floor(s.minutes / MINUTES_PER_DAY);
+  const prevMonth = Math.floor(s.minutes / MINUTES_PER_MONTH);
+  s.minutes += dt;
+  const newDay = Math.floor(s.minutes / MINUTES_PER_DAY) > prevDay;
+  const newMonth = Math.floor(s.minutes / MINUTES_PER_MONTH) > prevMonth;
+
+  const expiredCampaigns = s.campaigns.filter((campaign) => campaign.endsAt <= s.minutes);
+  if (expiredCampaigns.length) {
+    for (const campaign of expiredCampaigns) {
+      const district = s.districts.find((entry) => entry.id === campaign.districtId);
+      const customers = residentialSubs(s, campaign.districtId) + (district?.mobileSubs ?? 0);
+      const contracts = s.contracts.filter((contract) => contract.districtId === campaign.districtId).length;
+      s.campaignHistory = [
+        ...s.campaignHistory.slice(-39),
+        {
+          id: campaign.id,
+          districtId: campaign.districtId,
+          kind: campaign.kind,
+          completedAt: s.minutes,
+          cost: campaign.cost,
+          customerDelta: Math.round(customers - campaign.baselineCustomers),
+          satisfactionDelta: (district?.satisfaction ?? campaign.baselineSatisfaction) - campaign.baselineSatisfaction,
+          contractDelta: contracts - campaign.baselineContracts,
+        },
+      ];
+      pushLog(s, `${district?.name ?? 'District'} campaign completed.`, 'info');
+    }
+    s.campaigns = s.campaigns.filter((campaign) => campaign.endsAt > s.minutes);
+  }
+  autoScheduleMaintenance(s, mods);
+  tickMaintenance(s, dt);
+
+  // 1. Demand
+  const eventMul = s.activeEvent && s.minutes < s.activeEvent.endsAt ? s.activeEvent.mul : 1;
+  if (s.activeEvent && s.minutes >= s.activeEvent.endsAt) {
+    pushLog(s, `${s.activeEvent.name} is over. Traffic is settling back down.`, 'info');
+    s.activeEvent = null;
+  }
+  const curve = demandCurve(s.minutes) * eventMul;
+  const {
+    avgSpeed,
+    services,
+    routes,
+    priorities,
+    liveTowers,
+    residentialDemand,
+    businessDemand,
+    mobileDemand,
+    wholesaleFixedDemand,
+    wholesaleMobileDemand,
+  } = offeredTraffic(s, curve);
   const load = loadServices(s, services, routes, mods.hasAutoBalance);
 
   const transit = TRANSIT_TIERS[s.transitTier];
@@ -751,13 +813,7 @@ export function step(prev: GameState): GameState {
   // 4. Coverage, satisfaction and customers
   s.districts = s.districts.map((d) => {
     if (!d.unlocked) return d;
-    const serving = servingNodes(s, d.id).filter((n) => routes[n.id]);
-    let coverageTarget = 0;
-    for (const n of serving) {
-      const per = n.kind === 'pop' ? 0.32 : 0.13;
-      coverageTarget += per * (1 + (n.tier - 1) * 0.18);
-    }
-    coverageTarget = Math.min(mods.coverageCeiling, coverageTarget);
+    const coverageTarget = fixedCoverageTarget(s, d.id, routes, mods.coverageCeiling);
     const coverage = approach(d.coverage, coverageTarget, 0.035 * dayFrac * MINUTES_PER_DAY * 0.02 + 0.03 * dayFrac);
 
     const dPressure = Math.max(
@@ -865,6 +921,8 @@ export function step(prev: GameState): GameState {
 
   tickAuction(s, rng);
 
+  tickProcurement(s, dt);
+  tickCompetition(s, dt, newDay);
   const failure = checkSolvency(s);
   if (failure) {
     s.gameOver = { reason: failure, at: s.minutes };
@@ -887,11 +945,24 @@ export function step(prev: GameState): GameState {
     );
 
     const promoted = checkPromotion(s);
+    if (!s.gameOver) tickBoard(s);
     if (promoted) {
       s.reputation = clamp(s.reputation + 5, 0, 100);
       pushLog(s, `${s.companyName} is now a ${promoted.name}.`, 'good');
       // Reaching the top rung is the win, but the game carries on afterwards.
-      if (isTopRank(s) && s.victoryAt === null) s.victoryAt = s.minutes;
+      if (s.scenarioId === 'freeplay' && isTopRank(s) && s.victoryAt === null) s.victoryAt = s.minutes;
+    }
+    if (!s.gameOver && s.scenarioId !== 'freeplay' && s.scenarioCompletedAt === null) {
+      const status = scenarioStatus(s);
+      if (status.complete) {
+        s.scenarioCompletedAt = s.minutes;
+        s.victoryAt = s.minutes;
+        pushLog(s, `${status.scenario.name} completed.`, 'good');
+      } else if (status.expired) {
+        s.gameOver = { reason: `${status.scenario.name} missed its deadline.`, at: s.minutes };
+        s.speed = 0;
+        pushLog(s, 'The scenario deadline was missed.', 'bad');
+      }
     }
     if (s.minutes > s.nextEventAt) startCityEvent(s, rng);
     if (s.minutes > s.nextGrowthAt) growCity(s, rng);
@@ -961,7 +1032,8 @@ export function customerGrowthSnapshot(s: GameState, d: District): CustomerGrowt
     diff.growthMul;
   const gap = addressable - current;
   const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
-  const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention;
+  const retention =
+    clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention * marketEffects(s, d.id).retention;
   const companyAgeDays = Math.max(0, (s.minutes - 8 * 60) / MINUTES_PER_DAY);
   const marketLossExposure = clamp((companyAgeDays - STARTER_CUSTOMER_GRACE_DAYS) / STARTER_CUSTOMER_RAMP_DAYS, 0, 1);
   const marketLoss = gap < 0 ? -gap * CUSTOMER_MARKET_LOSS_RATE * retention * marketLossExposure : 0;
@@ -993,7 +1065,8 @@ function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayF
     const growth = customerGrowthSnapshot(s, d);
     const gap = growth.addressable - growth.current;
     const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
-    const retention = clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention;
+    const retention =
+      clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention * marketEffects(s, d.id).retention;
     // Two different ways to lose people.
     const marketLoss = gap < 0 ? -gap * CUSTOMER_MARKET_LOSS_RATE * dayFrac * retention * growth.marketLossExposure : 0;
     const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul * retention;
@@ -1392,9 +1465,8 @@ function tickIncidents(
   if (touched) s.incidents = next;
 
   if (s.autoDispatch && mods.hasAutoDispatch) {
-    for (const inc of s.incidents) {
-      if (inc.resolved || inc.assignedTechId) continue;
-      const free = s.technicians.find((t) => t.state === 'idle' && t.maintenanceId === null);
+    for (const inc of pendingIncidents(s)) {
+      const free = dispatchCandidates(s, inc, 'normal')[0]?.technician;
       if (!free) break;
       dispatch(s, inc.id, free.id, 'normal', true);
     }
@@ -1428,8 +1500,7 @@ export function dispatch(s: GameState, incidentId: string, techId: string, mode:
   ) {
     return false;
   }
-  const skillMul = 1 - (tech.skill - 1) * 0.12;
-  const minutes = Math.max(30, Math.round(inc.repairTotalMinutes * (mode === 'emergency' ? 0.28 : 1) * skillMul));
+  const minutes = repairMinutes(inc, tech.skill, mode);
   const cost = repairCost(inc, mode);
   if (!free && mode === 'emergency' && s.money < cost) return false;
   if (!free) {
@@ -1452,24 +1523,10 @@ export function dispatch(s: GameState, incidentId: string, techId: string, mode:
   return true;
 }
 
-export function incidentLocation(s: GameState, inc: Incident): { gx: number; gy: number } {
-  if (inc.targetType === 'node') {
-    const n = s.nodes.find((x) => x.id === inc.targetId);
-    if (n) return { gx: n.gx, gy: n.gy };
-  } else {
-    const l = s.links.find((x) => x.id === inc.targetId);
-    if (l) {
-      const a = s.nodes.find((n) => n.id === l.aId);
-      const b = s.nodes.find((n) => n.id === l.bId);
-      if (a && b) return { gx: (a.gx + b.gx) / 2, gy: (a.gy + b.gy) / 2 };
-    }
-  }
-  const d = s.districts.find((x) => x.id === inc.districtId);
-  return d ? d.center : { gx: 0, gy: 0 };
-}
+export { incidentLocation } from './incidents';
 
 function tickTechnicians(s: GameState, dt: number) {
-  const speed = 0.02 * dt; // grid units per game minute
+  const speed = CREW_SPEED * dt; // grid units per game minute
   let changed = false;
   const next = s.technicians.map((t) => {
     if (t.state === 'idle') return t;
@@ -1839,32 +1896,11 @@ function startCityEvent(s: GameState, rng: Rng) {
 }
 
 function growCity(s: GameState, rng: Rng) {
-  const unlocked = s.districts.filter((d) => d.unlocked);
-  if (!unlocked.length) return;
-  const d = pick(rng, unlocked);
-  const candidates = s.buildings.filter((b) => b.districtId === d.id && b.kind !== 'park' && b.floors < 9);
-  if (!candidates.length) return;
-
-  const upgraded: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const b = pick(rng, candidates);
-    upgraded.push(b.id);
-  }
-  s.buildings = s.buildings.map((b) => {
-    if (!upgraded.includes(b.id)) return b;
-    const extra = randInt(rng, 2, 8);
-    return { ...b, floors: Math.min(10, b.floors + 1), households: b.households + extra };
-  });
-  s.districts = s.districts.map((x) =>
-    x.id === d.id
-      ? { ...x, potential: Math.round(x.potential * 1.04), population: Math.round(x.population * 1.04) }
-      : x,
-  );
-  // Growth accelerates, so a network that was comfortable last year is not.
+  const candidates = s.districts.filter((d) => d.unlocked && d.coverage >= 0.4 && d.satisfaction >= 65);
+  if (candidates.length) developDistrict(s, pick(rng, candidates).id, 6);
   const years = s.minutes / (MINUTES_PER_DAY * 365);
-  const interval = Math.max(6, Math.round(randInt(rng, 14, 26) * clamp(1 - years * 0.18, 0.4, 1)));
-  s.nextGrowthAt = s.minutes + MINUTES_PER_DAY * interval;
-  pushLog(s, `${d.name} is growing, new residents mean new demand.`, 'info');
+  s.nextGrowthAt =
+    s.minutes + MINUTES_PER_DAY * Math.max(6, Math.round(randInt(rng, 14, 26) * clamp(1 - years * 0.18, 0.4, 1)));
 }
 
 export { clamp } from './util';

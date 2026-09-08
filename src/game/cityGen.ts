@@ -1,14 +1,7 @@
 import { GRID } from './constants';
+import { cityByName } from './cities';
 import { makeRng, randInt, type Rng } from './rng';
 import type { Building, BuildingKind, District } from './types';
-
-const DISTRICT_BLUEPRINTS = [
-  { name: 'Kadıköy', color: '#4d8dff', income: 'medium' as const, biz: 0.35, comp: 0.18 },
-  { name: 'Ataşehir', color: '#a78bfa', income: 'high' as const, biz: 0.6, comp: 0.35 },
-  { name: 'Üsküdar', color: '#3ee6d6', income: 'medium' as const, biz: 0.22, comp: 0.24 },
-  { name: 'Beşiktaş', color: '#ffc857', income: 'high' as const, biz: 0.7, comp: 0.42 },
-  { name: 'Bakırköy', color: '#7ee787', income: 'low' as const, biz: 0.28, comp: 0.3 },
-];
 
 // Roads run along every 5th line of the grid, forming visible city blocks.
 export const isRoad = (gx: number, gy: number) => gx % 5 === 0 || gy % 5 === 0;
@@ -90,8 +83,9 @@ export interface GeneratedCity {
 }
 
 // Five districts as Voronoi regions, filled with buildings that skip the road lines.
-export function generateCity(seed: number): GeneratedCity {
+export function generateCity(seed: number, cityName = 'Marmara'): GeneratedCity {
   const rng = makeRng(seed);
+  const city = cityByName(cityName);
   const half = GRID / 2;
 
   // Seed points placed roughly in a ring plus one centre, then jittered.
@@ -103,7 +97,7 @@ export function generateCity(seed: number): GeneratedCity {
     { gx: half, gy: half },
   ].map((a) => ({ gx: a.gx + randInt(rng, -1, 1), gy: a.gy + randInt(rng, -1, 1) }));
 
-  const districts: District[] = DISTRICT_BLUEPRINTS.map((bp, i) => ({
+  const districts: District[] = city.districts.map((bp, i) => ({
     id: `d${i}`,
     name: bp.name,
     color: bp.color,
@@ -113,7 +107,7 @@ export function generateCity(seed: number): GeneratedCity {
     incomeLevel: bp.income,
     businessDensity: bp.biz,
     demandFactor: 0.55 + rng() * 0.35,
-    competition: bp.comp,
+    competition: Math.min(0.75, bp.comp * city.competitionMul),
     coverage: 0,
     mobileCoverage: 0,
     mobileSubs: 0,
@@ -144,7 +138,7 @@ export function generateCity(seed: number): GeneratedCity {
     for (const cell of d.cells) {
       if (isRoad(cell.gx, cell.gy)) continue;
       // Leave gaps so the city reads as blocks rather than a solid mass.
-      if (rng() < 0.16) continue;
+      if (rng() < 1 - 0.84 * city.density) continue;
       const kind = weightedKind(rng, d.incomeLevel);
       const [fmin, fmax] = FLOORS[kind];
       const [hmin, hmax] = HOUSEHOLDS[kind];
@@ -169,7 +163,7 @@ export function generateCity(seed: number): GeneratedCity {
     const own = buildings.filter((b) => b.districtId === d.id);
     d.population = own.reduce((s, b) => s + b.households * 2.4, 0) | 0;
     d.potential = own.filter((b) => b.segment === 'residential').reduce((s, b) => s + b.households, 0);
-    d.entryCost = d.unlocked ? 0 : Math.round((18000 + d.potential * 12) / 1000) * 1000;
+    d.entryCost = d.unlocked ? 0 : Math.round(((18000 + d.potential * 12) * city.licenceCostMul) / 1000) * 1000;
   }
 
   return { districts, buildings };
