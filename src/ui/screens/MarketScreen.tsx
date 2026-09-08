@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
+import { t } from '../i18n';
 import { districtPull, rivalPosture, rivalArpu } from '../../game/competitors';
 import { customerGrowthSnapshot } from '../../game/simulation';
 import {
@@ -102,6 +103,7 @@ function MarketMap({
 
 function DistrictDesk({ id }: { id: string }) {
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const launch = useGame((s) => s.launchMarketOperation);
   const end = useGame((s) => s.endMarketOperation);
   const focus = useGame((s) => s.focus);
@@ -154,7 +156,7 @@ function DistrictDesk({ id }: { id: string }) {
     <section className="min-w-0" aria-label="District competition desk">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
         <div>
-          <p className="text-xs text-white/50">District commercial desk</p>
+          <p className="text-xs text-white/50">{t(locale, 'districtCommercialDesk')}</p>
           <h2 className="market-heading mt-1">{district.name}</h2>
         </div>
         <button
@@ -164,22 +166,22 @@ function DistrictDesk({ id }: { id: string }) {
             select({ type: 'district', id });
           }}
         >
-          Inspect network
+          {t(locale, 'inspectNetwork')}
         </button>
       </div>
       <dl className="my-4 grid grid-cols-3 gap-3 text-xs">
         <div>
-          <dt className="text-white/50">Fixed customers</dt>
+          <dt className="text-white/50">{t(locale, 'fixedCustomers')}</dt>
           <dd className="mt-1 text-xl font-semibold">
             {Math.round(districtFixedCustomers(game, id)).toLocaleString()}
           </dd>
         </div>
         <div>
-          <dt className="text-white/50">Fixed reach</dt>
+          <dt className="text-white/50">{t(locale, 'fixedReach')}</dt>
           <dd className="mt-1 text-xl font-semibold">{Math.round(district.coverage * 100)}%</dd>
         </div>
         <div>
-          <dt className="text-white/50">Satisfaction</dt>
+          <dt className="text-white/50">{t(locale, 'satisfaction')}</dt>
           <dd className="mt-1 text-xl font-semibold">
             {district.satisfaction.toFixed(0)}
             <span className="text-xs text-white/40"> /100</span>
@@ -198,7 +200,7 @@ function DistrictDesk({ id }: { id: string }) {
       ))}
       <div className="grid gap-5 md:grid-cols-2">
         <section aria-label="Local market appeal">
-          <h3 className="text-sm font-semibold">Who wins the next decision?</h3>
+          <h3 className="text-sm font-semibold">{t(locale, 'whoWinsNextDecision')}</h3>
           <p className="mt-1 text-xs text-white/45">
             Share of market appeal, including customers who do not switch. These are targets, not current subscriber
             shares.
@@ -221,7 +223,7 @@ function DistrictDesk({ id }: { id: string }) {
           </div>
         </section>
         <section aria-label="District customer history">
-          <h3 className="text-sm font-semibold">Customer trajectory</h3>
+          <h3 className="text-sm font-semibold">{t(locale, 'customerTrajectory')}</h3>
           <p className="mt-1 text-xs text-white/45">
             Last {samples.length} daily observations. All market factors included.
           </p>
@@ -235,7 +237,7 @@ function DistrictDesk({ id }: { id: string }) {
             </div>
           ) : (
             <p className="mt-6 border-l-2 border-white/15 pl-3 text-xs text-white/45">
-              Daily samples appear as the city clock advances.
+              {t(locale, 'dailySamplesAppear')}
             </p>
           )}
           <p className="mt-3 text-xs text-white/60">
@@ -254,7 +256,7 @@ function DistrictDesk({ id }: { id: string }) {
           <>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-neon-cyan">Operation in progress</p>
+                <p className="text-xs text-neon-cyan">{t(locale, 'operationInProgress')}</p>
                 <h3 className="mt-1 text-lg font-semibold">{MARKET_TACTICS[current.kind].title}</h3>
               </div>
               <p className="text-sm text-neon-cyan">{daysLeft(current.endsAt, game.minutes)} days left</p>
@@ -275,15 +277,15 @@ function DistrictDesk({ id }: { id: string }) {
             <p className="mt-3 text-sm text-white/65">{MARKET_TACTICS[current.kind].detail}</p>
             <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs">
               <div>
-                <dt className="text-white/45">Programme paid</dt>
+                <dt className="text-white/45">{t(locale, 'programmePaid')}</dt>
                 <dd>{fmtMoneyExact(current.cost)}</dd>
               </div>
               <div>
-                <dt className="text-white/45">Net fixed-customer change</dt>
+                <dt className="text-white/45">{t(locale, 'netFixedCustomerChange')}</dt>
                 <dd>{signed(districtFixedCustomers(game, id) - current.baselineCustomers)}</dd>
               </div>
               <div>
-                <dt className="text-white/45">Live appeal multiplier</dt>
+                <dt className="text-white/45">{t(locale, 'liveAppealMultiplier')}</dt>
                 <dd>{marketEffects(game, id).appeal.toFixed(2)}×</dd>
               </div>
             </dl>
@@ -315,10 +317,8 @@ function DistrictDesk({ id }: { id: string }) {
           </>
         ) : (
           <>
-            <h3 className="text-lg font-semibold">Choose your response</h3>
-            <p className="mt-1 text-xs text-white/55">
-              One operation per district, up to three citywide. Each lasts 14 days and is paid upfront.
-            </p>
+            <h3 className="text-lg font-semibold">{t(locale, 'chooseYourResponse')}</h3>
+            <p className="mt-1 text-xs text-white/55">{t(locale, 'operationRulesBlurb')}</p>
             <div className="mt-4 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Market response">
               {(Object.keys(MARKET_TACTICS) as MarketTactic[]).map((k) => (
                 <label
@@ -344,11 +344,11 @@ function DistrictDesk({ id }: { id: string }) {
             <p className="mt-2 text-xs leading-relaxed text-white/50">{MARKET_TACTICS[kind].tradeoff}</p>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-4">
               <div>
-                <p className="text-xs text-white/50">Full programme cost</p>
+                <p className="text-xs text-white/50">{t(locale, 'fullProgrammeCost')}</p>
                 <strong className="text-xl">{fmtMoneyExact(cost)}</strong>
               </div>
               <div className="text-xs">
-                <p className="text-white/50">Daily net change at today's conditions</p>
+                <p className="text-white/50">{t(locale, 'dailyNetChangeToday')}</p>
                 <p className="mt-1">
                   <span>{signed(growth.projectedDailyDelta)}</span>
                   <span className="mx-2 text-white/30">→</span>
@@ -389,6 +389,7 @@ function DistrictDesk({ id }: { id: string }) {
 
 export default function MarketScreen() {
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const setScreen = useGame((s) => s.setScreen);
   const selected = useGame((s) => s.selection);
   const [id, setId] = useState(
@@ -402,19 +403,17 @@ export default function MarketScreen() {
       <div className="mx-auto max-w-[1360px] space-y-5">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">The city is contested</h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/55">
-              Read local pressure. Back a commercial response with a network that can deliver.
-            </p>
+            <h1 className="text-3xl font-semibold">{t(locale, 'cityIsContested')}</h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/55">{t(locale, 'cityContestedBlurb')}</p>
           </div>
           <button className="btn text-xs" onClick={() => setScreen('company')}>
-            Company finances
+            {t(locale, 'companyFinances')}
           </button>
         </header>
         <div className="market-command-grid grid items-start gap-5 xl:grid-cols-[330px_minmax(0,1fr)]">
           <aside className="min-w-0 rounded-lg bg-[#132832] p-4" aria-label="City market board">
             <div className="flex items-center justify-between gap-2 text-sm">
-              <h2 className="font-semibold">District pressure</h2>
+              <h2 className="font-semibold">{t(locale, 'districtPressure')}</h2>
               <span className={liveMoves.length ? 'text-[#ed9e77]' : 'text-white/40'}>
                 {liveMoves.length} rival moves
               </span>
@@ -441,9 +440,7 @@ export default function MarketScreen() {
                 ))}
               </div>
             </div>
-            <p className="mt-3 text-[11px] text-white/45">
-              Colour shows the operator with the strongest local appeal. Amber markers flag an active rival offensive.
-            </p>
+            <p className="mt-3 text-[11px] text-white/45">{t(locale, 'districtPressureBlurb')}</p>
             <p className="mt-4 border-t border-white/10 pt-3 text-xs text-white/45">
               Commercial capacity: {game.competition.operations.length} / 3 operations
             </p>
@@ -453,7 +450,7 @@ export default function MarketScreen() {
           </div>
         </div>
         <section aria-label="Rival intelligence" className="rounded-lg border border-white/10 bg-[#142b36] p-4 sm:p-5">
-          <h2 className="market-heading">Rival intelligence</h2>
+          <h2 className="market-heading">{t(locale, 'rivalIntelligence')}</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {game.competitors.map((c) => {
               const move = liveMoves.find((m) => m.rivalId === c.id);
@@ -469,11 +466,11 @@ export default function MarketScreen() {
                   <p className="mt-2 text-xs text-white/55">{posture.detail}</p>
                   <dl className="mt-3 flex flex-wrap gap-5 text-xs">
                     <div>
-                      <dt className="text-white/40">Cash reserves</dt>
+                      <dt className="text-white/40">{t(locale, 'cashReserves')}</dt>
                       <dd>{fmtMoneyExact(c.cash)}</dd>
                     </div>
                     <div>
-                      <dt className="text-white/40">Base monthly ARPU</dt>
+                      <dt className="text-white/40">{t(locale, 'baseMonthlyArpu')}</dt>
                       <dd>{fmtMoneyExact(rivalArpu(c))}</dd>
                     </div>
                   </dl>
@@ -488,7 +485,7 @@ export default function MarketScreen() {
                       {RIVAL_MOVES[move.kind].title} · {daysLeft(move.endsAt, game.minutes)}d
                     </button>
                   ) : (
-                    <p className="mt-3 text-xs text-white/35">No active district offensive.</p>
+                    <p className="mt-3 text-xs text-white/35">{t(locale, 'noActiveOffensive')}</p>
                   )}
                 </article>
               );
@@ -496,7 +493,7 @@ export default function MarketScreen() {
           </div>
         </section>
         <section className="rounded-lg border border-white/10 p-4 sm:p-5" aria-label="Operation results">
-          <h2 className="market-heading">After the campaign</h2>
+          <h2 className="market-heading">{t(locale, 'afterTheCampaign')}</h2>
           <p className="mt-1 text-xs text-white/50">
             Observed district results include the wider market and network changes; they are not a claim that the
             programme caused every sign-up.
@@ -530,9 +527,7 @@ export default function MarketScreen() {
               ))}
             </div>
           ) : (
-            <p className="mt-5 text-sm text-white/40">
-              Complete an operation to compare the outcome with your starting position.
-            </p>
+            <p className="mt-5 text-sm text-white/40">{t(locale, 'completeOperationBlurb')}</p>
           )}
         </section>
       </div>
