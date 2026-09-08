@@ -3,8 +3,10 @@ import { investmentEstimate } from '../game/investment';
 import { fmtMoney } from '../game/economy';
 import type { NodeKind } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 
 export default function InvestmentPreview({ kind, nodeId }: { kind: NodeKind; nodeId?: string }) {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const tr = useGame((s) => s.locale) === 'tr';
   const estimate = investmentEstimate(game, kind, nodeId);
@@ -28,9 +30,7 @@ export default function InvestmentPreview({ kind, nodeId }: { kind: NodeKind; no
         <div className="mt-2 text-xs text-teal-200">
           +{reach.homes.toLocaleString()} potential homes · {Math.round(reach.before * 100)}% →{' '}
           {Math.round(reach.after * 100)}% reach
-          <p className="mt-1 text-[10px] text-white/45">
-            Coverage settles over time; sign-ups depend on price and service.
-          </p>
+          <p className="mt-1 text-[10px] text-white/45">{t(locale, 'coverageSettlesBlurb')}</p>
         </div>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-white/55">
