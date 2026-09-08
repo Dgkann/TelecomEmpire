@@ -11,6 +11,7 @@ import { MINUTES_PER_DAY } from '../../game/constants';
 import { fmtMoneyExact } from '../../game/economy';
 import type { CityTender, GameState } from '../../game/types';
 import { useGame } from '../../store/gameStore';
+import { t } from '../i18n';
 
 const timeLeft = (until: number, now: number) => {
   const hours = Math.max(0, Math.ceil((until - now) / 60));
@@ -55,6 +56,7 @@ function DistrictDiagram({ game, tender }: { game: GameState; tender: CityTender
 
 function TenderDetail({ tender }: { tender: CityTender }) {
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const bid = useGame((s) => s.bidOnTender);
   const withdraw = useGame((s) => s.withdrawTender);
   const focus = useGame((s) => s.focus);
@@ -123,7 +125,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
       </div>
       <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
         <section>
-          <h3 className="font-semibold">Delivery specification</h3>
+          <h3 className="font-semibold">{t(locale, 'deliverySpecification')}</h3>
           <p className="mt-1 text-xs leading-relaxed text-white/50">
             Build within {spec.days} days of award. Hold every condition for six consecutive game hours. Losing a
             condition restarts the acceptance test.
@@ -159,7 +161,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
           </ul>
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="btn text-xs" onClick={inspect}>
-              Inspect project district
+              {t(locale, 'inspectProjectDistrict')}
             </button>
             {tender.status === 'delivery' && (
               <button
@@ -170,7 +172,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                   beginPlan();
                 }}
               >
-                Plan delivery network
+                {t(locale, 'planDeliveryNetwork')}
               </button>
             )}
           </div>
@@ -191,13 +193,13 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 );
               }}
             >
-              <h3 className="font-semibold">Your sealed bid</h3>
+              <h3 className="font-semibold">{t(locale, 'yourSealedBid')}</h3>
               <p className="mt-1 text-xs leading-relaxed text-white/55">
                 Offer the payment you require for the complete job. Lowest cost contributes 70 points; reputation
                 contributes 30.
               </p>
               <label className="mt-4 block text-xs text-white/60">
-                Requested payment
+                {t(locale, 'requestedPayment')}
                 <input
                   type="number"
                   min={Math.ceil(tender.budget * 0.65)}
@@ -230,7 +232,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
               </div>
               <dl className="mt-4 space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <dt>Your score at current reputation</dt>
+                  <dt>{t(locale, 'yourScoreAtReputation')}</dt>
                   <dd className="text-neon-amber">
                     {Number.isFinite(price) ? bidScore(tender.budget, price, game.reputation).toFixed(1) : '—'} / 100
                   </dd>
@@ -240,11 +242,11 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                   <dd>{Number.isFinite(price) ? fmtMoneyExact(bidBond(price)) : '—'}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Bond already held</dt>
+                  <dt>{t(locale, 'bondAlreadyHeld')}</dt>
                   <dd>{fmtMoneyExact(tender.bond)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Sealed rival bids</dt>
+                  <dt>{t(locale, 'sealedRivalBids')}</dt>
                   <dd>{tender.rivals.length}</dd>
                 </div>
               </dl>
@@ -275,7 +277,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                     )
                   }
                 >
-                  Withdraw bid & recover bond
+                  {t(locale, 'withdrawBidRecoverBond')}
                 </button>
               )}
               <p role="status" className="mt-2 text-xs text-neon-cyan">
@@ -289,7 +291,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
           ) : tender.status === 'delivery' ? (
             <>
               <p className="text-xs text-neon-cyan">Awarded to {game.companyName}</p>
-              <h3 className="mt-2 text-xl font-semibold">Prove the network</h3>
+              <h3 className="mt-2 text-xl font-semibold">{t(locale, 'proveTheNetwork')}</h3>
               <p className="mt-2 text-sm text-white/60">
                 {progress.ready
                   ? 'All conditions met. Keep service healthy while the clock runs.'
@@ -314,15 +316,15 @@ function TenderDetail({ tender }: { tender: CityTender }) {
               </div>
               <dl className="mt-5 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt>Payment on acceptance</dt>
+                  <dt>{t(locale, 'paymentOnAcceptance')}</dt>
                   <dd>{fmtMoneyExact(tender.playerBid!.price)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Bond returned on success</dt>
+                  <dt>{t(locale, 'bondReturnedOnSuccess')}</dt>
                   <dd>{fmtMoneyExact(tender.bond)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Completion reward</dt>
+                  <dt>{t(locale, 'completionReward')}</dt>
                   <dd>+5 reputation · {spec.reward} RP</dd>
                 </div>
               </dl>
@@ -354,7 +356,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
         </section>
         {tender.status !== 'open' && (
           <section className="min-w-0 lg:col-span-2">
-            <h3 className="font-semibold">Revealed bids</h3>
+            <h3 className="font-semibold">{t(locale, 'revealedBids')}</h3>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="text-white/45">
@@ -392,6 +394,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
 
 export default function ProjectsScreen() {
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const tender =
     game.procurement.tenders.find((t) => t.id === selectedId) ??
@@ -403,8 +406,8 @@ export default function ProjectsScreen() {
       <div className="mx-auto max-w-[1280px] space-y-5">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs text-neon-amber">Municipal procurement office</p>
-            <h1 className="mt-2 text-3xl font-semibold">City infrastructure</h1>
+            <p className="text-xs text-neon-amber">{t(locale, 'municipalProcurementOffice')}</p>
+            <h1 className="mt-2 text-3xl font-semibold">{t(locale, 'cityInfrastructure')}</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/55">
               Compete for funded network projects. Price the job, secure the award, then deliver a network the city can
               trust.
@@ -416,7 +419,7 @@ export default function ProjectsScreen() {
         </header>
         <div className="grid items-start gap-4 xl:grid-cols-[240px_1fr]">
           <aside className="space-y-3">
-            <h2 className="text-sm font-semibold">Project register</h2>
+            <h2 className="text-sm font-semibold">{t(locale, 'projectRegister')}</h2>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {game.procurement.tenders.map((t) => (
                 <button
@@ -448,7 +451,7 @@ export default function ProjectsScreen() {
             <TenderDetail key={tender.id} tender={tender} />
           ) : (
             <div className="panel p-8">
-              <h2 className="text-xl font-semibold">The next city call is being prepared</h2>
+              <h2 className="text-xl font-semibold">{t(locale, 'nextCityCallPreparing')}</h2>
               <p className="mt-2 text-sm text-white/60">
                 {game.procurement.nextTenderAt <= game.minutes
                   ? 'Resume the city clock to publish the first tender.'
