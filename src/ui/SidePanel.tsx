@@ -8,6 +8,7 @@ import { networkResilience, pendingRegulations, regulationProgress } from '../ga
 import { contractProfile, negotiatedTerms, premiumCounterChance } from '../game/contracts';
 import { fmtClock, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import DevelopmentGoals from './DevelopmentGoals';
 import { operationsCopy } from './operationsCopy';
 
@@ -43,6 +44,7 @@ function scrollToAnchor(id: string, tries = 40) {
 }
 
 export default function SidePanel() {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const tr = useGame((s) => s.locale) === 'tr';
   const openIncident = useGame((s) => s.openIncident);
@@ -269,7 +271,7 @@ export default function SidePanel() {
                       {tr ? 'Şebeke dengeli' : 'Network steady'}
                     </div>
                     <div className="mt-1 text-[10px] leading-snug text-white/40">
-                      No immediate operational priorities.
+                      {t(locale, 'noImmediatePriorities')}
                     </div>
                   </div>
                 )}
@@ -330,7 +332,7 @@ export default function SidePanel() {
                             className="alert-blink rounded-lg border border-neon-red/40 bg-neon-red/10 px-2.5 py-2 text-left"
                           >
                             <div className="text-xs font-semibold text-neon-red">{d.name}: NO SERVICE</div>
-                            <div className="text-[10px] text-white/50">No live path back to a core router.</div>
+                            <div className="text-[10px] text-white/50">{t(locale, 'noLivePathBackToCore')}</div>
                           </button>
                         );
                       })}
@@ -482,7 +484,7 @@ export default function SidePanel() {
                             <span className="text-right text-white">{o.slaPercent}%</span>
                             <span>Term</span>
                             <span className="text-right text-white">{o.termMonths} months</span>
-                            <span>Signing bonus</span>
+                            <span>{t(locale, 'signingBonus')}</span>
                             <span className="text-right text-white">{fmtMoney(o.signingBonus)}</span>
                             <span>District</span>
                             <span className="text-right text-white">{d?.name}</span>
@@ -512,7 +514,7 @@ export default function SidePanel() {
                               onClick={() => acceptOffer(o.id, 'flexible')}
                               title="Take 15% less revenue in exchange for twice the monthly downtime allowance."
                             >
-                              <span className="block text-[10px] font-semibold">Flexible SLA</span>
+                              <span className="block text-[10px] font-semibold">{t(locale, 'flexibleSla')}</span>
                               <span className="num block text-[9px] text-white/45">
                                 {flexible.slaPercent}% · {fmtMoney(flexible.monthlyRevenue)}
                               </span>
@@ -523,7 +525,9 @@ export default function SidePanel() {
                               onClick={() => acceptOffer(o.id, 'premium')}
                               title="Ask for 20% more monthly revenue. Rejection loses the deal."
                             >
-                              <span className="block text-[10px] font-semibold text-neon-amber">Premium counter</span>
+                              <span className="block text-[10px] font-semibold text-neon-amber">
+                                {t(locale, 'premiumCounter')}
+                              </span>
                               <span className="num block text-[9px] text-white/45">
                                 {fmtMoney(premium.monthlyRevenue)} · {Math.round(premiumChance * 100)}%
                               </span>
