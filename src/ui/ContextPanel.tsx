@@ -13,6 +13,7 @@ import { residentialSubs } from '../game/simulation';
 import { CAMPAIGN_CONFIG, MAINTENANCE_CONFIG, activeCampaign, maintenanceCost } from '../game/strategy';
 import type { CampaignKind, MaintenanceMode } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { useMemo } from 'react';
 import SiteIcon, { TierBadge } from './SiteIcon';
 import InvestmentPreview from './InvestmentPreview';
@@ -43,6 +44,7 @@ export default function ContextPanel() {
   const addBackupRoute = useGame((s) => s.addBackupRoute);
   const beginDrill = useGame((s) => s.beginFailureDrill);
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const selection = useGame((s) => s.selection);
   const select = useGame((s) => s.select);
   const setTool = useGame((s) => s.setTool);
@@ -156,7 +158,9 @@ export default function ContextPanel() {
                     <TierBadge tier={node.tier} maxTier={nodeMaxTier} compact />
                   </div>
                   <div className="truncate text-lg font-semibold leading-tight">{node.name}</div>
-                  {node.down && <div className="mt-1 text-xs font-semibold text-neon-red">OUT OF SERVICE</div>}
+                  {node.down && (
+                    <div className="mt-1 text-xs font-semibold text-neon-red">{t(locale, 'outOfService')}</div>
+                  )}
                 </div>
               </div>
 
@@ -169,13 +173,13 @@ export default function ContextPanel() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="chip">
-                  <div className="stat-label">Path to core</div>
+                  <div className="stat-label">{t(locale, 'pathToCore')}</div>
                   <div className={connected ? 'text-neon-lime' : 'text-neon-red'}>
                     {connected ? 'Live' : 'Isolated'}
                   </div>
                 </div>
                 <div className="chip">
-                  <div className="stat-label">Redundancy</div>
+                  <div className="stat-label">{t(locale, 'redundancy')}</div>
                   <div className={redundant ? 'text-neon-lime' : 'text-neon-amber'}>
                     {node.kind === 'core' ? 'n/a' : redundant ? 'Protected' : 'Single path'}
                   </div>
@@ -187,12 +191,12 @@ export default function ContextPanel() {
                   className="btn w-full border-orange-300/30 text-xs text-orange-200"
                   onClick={() => beginDrill({ type: 'node', id: node.id })}
                 >
-                  Test site failure
+                  {t(locale, 'testSiteFailure')}
                 </button>
               )}
               {backup && (
                 <div className="rounded-md border border-teal-300/25 bg-teal-300/5 p-3">
-                  <div className="text-xs font-semibold text-teal-200">Protect against a fibre cut</div>
+                  <div className="text-xs font-semibold text-teal-200">{t(locale, 'protectAgainstCut')}</div>
                   <p className="my-2 text-[11px] text-white/60">
                     Independent path via {backup.node.name}. Validated against every cut on the current route.
                   </p>
@@ -206,15 +210,13 @@ export default function ContextPanel() {
                 </div>
               )}
               {!redundant && node.kind !== 'core' && (
-                <p className="text-[11px] leading-snug text-white/45">
-                  One fibre cut takes this site dark. A second span from another site keeps it alive.
-                </p>
+                <p className="text-[11px] leading-snug text-white/45">{t(locale, 'protectAgainstCutBlurb')}</p>
               )}
 
               {nextNodeCapacity !== null && (
                 <div className="rounded-lg border border-neon-cyan/15 bg-neon-cyan/[0.045] p-2.5">
                   <div className="mb-2 flex items-center justify-between">
-                    <div className="stat-label">Upgrade preview</div>
+                    <div className="stat-label">{t(locale, 'upgradePreview')}</div>
                     <div className="num text-[10px] font-semibold text-neon-lime">
                       +{Math.round((nextNodeCapacity / Math.max(0.01, node.capacityGbps) - 1) * 100)}% capacity
                     </div>
@@ -239,7 +241,7 @@ export default function ContextPanel() {
               {nodeMaintenance ? (
                 <div className="rounded-lg border border-neon-amber/25 bg-neon-amber/[0.06] p-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="stat-label text-neon-amber">Planned work</span>
+                    <span className="stat-label text-neon-amber">{t(locale, 'plannedWork')}</span>
                     <span className="chip border-neon-amber/30 text-[9px] text-neon-amber">
                       {nodeMaintenance.status.toUpperCase()}
                     </span>
@@ -261,7 +263,7 @@ export default function ContextPanel() {
                 </div>
               ) : (
                 <div>
-                  <div className="stat-label mb-1.5">Maintenance window</div>
+                  <div className="stat-label mb-1.5">{t(locale, 'maintenanceWindow')}</div>
                   <div
                     className={`mb-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${maintenanceCover.safe ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}
                   >
@@ -310,10 +312,10 @@ export default function ContextPanel() {
                     clickNodeForLink(node.id);
                   }}
                 >
-                  Add fibre
+                  {t(locale, 'addFibre')}
                 </button>
                 <button className="btn-danger" onClick={() => sellNode(node.id)}>
-                  Decommission
+                  {t(locale, 'decommission')}
                 </button>
               </div>
             </div>
@@ -323,13 +325,13 @@ export default function ContextPanel() {
             <div className="space-y-3">
               <div>
                 <div className="mb-1 flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-widest text-white/40">Fibre span</span>
+                  <span className="text-[10px] uppercase tracking-widest text-white/40">{t(locale, 'fibreSpan')}</span>
                   <TierBadge tier={link.tier} maxTier={mods.maxLinkTier} compact />
                 </div>
                 <div className="text-base font-semibold leading-tight">
                   {game.nodes.find((n) => n.id === link.aId)?.name} ↔ {game.nodes.find((n) => n.id === link.bId)?.name}
                 </div>
-                {link.down && <div className="mt-1 text-xs font-semibold text-neon-red">SPAN DARK</div>}
+                {link.down && <div className="mt-1 text-xs font-semibold text-neon-red">{t(locale, 'spanDark')}</div>}
               </div>
               <Bar
                 value={linkUtil(link)}
@@ -341,13 +343,13 @@ export default function ContextPanel() {
                   className="btn w-full border-orange-300/30 text-xs text-orange-200"
                   onClick={() => beginDrill({ type: 'link', id: link.id })}
                 >
-                  Test fibre cut
+                  {t(locale, 'testFibreCut')}
                 </button>
               )}
               <div className="text-[11px] text-white/45">Length {link.length.toFixed(1)} km</div>
               {nextLinkCapacity !== null && (
                 <div className="flex items-center justify-between rounded-lg border border-neon-blue/15 bg-neon-blue/[0.045] px-3 py-2 text-[11px]">
-                  <span className="text-white/45">After optics upgrade</span>
+                  <span className="text-white/45">{t(locale, 'afterOpticsUpgrade')}</span>
                   <span className="num font-semibold text-neon-blue">
                     {link.capacityGbps.toFixed(0)}G → {nextLinkCapacity.toFixed(0)}G
                   </span>
@@ -386,7 +388,7 @@ export default function ContextPanel() {
                 <>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="chip">
-                      <div className="stat-label">Bandwidth</div>
+                      <div className="stat-label">{t(locale, 'bandwidth')}</div>
                       <div className="num">{buildingContract.bandwidthGbps} Gbps</div>
                     </div>
                     <div className="chip">
@@ -398,7 +400,7 @@ export default function ContextPanel() {
                       <div className="num">{buildingContract.slaPercent}%</div>
                     </div>
                     <div className="chip">
-                      <div className="stat-label">Penalties paid</div>
+                      <div className="stat-label">{t(locale, 'penaltiesPaid')}</div>
                       <div className="num">{fmtMoneyExact(buildingContract.penaltyPaid)}</div>
                     </div>
                   </div>
@@ -426,11 +428,11 @@ export default function ContextPanel() {
               ) : (
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="chip">
-                    <div className="stat-label">Households</div>
+                    <div className="stat-label">{t(locale, 'households')}</div>
                     <div className="num">{fmtNum(building.households)}</div>
                   </div>
                   <div className="chip">
-                    <div className="stat-label">Connected</div>
+                    <div className="stat-label">{t(locale, 'connectedLabel')}</div>
                     <div className="num">{Math.round(building.connected * 100)}%</div>
                   </div>
                 </div>
@@ -449,11 +451,11 @@ export default function ContextPanel() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="chip">
-                  <div className="stat-label">Population</div>
+                  <div className="stat-label">{t(locale, 'population')}</div>
                   <div className="num">{fmtNum(district.population)}</div>
                 </div>
                 <div className="chip">
-                  <div className="stat-label">Potential</div>
+                  <div className="stat-label">{t(locale, 'potential')}</div>
                   <div className="num">{fmtNum(district.potential)}</div>
                 </div>
                 <div className="chip">
@@ -461,13 +463,13 @@ export default function ContextPanel() {
                   <div className="capitalize">{district.incomeLevel}</div>
                 </div>
                 <div className="chip">
-                  <div className="stat-label">Your customers</div>
+                  <div className="stat-label">{t(locale, 'yourCustomers')}</div>
                   <div className="num">{fmtNum(residentialSubs(game, district.id))}</div>
                 </div>
               </div>
 
               <button className="btn w-full text-xs" onClick={() => useGame.getState().setScreen('market')}>
-                Open district competition
+                {t(locale, 'openDistrictCompetition')}
               </button>
               <DistrictProjectCard districtId={district.id} />
               <DistrictLaunchProgress districtId={district.id} />
@@ -479,7 +481,7 @@ export default function ContextPanel() {
               />
 
               <div>
-                <div className="stat-label mb-1">Market share</div>
+                <div className="stat-label mb-1">{t(locale, 'marketShare')}</div>
                 <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/10">
                   {(() => {
                     const mine = district.potential > 0 ? residentialSubs(game, district.id) / district.potential : 0;
@@ -541,7 +543,7 @@ export default function ContextPanel() {
                   </div>
                 ) : (
                   <div>
-                    <div className="stat-label mb-1.5">District campaign · 30 days</div>
+                    <div className="stat-label mb-1.5">{t(locale, 'districtCampaign30')}</div>
                     <div className="grid grid-cols-2 gap-2">
                       {(
                         Object.entries(CAMPAIGN_CONFIG) as Array<[CampaignKind, (typeof CAMPAIGN_CONFIG)[CampaignKind]]>
@@ -564,14 +566,14 @@ export default function ContextPanel() {
                       })}
                     </div>
                     <div className="mt-1.5 text-[9px] leading-relaxed text-white/30">
-                      One focused campaign per district. Choose growth, loyalty, business leads or mobile adoption.
+                      {t(locale, 'districtCampaignBlurb')}
                     </div>
                   </div>
                 ))}
 
               {districtCampaignHistory.length > 0 && (
                 <div>
-                  <div className="stat-label mb-1.5">Recent campaign results</div>
+                  <div className="stat-label mb-1.5">{t(locale, 'recentCampaignResults')}</div>
                   <div className="space-y-1">
                     {districtCampaignHistory.map((result) => (
                       <div
@@ -600,9 +602,7 @@ export default function ContextPanel() {
                   Buy licence · {fmtMoneyExact(district.entryCost)}
                 </button>
               ) : (
-                <p className="text-[11px] leading-snug text-white/45">
-                  Place a POP here and run fibre back to your core to start selling.
-                </p>
+                <p className="text-[11px] leading-snug text-white/45">{t(locale, 'placePopHere')}</p>
               )}
             </div>
           )}
