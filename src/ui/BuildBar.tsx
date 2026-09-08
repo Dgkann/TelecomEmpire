@@ -125,7 +125,7 @@ export default function BuildBar() {
                 checked={autoConnect}
                 onChange={(e) => setAutoConnect(e.target.checked)}
               />
-              Include fibre to nearest live site
+              {translate(locale, 'includeFibreToNearest')}
               <span className="ml-auto text-neon-cyan">{autoConnect ? 'One-click build' : 'Optional'}</span>
             </label>
           )}
