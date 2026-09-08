@@ -8,6 +8,8 @@ import { networkResilience, pendingRegulations, regulationProgress } from '../ga
 import { contractProfile, negotiatedTerms, premiumCounterChance } from '../game/contracts';
 import { fmtClock, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import DevelopmentGoals from './DevelopmentGoals';
+import { operationsCopy } from './operationsCopy';
 
 type ActionSection = 'live' | 'alerts' | 'obligations' | 'offers' | 'posts';
 
@@ -42,14 +44,30 @@ function scrollToAnchor(id: string, tries = 40) {
 
 export default function SidePanel() {
   const game = useGame((s) => s.game)!;
+  const tr = useGame((s) => s.locale) === 'tr';
   const openIncident = useGame((s) => s.openIncident);
   const focus = useGame((s) => s.focus);
   const acceptOffer = useGame((s) => s.acceptOffer);
   const declineOffer = useGame((s) => s.declineOffer);
   const select = useGame((s) => s.select);
   const setScreen = useGame((s) => s.setScreen);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<ActionSection>('live');
+  const inspectedOfferId = useGame((s) => s.inspectedOfferId);
+  const inspectOffer = useGame((s) => s.inspectOffer);
+  const [manuallyOpen, setManuallyOpen] = useState(false);
+  const [chosenSection, setChosenSection] = useState<ActionSection>('live');
+  const mobileOpen = manuallyOpen || !!inspectedOfferId;
+  const activeSection = inspectedOfferId ? 'offers' : chosenSection;
+  const setMobileOpen = (value: boolean | ((open: boolean) => boolean)) => {
+    const open = typeof value === 'function' ? value(mobileOpen) : value;
+    setManuallyOpen(open);
+    if (!open) inspectOffer(null);
+  };
+  const setActiveSection = (section: ActionSection) => {
+    setChosenSection(section);
+    setManuallyOpen(mobileOpen);
+    inspectOffer(null);
+  };
+  const planning = useGame((s) => s.planning);
 
   // Redundancy costs a Dijkstra per span, and this panel redraws every tick.
   const topology = `${game.nodes.length}:${game.links.length}:${game.nodes
@@ -73,17 +91,18 @@ export default function SidePanel() {
   const active = game.incidents.filter((i) => !i.resolved);
   const outages = Object.entries(game.stats.outages).filter(([, v]) => v);
   const obligations = pendingRegulations(game);
-  const insights = operationsInsights(game);
+  const insights = operationsInsights(game).map((item) => operationsCopy(item, game, tr));
   const priorityCount =
     insights.length + active.length + obligations.length + game.offers.length + (game.activeEvent ? 1 : 0);
   const sections: { id: ActionSection; label: string; count: number; tone: string }[] = [
-    { id: 'live', label: 'Live', count: insights.length + (game.activeEvent ? 1 : 0), tone: '#4de3ff' },
-    { id: 'alerts', label: 'Faults', count: active.length + outages.length, tone: '#ff5d73' },
-    { id: 'obligations', label: 'Due', count: obligations.length, tone: '#ffc857' },
-    { id: 'offers', label: 'Deals', count: game.offers.length, tone: '#7ee787' },
-    { id: 'posts', label: 'Feed', count: game.posts.length, tone: '#69a7ff' },
+    { id: 'live', label: tr ? 'Gündem' : 'Live', count: insights.length + (game.activeEvent ? 1 : 0), tone: '#4de3ff' },
+    { id: 'alerts', label: tr ? 'Arızalar' : 'Faults', count: active.length + outages.length, tone: '#ff5d73' },
+    { id: 'obligations', label: tr ? 'Takvim' : 'Due', count: obligations.length, tone: '#ffc857' },
+    { id: 'offers', label: tr ? 'Teklif' : 'Deals', count: game.offers.length, tone: '#7ee787' },
+    { id: 'posts', label: tr ? 'Akış' : 'Feed', count: game.posts.length, tone: '#69a7ff' },
   ];
 
+  if (planning) return null;
   return (
     <>
       <button
@@ -92,7 +111,8 @@ export default function SidePanel() {
         aria-expanded={mobileOpen}
         aria-controls="mobile-action-center"
       >
-        Actions{priorityCount > 0 ? ` · ${priorityCount}` : ''}
+        {tr ? 'Operasyonlar' : 'Actions'}
+        {priorityCount > 0 ? ` · ${priorityCount}` : ''}
       </button>
       <div
         id="mobile-action-center"
@@ -100,8 +120,12 @@ export default function SidePanel() {
       >
         <div className="pointer-events-auto panel flex items-center justify-between p-2.5 lg:hidden">
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-neon-cyan">Action center</div>
-            <div className="text-[10px] text-white/35">Offers, alerts, events, and obligations</div>
+            <div className="text-[10px] uppercase tracking-widest text-neon-cyan">
+              {tr ? 'Operasyon merkezi' : 'Action center'}
+            </div>
+            <div className="text-[10px] text-white/35">
+              {tr ? 'Teklifler, arızalar, olaylar ve yükümlülükler' : 'Offers, alerts, events, and obligations'}
+            </div>
           </div>
           <button
             className="btn px-2 py-1 text-xs"
@@ -113,8 +137,10 @@ export default function SidePanel() {
         </div>
         <div className="pointer-events-auto panel shrink-0 overflow-hidden p-1.5">
           <div className="mb-1.5 flex items-center justify-between px-1">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/55">Operations queue</span>
-            <span className="num text-[9px] text-neon-cyan">{priorityCount} active</span>
+            <span className="text-xs font-semibold text-white/70">{tr ? 'Operasyonlar' : 'Operations queue'}</span>
+            <span className="num text-[9px] text-neon-cyan">
+              {priorityCount} {tr ? 'gündem' : 'active'}
+            </span>
           </div>
           <div className="grid grid-cols-5 gap-1" role="tablist" aria-label="Action center sections">
             {sections.map((section) => {
@@ -135,9 +161,7 @@ export default function SidePanel() {
                   <span className="num block text-[11px] font-semibold" style={{ color: section.tone }}>
                     {section.count}
                   </span>
-                  <span className="block text-[8px] font-semibold uppercase tracking-wide text-white/45">
-                    {section.label}
-                  </span>
+                  <span className="block text-[10px] font-semibold text-white/65">{section.label}</span>
                   {selected && (
                     <span className="absolute inset-x-2 bottom-0 h-px" style={{ background: section.tone }} />
                   )}
@@ -150,6 +174,18 @@ export default function SidePanel() {
           <div className="flex flex-col gap-2">
             {activeSection === 'live' && (
               <>
+                <button
+                  className="btn mb-2 w-full text-xs"
+                  onClick={() => {
+                    setScreen('company');
+                    setMobileOpen(false);
+                    scrollToAnchor('strategy-desk');
+                  }}
+                >
+                  {tr ? 'Strateji masası' : 'Strategy desk'}
+                  {game.strategy.decision ? (tr ? ' · Karar bekliyor' : ' · Decision waiting') : ' ↗'}
+                </button>
+                <DevelopmentGoals onNavigate={() => setMobileOpen(false)} />
                 <AnimatePresence>
                   {game.activeEvent && (
                     <motion.div
@@ -158,7 +194,9 @@ export default function SidePanel() {
                       exit={{ opacity: 0, y: -12 }}
                       className="pointer-events-auto panel border-neon-violet/40 p-3"
                     >
-                      <div className="text-[10px] uppercase tracking-widest text-neon-violet">City event</div>
+                      <div className="text-[10px] uppercase tracking-widest text-neon-violet">
+                        {tr ? 'Şehir etkinliği' : 'City event'}
+                      </div>
                       <div className="text-sm font-semibold">{game.activeEvent.name}</div>
                       <div className="mt-0.5 text-[11px] leading-snug text-white/50">{game.activeEvent.blurb}</div>
                       <div className="num mt-1.5 text-[11px] text-neon-violet">
@@ -172,8 +210,10 @@ export default function SidePanel() {
                 {insights.length > 0 && (
                   <div className="pointer-events-auto panel p-3">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="text-[10px] uppercase tracking-widest text-neon-cyan">Action center</div>
-                      <span className="num text-[9px] text-white/35">LIVE PRIORITIES</span>
+                      <div className="text-[10px] uppercase tracking-widest text-neon-cyan">
+                        {tr ? 'Operasyon merkezi' : 'Action center'}
+                      </div>
+                      <span className="num text-[9px] text-white/35">{tr ? 'Öncelik sırası' : 'Live priorities'}</span>
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {insights.map((item) => {
@@ -188,6 +228,7 @@ export default function SidePanel() {
                             key={item.id}
                             className="group rounded-lg border border-white/[0.08] bg-white/[0.035] p-2.5 text-left transition-colors hover:bg-white/[0.075]"
                             onClick={() => {
+                              setMobileOpen(false);
                               if (item.target.type === 'screen') {
                                 const { id, anchor } = item.target;
                                 setScreen(id);
@@ -224,7 +265,9 @@ export default function SidePanel() {
                 )}
                 {!game.activeEvent && insights.length === 0 && (
                   <div className="panel p-4 text-center">
-                    <div className="text-xs font-semibold text-neon-lime">Network steady</div>
+                    <div className="text-xs font-semibold text-neon-lime">
+                      {tr ? 'Şebeke dengeli' : 'Network steady'}
+                    </div>
                     <div className="mt-1 text-[10px] leading-snug text-white/40">
                       No immediate operational priorities.
                     </div>
@@ -298,8 +341,12 @@ export default function SidePanel() {
             )}
             {activeSection === 'alerts' && active.length === 0 && outages.length === 0 && (
               <div className="panel p-4 text-center">
-                <div className="text-xs font-semibold text-neon-lime">All systems nominal</div>
-                <div className="mt-1 text-[10px] text-white/40">There are no open faults or outages.</div>
+                <div className="text-xs font-semibold text-neon-lime">
+                  {tr ? 'Tüm sistemler çalışıyor' : 'All systems nominal'}
+                </div>
+                <div className="mt-1 text-[10px] text-white/40">
+                  {tr ? 'Açık arıza veya kesinti bulunmuyor.' : 'There are no open faults or outages.'}
+                </div>
               </div>
             )}
 
@@ -385,8 +432,14 @@ export default function SidePanel() {
                 })}
                 {obligations.length === 0 && (
                   <div className="panel p-4 text-center">
-                    <div className="text-xs font-semibold text-neon-lime">No deadlines pending</div>
-                    <div className="mt-1 text-[10px] text-white/40">Regulatory obligations are currently clear.</div>
+                    <div className="text-xs font-semibold text-neon-lime">
+                      {tr ? 'Bekleyen son tarih yok' : 'No deadlines pending'}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/40">
+                      {tr
+                        ? 'Şu an bekleyen düzenleyici yükümlülük yok.'
+                        : 'Regulatory obligations are currently clear.'}
+                    </div>
                   </div>
                 )}
               </>
@@ -395,99 +448,106 @@ export default function SidePanel() {
             {activeSection === 'offers' && (
               <>
                 <AnimatePresence>
-                  {game.offers.slice(0, 2).map((o) => {
-                    const d = game.districts.find((x) => x.id === o.districtId);
-                    const building = game.buildings.find((entry) => entry.id === o.buildingId);
-                    const service = building ? contractProfile(building.kind) : null;
-                    const cover = redundancyBy.get(o.districtId);
-                    const ready = !o.requiresRedundancy || !!cover?.complete;
-                    const flexible = negotiatedTerms(o, 'flexible');
-                    const premium = negotiatedTerms(o, 'premium');
-                    const premiumChance = premiumCounterChance(game, o);
-                    return (
-                      <motion.div
-                        key={o.id}
-                        initial={{ opacity: 0, x: -16 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -16, transition: { duration: 0.2 } }}
-                        className="pointer-events-auto panel border-neon-lime/30 p-3"
-                      >
-                        <div className="text-[10px] uppercase tracking-widest text-neon-lime">
-                          {o.segment === 'enterprise' ? 'Enterprise contract' : 'Business contract'}
-                        </div>
-                        <div className="text-sm font-semibold">{o.clientName}</div>
-                        {service && <div className="mt-0.5 text-[10px] text-neon-cyan/70">{service.label}</div>}
-                        <div className="num mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-white/55">
-                          <span>Bandwidth</span>
-                          <span className="text-right text-white">{o.bandwidthGbps} Gbps</span>
-                          <span>Revenue</span>
-                          <span className="text-right text-neon-lime">{fmtMoney(o.monthlyRevenue)}/mo</span>
-                          <span>SLA</span>
-                          <span className="text-right text-white">{o.slaPercent}%</span>
-                          <span>Term</span>
-                          <span className="text-right text-white">{o.termMonths} months</span>
-                          <span>Signing bonus</span>
-                          <span className="text-right text-white">{fmtMoney(o.signingBonus)}</span>
-                          <span>District</span>
-                          <span className="text-right text-white">{d?.name}</span>
-                        </div>
-                        {o.requiresRedundancy && (
-                          <div
-                            className={`mt-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${ready ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}
-                          >
-                            {ready
-                              ? 'Second path in place, this client will sign.'
-                              : `Every site in ${d?.name} needs a second path: ${cover?.done ?? 0} of ${cover?.total ?? 0} covered.`}
+                  {[...game.offers]
+                    .sort((a, b) => Number(b.id === inspectedOfferId) - Number(a.id === inspectedOfferId))
+                    .slice(0, 2)
+                    .map((o) => {
+                      const d = game.districts.find((x) => x.id === o.districtId);
+                      const building = game.buildings.find((entry) => entry.id === o.buildingId);
+                      const service = building ? contractProfile(building.kind) : null;
+                      const cover = redundancyBy.get(o.districtId);
+                      const ready = !o.requiresRedundancy || !!cover?.complete;
+                      const flexible = negotiatedTerms(o, 'flexible');
+                      const premium = negotiatedTerms(o, 'premium');
+                      const premiumChance = premiumCounterChance(game, o);
+                      return (
+                        <motion.div
+                          key={o.id}
+                          initial={{ opacity: 0, x: -16 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -16, transition: { duration: 0.2 } }}
+                          className="pointer-events-auto panel border-neon-lime/30 p-3"
+                        >
+                          <div className="text-[10px] uppercase tracking-widest text-neon-lime">
+                            {o.segment === 'enterprise' ? 'Enterprise contract' : 'Business contract'}
                           </div>
-                        )}
-                        <div className="mt-2 grid grid-cols-2 gap-1.5">
-                          <button
-                            className="btn-primary py-1.5 text-left"
-                            disabled={!ready}
-                            onClick={() => acceptOffer(o.id, 'standard')}
-                            title="Sign the contract exactly as offered."
-                          >
-                            <span className="block text-[10px] font-semibold">Standard</span>
-                            <span className="num block text-[9px] opacity-70">{fmtMoney(o.monthlyRevenue)}/mo</span>
-                          </button>
-                          <button
-                            className="btn py-1.5 text-left"
-                            disabled={!ready}
-                            onClick={() => acceptOffer(o.id, 'flexible')}
-                            title="Take 15% less revenue in exchange for twice the monthly downtime allowance."
-                          >
-                            <span className="block text-[10px] font-semibold">Flexible SLA</span>
-                            <span className="num block text-[9px] text-white/45">
-                              {flexible.slaPercent}% · {fmtMoney(flexible.monthlyRevenue)}
-                            </span>
-                          </button>
-                          <button
-                            className="btn border-neon-amber/30 py-1.5 text-left"
-                            disabled={!ready}
-                            onClick={() => acceptOffer(o.id, 'premium')}
-                            title="Ask for 20% more monthly revenue. Rejection loses the deal."
-                          >
-                            <span className="block text-[10px] font-semibold text-neon-amber">Premium counter</span>
-                            <span className="num block text-[9px] text-white/45">
-                              {fmtMoney(premium.monthlyRevenue)} · {Math.round(premiumChance * 100)}%
-                            </span>
-                          </button>
-                          <button className="btn py-1.5 text-xs" onClick={() => declineOffer(o.id)}>
-                            Pass
-                          </button>
-                        </div>
-                        <div className="mt-1.5 text-[10px] leading-snug text-white/35">
-                          Flexible doubles the outage allowance for 15% less income. Premium asks 20% more, halves the
-                          bonus, and can lose the offer.
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                          <div className="text-sm font-semibold">{o.clientName}</div>
+                          {service && <div className="mt-0.5 text-[10px] text-neon-cyan/70">{service.label}</div>}
+                          <div className="num mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-white/55">
+                            <span>Bandwidth</span>
+                            <span className="text-right text-white">{o.bandwidthGbps} Gbps</span>
+                            <span>Revenue</span>
+                            <span className="text-right text-neon-lime">{fmtMoney(o.monthlyRevenue)}/mo</span>
+                            <span>SLA</span>
+                            <span className="text-right text-white">{o.slaPercent}%</span>
+                            <span>Term</span>
+                            <span className="text-right text-white">{o.termMonths} months</span>
+                            <span>Signing bonus</span>
+                            <span className="text-right text-white">{fmtMoney(o.signingBonus)}</span>
+                            <span>District</span>
+                            <span className="text-right text-white">{d?.name}</span>
+                          </div>
+                          {o.requiresRedundancy && (
+                            <div
+                              className={`mt-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${ready ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}
+                            >
+                              {ready
+                                ? 'Second path in place, this client will sign.'
+                                : `Every site in ${d?.name} needs a second path: ${cover?.done ?? 0} of ${cover?.total ?? 0} covered.`}
+                            </div>
+                          )}
+                          <div className="mt-2 grid grid-cols-2 gap-1.5">
+                            <button
+                              className="btn-primary py-1.5 text-left"
+                              disabled={!ready}
+                              onClick={() => acceptOffer(o.id, 'standard')}
+                              title="Sign the contract exactly as offered."
+                            >
+                              <span className="block text-[10px] font-semibold">Standard</span>
+                              <span className="num block text-[9px] opacity-70">{fmtMoney(o.monthlyRevenue)}/mo</span>
+                            </button>
+                            <button
+                              className="btn py-1.5 text-left"
+                              disabled={!ready}
+                              onClick={() => acceptOffer(o.id, 'flexible')}
+                              title="Take 15% less revenue in exchange for twice the monthly downtime allowance."
+                            >
+                              <span className="block text-[10px] font-semibold">Flexible SLA</span>
+                              <span className="num block text-[9px] text-white/45">
+                                {flexible.slaPercent}% · {fmtMoney(flexible.monthlyRevenue)}
+                              </span>
+                            </button>
+                            <button
+                              className="btn border-neon-amber/30 py-1.5 text-left"
+                              disabled={!ready}
+                              onClick={() => acceptOffer(o.id, 'premium')}
+                              title="Ask for 20% more monthly revenue. Rejection loses the deal."
+                            >
+                              <span className="block text-[10px] font-semibold text-neon-amber">Premium counter</span>
+                              <span className="num block text-[9px] text-white/45">
+                                {fmtMoney(premium.monthlyRevenue)} · {Math.round(premiumChance * 100)}%
+                              </span>
+                            </button>
+                            <button className="btn py-1.5 text-xs" onClick={() => declineOffer(o.id)}>
+                              Pass
+                            </button>
+                          </div>
+                          <div className="mt-1.5 text-[10px] leading-snug text-white/35">
+                            Flexible doubles the outage allowance for 15% less income. Premium asks 20% more, halves the
+                            bonus, and can lose the offer.
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                 </AnimatePresence>
                 {game.offers.length === 0 && (
                   <div className="panel p-4 text-center">
-                    <div className="text-xs font-semibold text-white/70">No contracts waiting</div>
-                    <div className="mt-1 text-[10px] text-white/40">New business offers will appear here.</div>
+                    <div className="text-xs font-semibold text-white/70">
+                      {tr ? 'Bekleyen sözleşme yok' : 'No contracts waiting'}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/40">
+                      {tr ? 'Yeni ticari teklifler burada görünecek.' : 'New business offers will appear here.'}
+                    </div>
                   </div>
                 )}
               </>
@@ -495,7 +555,9 @@ export default function SidePanel() {
 
             {activeSection === 'posts' && game.posts.length > 0 && (
               <div className="pointer-events-auto panel p-3">
-                <div className="mb-2 text-[10px] uppercase tracking-widest text-white/40">Word on the street</div>
+                <div className="mb-2 text-[10px] uppercase tracking-widest text-white/40">
+                  {tr ? 'Şehrin sesi' : 'Word on the street'}
+                </div>
                 <div className="flex flex-col divide-y divide-white/[0.07]">
                   <AnimatePresence initial={false}>
                     {game.posts.slice(0, 6).map((p) => (
@@ -518,8 +580,10 @@ export default function SidePanel() {
             )}
             {activeSection === 'posts' && game.posts.length === 0 && (
               <div className="panel p-4 text-center">
-                <div className="text-xs font-semibold text-white/70">The city is quiet</div>
-                <div className="mt-1 text-[10px] text-white/40">Customer reactions will appear here.</div>
+                <div className="text-xs font-semibold text-white/70">{tr ? 'Şehir sakin' : 'The city is quiet'}</div>
+                <div className="mt-1 text-[10px] text-white/40">
+                  {tr ? 'Müşteri yorumları burada görünecek.' : 'Customer reactions will appear here.'}
+                </div>
               </div>
             )}
           </div>
