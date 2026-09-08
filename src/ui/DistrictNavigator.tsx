@@ -1,6 +1,8 @@
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 
 export default function DistrictNavigator() {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const planning = useGame((s) => s.planning || !!s.drillTarget);
   const selection = useGame((s) => s.selection);
@@ -48,7 +50,7 @@ export default function DistrictNavigator() {
         value=""
         onChange={(e) => go(e.target.value)}
       >
-        <option value="">Explore districts</option>
+        <option value="">{t(locale, 'exploreDistricts')}</option>
         {game.districts.map((d) => (
           <option value={d.id} key={d.id}>
             {d.name} · {d.unlocked ? `${Math.round(d.coverage * 100)}% coverage` : 'Locked'}
