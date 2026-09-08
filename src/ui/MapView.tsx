@@ -1139,7 +1139,7 @@ export default function MapView() {
   const hoveredNode = hover ? (nodeGrid.get(`${hover.gx},${hover.gy}`) ?? null) : null;
   const connectedQuote =
     autoConnect && !planning && tool && tool !== 'fiber' && hover
-      ? connectedSiteEstimate(game, tool, hover.gx, hover.gy, routes)
+      ? connectedSiteEstimate(game, tool, hover.gx, hover.gy, routes, locale)
       : null;
   const placementIssue =
     connectedQuote?.error ??

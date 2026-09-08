@@ -1,4 +1,5 @@
 import { computeRoutes } from './network';
+import { fmtMoneyExact } from './economy';
 import { suggestedBackhaul } from './investment';
 import { nodePlacementCost, nodePlacementIssue } from './placement';
 import { projectBlueprint } from './blueprint';
@@ -11,17 +12,25 @@ export function connectedSiteEstimate(
   gx: number,
   gy: number,
   routes = computeRoutes(state),
+  locale: 'en' | 'tr' = 'en',
 ) {
+  const tr = locale === 'tr';
   const backhaul = kind === 'core' ? null : suggestedBackhaul(state, gx, gy, routes);
   const siteCost = nodePlacementCost(state, kind);
   const total = siteCost + (backhaul?.cost ?? 0);
   const error = state.gameOver
-    ? 'This company has closed.'
-    : (nodePlacementIssue(state, kind, gx, gy) ??
+    ? tr
+      ? 'Bu şirket kapandı.'
+      : 'This company has closed.'
+    : (nodePlacementIssue(state, kind, gx, gy, locale) ??
       (kind !== 'core' && !backhaul
-        ? 'No live backhaul. Restore a core connection first.'
+        ? tr
+          ? 'Canlı backhaul yok. Önce çekirdek bağlantısını geri getir.'
+          : 'No live backhaul. Restore a core connection first.'
         : state.money < total
-          ? `Site + fibre requires $${total.toLocaleString()}.`
+          ? tr
+            ? `Nokta + fiber için ${fmtMoneyExact(total)} gerekiyor.`
+            : `Site + fibre requires ${fmtMoneyExact(total)}.`
           : null));
   return { backhaul, siteCost, total, error };
 }
