@@ -1,7 +1,5 @@
-import MarketScreen from './ui/screens/MarketScreen';
-import ProjectsScreen from './ui/screens/ProjectsScreen';
 import { SmartPauseBanner } from './ui/SmartPause';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
 import { useGame } from './store/gameStore';
@@ -18,11 +16,15 @@ import NavigationRail from './ui/NavigationRail';
 import SidePanel from './ui/SidePanel';
 import TopBar from './ui/TopBar';
 import Tutorial from './ui/Tutorial';
-import CompanyScreen from './ui/screens/CompanyScreen';
-import NetworkScreen from './ui/screens/NetworkScreen';
-import ResearchScreen from './ui/screens/ResearchScreen';
 import { playSound, prepareAudio } from './ui/sound';
 import SaveManager from './ui/SaveManager';
+
+// Only the map is on screen at startup. The rest load when first opened.
+const NetworkScreen = lazy(() => import('./ui/screens/NetworkScreen'));
+const CompanyScreen = lazy(() => import('./ui/screens/CompanyScreen'));
+const ResearchScreen = lazy(() => import('./ui/screens/ResearchScreen'));
+const ProjectsScreen = lazy(() => import('./ui/screens/ProjectsScreen'));
+const MarketScreen = lazy(() => import('./ui/screens/MarketScreen'));
 
 function useGameClock() {
   const tick = useGame((s) => s.tick);
@@ -205,11 +207,13 @@ function GameShell() {
               )}
             </>
           )}
-          {screen === 'network' && <NetworkScreen />}
-          {screen === 'company' && <CompanyScreen />}
-          {screen === 'research' && <ResearchScreen />}
-          {screen === 'projects' && <ProjectsScreen />}
-          {screen === 'market' && <MarketScreen />}
+          <Suspense fallback={null}>
+            {screen === 'network' && <NetworkScreen />}
+            {screen === 'company' && <CompanyScreen />}
+            {screen === 'research' && <ResearchScreen />}
+            {screen === 'projects' && <ProjectsScreen />}
+            {screen === 'market' && <MarketScreen />}
+          </Suspense>
 
           <IncidentModal />
           <AuctionModal />
