@@ -1,11 +1,14 @@
-import { motion } from 'framer-motion';
+import { SmartPauseSettings } from './SmartPause';
 import { fmtMoney, fmtNum } from '../game/economy';
 import { currentMonthCashFlow } from '../game/financeLedger';
-import { rankOf } from '../game/progression';
-import { fmtClock, fmtDate, totalCustomers } from '../game/simulation';
+import CompanyProfile from './CompanyProfile';
+import { scenarioStatus } from '../game/scenarios';
+import { dateFromMinutes, fmtClock, fmtDate, hourOfDay, totalCustomers } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 import type { Speed } from '../game/types';
 import { AlertIcon } from './icons';
+import { MobileOperatorSummary, Stat } from './OperatorSummary';
+import { scenarioCopy, t } from './i18n';
 
 const SPEEDS: Array<{ v: Speed; label: string }> = [
   { v: 0, label: 'Ⅱ' },
@@ -14,76 +17,39 @@ const SPEEDS: Array<{ v: Speed; label: string }> = [
   { v: 4, label: '4×' },
 ];
 
-function Stat({
-  label,
-  shortLabel,
-  value,
-  tone,
-  bar,
-  secondary,
-}: {
-  label: string;
-  shortLabel?: string;
-  value: string;
-  tone?: string;
-  bar?: number;
-  secondary?: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-1 flex-col justify-center border-l border-white/[0.06] px-2 first:border-l-0 lg:px-3">
-      <div className="stat-label truncate">
-        <span className="hidden lg:inline">{label}</span>
-        <span className="lg:hidden">{shortLabel ?? label}</span>
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <div className={`num truncate text-[15px] font-semibold leading-tight ${tone ?? 'text-white'}`}>{value}</div>
-        {secondary && <span className="hidden text-[11px] text-white/35 2xl:inline">{secondary}</span>}
-      </div>
-      {bar !== undefined && (
-        <div className="mt-1 h-[3px] w-full max-w-[92px] overflow-hidden rounded-full bg-white/10">
-          <motion.div
-            className="h-full rounded-full"
-            style={{ background: bar > 0.66 ? '#75df9a' : bar > 0.33 ? '#f3b843' : '#ff6577' }}
-            animate={{ width: `${Math.round(bar * 100)}%` }}
-            transition={{ duration: 0.4 }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function TopBar() {
   const game = useGame((s) => s.game)!;
+  const planning = useGame((s) => s.planning || !!s.drillTarget);
   const setSpeed = useGame((s) => s.setSpeed);
   const setScreen = useGame((s) => s.setScreen);
   const customers = totalCustomers(game);
   const health = game.stats.health;
   const cashFlow = currentMonthCashFlow(game);
   const incidents = game.incidents.filter((i) => !i.resolved).length;
+  const locale = useGame((s) => s.locale);
+  const peakHour = hourOfDay(game.minutes) >= 18 && hourOfDay(game.minutes) < 23;
+  const mission = scenarioStatus(game);
+  const missionProgress = mission.objectives.length
+    ? mission.objectives.reduce((sum, objective) => sum + objective.progress, 0) / mission.objectives.length
+    : null;
 
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-stretch border-b border-white/[0.09] bg-[#111b23]">
-      <div className="flex w-12 shrink-0 items-center justify-center border-r border-white/[0.07] px-1 sm:w-[160px] sm:justify-start sm:gap-2 sm:px-3 lg:w-[220px] lg:gap-3 lg:px-4">
-        <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-sm border border-white/10 bg-black/15 text-lg">
-          {game.logo}
-          <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-ink-800 bg-neon-lime" />
-        </div>
-        <div className="hidden min-w-0 leading-tight sm:block">
-          <div className="truncate text-[16px] font-semibold text-white/90">{game.companyName}</div>
-          <div className="truncate text-[11px] text-white/40">
-            {game.cityName} <span className="px-1 text-white/20">/</span>{' '}
-            <span className="text-neon-cyan/80">{rankOf(game).name}</span>
-          </div>
-        </div>
-      </div>
+      <CompanyProfile />
 
       <div className="flex min-w-0 flex-1 items-stretch px-1">
-        <Stat label="Cash" value={fmtMoney(game.money)} tone={game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'} />
+        <MobileOperatorSummary game={game} />
+        <div className="hidden min-w-0 flex-1 md:flex">
+          <Stat
+            label={t(locale, 'cash')}
+            value={fmtMoney(game.money)}
+            tone={game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'}
+          />
+        </div>
         <div className="hidden min-w-0 flex-1 lg:flex">
           <Stat
-            label="Free cash flow MTD"
-            shortLabel="Cash flow"
+            label={locale === 'tr' ? 'Aylık serbest nakit' : 'Free cash flow MTD'}
+            shortLabel={t(locale, 'cashFlow')}
             value={`${cashFlow.freeCashFlow >= 0 ? '+' : ''}${fmtMoney(cashFlow.freeCashFlow)}`}
             tone={cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}
             secondary={`op ${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoney(cashFlow.operatingCash)}`}
@@ -91,23 +57,39 @@ export default function TopBar() {
         </div>
         <div className="hidden min-w-0 flex-1 md:flex">
           <Stat
-            label="Customers"
-            shortLabel="Subs"
+            label={t(locale, 'customers')}
+            shortLabel={locale === 'tr' ? 'Abone' : 'Subs'}
             value={fmtNum(customers)}
             secondary={`rep ${Math.round(game.reputation)}`}
           />
         </div>
         <div className="hidden min-w-0 flex-1 lg:flex">
           <Stat
-            label="Network"
-            shortLabel="Health"
+            label={t(locale, 'network')}
+            shortLabel={t(locale, 'health')}
             value={`${Math.round(health)}%`}
             tone={health > 80 ? 'text-neon-lime' : health > 55 ? 'text-neon-amber' : 'text-neon-red'}
             bar={health / 100}
           />
         </div>
         <div className="hidden min-w-0 flex-1 xl:flex">
-          <Stat label="Traffic" value={`${game.stats.demandGbps.toFixed(1)}G`} secondary="Gbps" />
+          {missionProgress === null ? (
+            <Stat label={t(locale, 'traffic')} value={`${game.stats.demandGbps.toFixed(1)}G`} secondary="Gbps" />
+          ) : (
+            <Stat
+              label={scenarioCopy(locale, mission.scenario.id)?.name ?? mission.scenario.name}
+              shortLabel={t(locale, 'objective')}
+              value={`${Math.round(missionProgress * 100)}%`}
+              secondary={
+                mission.daysLeft === null
+                  ? undefined
+                  : locale === 'tr'
+                    ? `${mission.daysLeft} gün kaldı`
+                    : `${mission.daysLeft} days left`
+              }
+              bar={missionProgress}
+            />
+          )}
         </div>
       </div>
 
@@ -115,7 +97,15 @@ export default function TopBar() {
         onClick={() => setScreen('network')}
         className={`flex w-14 shrink-0 items-center justify-center border-l border-white/[0.07] transition-colors ${incidents ? 'bg-neon-red/10 text-neon-red' : 'text-white/35 hover:bg-white/5 hover:text-white/70'}`}
         title={incidents ? `${incidents} active alert${incidents > 1 ? 's' : ''}` : 'No active alerts'}
-        aria-label={incidents ? `${incidents} active alerts` : 'No active alerts'}
+        aria-label={
+          locale === 'tr'
+            ? incidents
+              ? `${incidents} aktif alarm`
+              : 'Aktif alarm yok'
+            : incidents
+              ? `${incidents} active alerts`
+              : 'No active alerts'
+        }
       >
         <span className="relative">
           <AlertIcon className="h-5 w-5" />
@@ -128,22 +118,44 @@ export default function TopBar() {
       </button>
 
       <div className="flex shrink-0 items-center gap-1 border-l border-white/[0.07] px-1 sm:gap-3 sm:px-3">
-        <div className="text-right leading-tight">
-          <div className="num text-[15px] font-semibold text-white">{fmtClock(game.minutes)}</div>
-          <div className="hidden text-[11px] text-white/40 sm:block">{fmtDate(game.minutes)}</div>
-        </div>
+        <SmartPauseSettings>
+          <div className="text-right leading-tight">
+            <div
+              className={`num text-[15px] font-semibold ${peakHour ? 'text-neon-amber' : 'text-white'}`}
+              title={
+                locale === 'tr'
+                  ? '18:00–23:00: yoğun saatlerde trafik artar'
+                  : '18:00–23:00: demand rises during the evening peak'
+              }
+            >
+              {fmtClock(game.minutes)}
+              {peakHour && <span className="ml-1 text-[10px]">{locale === 'tr' ? 'Yoğun' : 'Peak'}</span>}
+            </div>
+            <div className="hidden text-[11px] text-white/55 sm:block">
+              {game.speed === 0
+                ? locale === 'tr'
+                  ? 'Duraklatıldı'
+                  : 'Paused'
+                : locale === 'tr'
+                  ? dateFromMinutes(game.minutes).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })
+                  : fmtDate(game.minutes)}
+            </div>
+          </div>
+        </SmartPauseSettings>
         <div className="flex items-center gap-0.5 rounded-sm border border-white/[0.08] bg-black/10 p-1">
           {SPEEDS.map((s) => (
             <button
               key={s.v}
+              disabled={planning}
               onClick={() => setSpeed(s.v)}
               className={`h-7 min-w-8 rounded-sm px-1.5 font-mono text-[11px] font-semibold transition-colors ${
                 game.speed === s.v
                   ? 'bg-white/[0.09] text-white'
                   : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
               }`}
-              title={s.v === 0 ? 'Pause (Space)' : `${s.v}x speed`}
-              aria-label={s.v === 0 ? 'Pause' : `${s.v}x speed`}
+              title={s.v === 0 ? `${t(locale, 'pause')} (Space)` : `${s.v}x speed`}
+              aria-label={s.v === 0 ? t(locale, 'pause') : `${s.v}x speed`}
+              aria-pressed={game.speed === s.v}
             >
               {s.label}
             </button>
