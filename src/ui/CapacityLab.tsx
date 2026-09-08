@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { capacityOptions, capacityPlan, testCapacity, upgradeKey, type CapacityUpgrade } from '../game/capacityLab';
 import { fmtMoney, fmtMoneyExact } from '../game/economy';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 
 export default function CapacityLab() {
   const [snapshot, setSnapshot] = useState(() => useGame.getState().game!);
@@ -10,6 +11,7 @@ export default function CapacityLab() {
   const [items, setItems] = useState<CapacityUpgrade[]>([]);
   const [filter, setFilter] = useState('');
   const [message, setMessage] = useState('');
+  const locale = useGame((s) => s.locale);
   const commission = useGame((s) => s.commissionUpgrades);
   const cash = useGame((s) => s.game!.money);
   const blocked = useGame((s) => s.planning || !!s.drillTarget);
@@ -39,16 +41,16 @@ export default function CapacityLab() {
     <section className="capacity-lab lg:col-span-2" aria-label="Network Lab">
       <div className="lab-heading">
         <div>
-          <h2>Network Lab</h2>
-          <p>Rehearse the next traffic surge. Commission the capacity you need.</p>
+          <h2>{t(locale, 'networkLab')}</h2>
+          <p>{t(locale, 'networkLabBlurb')}</p>
         </div>
         <button className="btn text-xs" onClick={refresh}>
-          Refresh snapshot
+          {t(locale, 'refreshSnapshot')}
         </button>
       </div>
       <div className="lab-controls">
         <fieldset>
-          <legend>Traffic scenario</legend>
+          <legend>{t(locale, 'trafficScenario')}</legend>
           <div className="flex flex-wrap gap-1.5">
             {[1, 1.5, 2, 3, 4].map((m) => (
               <button
@@ -63,13 +65,13 @@ export default function CapacityLab() {
           </div>
         </fieldset>
         <label>
-          Failure scenario
+          {t(locale, 'failureScenario')}
           <select
             aria-label="Lab fibre failure"
             value={cutLinkId ?? ''}
             onChange={(e) => setCutLinkId(e.target.value || null)}
           >
-            <option value="">All current routes</option>
+            <option value="">{t(locale, 'allCurrentRoutes')}</option>
             {options
               .filter((o) => o.type === 'link' && !snapshot.links.find((l) => l.id === o.id)?.down)
               .map((o) => (
@@ -84,7 +86,7 @@ export default function CapacityLab() {
         <div className="lab-analysis">
           <div className="lab-result-heading">
             <div>
-              <span>Traffic delivered</span>
+              <span>{t(locale, 'trafficDelivered')}</span>
               <strong>
                 {Math.round(before.delivery * 100)}% <span aria-hidden="true">→</span>{' '}
                 <em>{Math.round(after.delivery * 100)}%</em>
@@ -99,11 +101,11 @@ export default function CapacityLab() {
           <div className="lab-legend">
             <span>
               <i className="lab-current" />
-              Current network
+              {t(locale, 'currentNetwork')}
             </span>
             <span>
               <i className="lab-proposed" />
-              Proposed network
+              {t(locale, 'proposedNetwork')}
             </span>
           </div>
           <div role="img" aria-label="District service delivery comparison" className="lab-districts">
@@ -141,24 +143,24 @@ export default function CapacityLab() {
         </div>
         <aside className="lab-order" aria-label="Capacity upgrade order">
           <h3>
-            Commissioning order <span>{items.length}/32</span>
+            {t(locale, 'commissioningOrder')} <span>{items.length}/32</span>
           </h3>
           <dl>
             <div>
-              <dt>Capital spend</dt>
+              <dt>{t(locale, 'capitalSpend')}</dt>
               <dd>{fmtMoneyExact(plan.cost)}</dd>
             </div>
             <div>
-              <dt>Added monthly costs</dt>
+              <dt>{t(locale, 'addedMonthlyCosts')}</dt>
               <dd>+{fmtMoneyExact(plan.monthly)}</dd>
             </div>
             <div>
-              <dt>Cash after order</dt>
+              <dt>{t(locale, 'cashAfterOrder')}</dt>
               <dd className={cash < plan.cost ? 'text-neon-red' : ''}>{fmtMoney(cash - plan.cost)}</dd>
             </div>
           </dl>
           {!items.length ? (
-            <p className="lab-note">Choose upgrades below. Test a larger surge to reveal the next constraint.</p>
+            <p className="lab-note">{t(locale, 'chooseUpgradesBlurb')}</p>
           ) : (
             <ul>
               {items.map((item) => (
@@ -197,7 +199,7 @@ export default function CapacityLab() {
             disabled={!items.length}
             onClick={() => setItems([])}
           >
-            Clear order
+            {t(locale, 'clearOrder')}
           </button>
           <p role="status" className="mt-3 text-xs text-teal-200">
             {message}
@@ -206,8 +208,8 @@ export default function CapacityLab() {
       </div>
       <div className="lab-assets-heading">
         <div>
-          <h3>Capacity workbench</h3>
-          <p>Highest offered load first. Above 100% means demand exceeds capacity.</p>
+          <h3>{t(locale, 'capacityWorkbench')}</h3>
+          <p>{t(locale, 'capacityWorkbenchBlurb')}</p>
         </div>
         <input
           aria-label="Find capacity asset"
@@ -248,9 +250,7 @@ export default function CapacityLab() {
             </div>
           );
         })}
-        {!visible.length && (
-          <p className="p-5 text-sm text-white/60">No matching assets. Try a district or site name.</p>
-        )}
+        {!visible.length && <p className="p-5 text-sm text-white/60">{t(locale, 'noMatchingAssets')}</p>}
       </div>
     </section>
   );
