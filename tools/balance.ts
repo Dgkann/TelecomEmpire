@@ -95,6 +95,11 @@ function buildPop(g: GameState, districtId: string) {
 
 const rows: string[] = [];
 let peakPressure = 0;
+const milestones: Record<string, number> = {};
+
+function mark(name: string, day: number, reached: boolean) {
+  if (reached && milestones[name] === undefined) milestones[name] = day;
+}
 
 for (let day = 0; day < DAYS; day++) {
   for (let i = 0; i < STEPS_PER_DAY; i++) {
@@ -170,12 +175,23 @@ for (let day = 0; day < DAYS; day++) {
   }
   // 6. expand: unlock a district when rich, then build a POP where coverage is thin
   const locked = g.districts.find((d) => !d.unlocked);
-  if (locked && g.money > locked.entryCost * 3) {
+  if (day >= 45 && locked && g.money > locked.entryCost * 1.5) {
     g.money -= locked.entryCost;
     g.districts = g.districts.map((d) => (d.id === locked.id ? { ...d, unlocked: true } : d));
   }
   const thin = g.districts.filter((d) => d.unlocked && d.coverage < 0.55).sort((a, b) => a.coverage - b.coverage)[0];
   if (thin && day % 3 === 0) buildPop(g, thin.id);
+
+  const unlocked = g.districts.filter((district) => district.unlocked).length;
+  mark('1,500 customers', day, totalCustomers(g) >= 1500);
+  mark('second district', day, unlocked >= 2);
+  mark('four districts', day, unlocked >= 4);
+  mark('mobile launch', day, g.researchDone.includes('mobile_4g'));
+  mark(
+    'first data centre',
+    day,
+    g.nodes.some((node) => node.kind === 'datacenter'),
+  );
 
   if (day % 30 === 0) {
     const m = monthlyBreakdown(g, researchModifiers(g.researchDone));
@@ -209,3 +225,9 @@ console.log(
 );
 console.log('incidents total seen:', g.incidents.length);
 console.log('posts:', g.posts.length, '| log:', g.log.length);
+console.log(
+  'milestones:',
+  ['1,500 customers', 'second district', 'four districts', 'mobile launch', 'first data centre']
+    .map((name) => `${name} ${milestones[name] === undefined ? 'not reached' : `day ${milestones[name]}`}`)
+    .join(' | '),
+);
