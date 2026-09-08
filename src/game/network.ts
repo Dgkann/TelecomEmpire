@@ -8,11 +8,12 @@ export interface Adjacency {
 
 export function buildAdjacency(state: GameState, ignoreLinkId?: string): Adjacency {
   const adj: Adjacency = {};
+  const nodes = new Map(state.nodes.map((n) => [n.id, n]));
   for (const n of state.nodes) adj[n.id] = [];
   for (const l of state.links) {
     if (l.down || l.id === ignoreLinkId) continue;
-    const a = state.nodes.find((n) => n.id === l.aId);
-    const b = state.nodes.find((n) => n.id === l.bId);
+    const a = nodes.get(l.aId);
+    const b = nodes.get(l.bId);
     if (!a || !b || a.down || b.down) continue;
     adj[l.aId]?.push({ linkId: l.id, otherId: l.bId, length: l.length });
     adj[l.bId]?.push({ linkId: l.id, otherId: l.aId, length: l.length });
@@ -27,7 +28,26 @@ export interface RouteInfo {
   coreId: string;
 }
 
+// Route results are read-only derived data. Key by topology values rather than object
+// identity: simulation steps replace arrays, and repair/build helpers may mutate them.
+// Keep only four topologies so previews and save-slot changes cannot grow the cache.
+const routeCache = new Map<string, Record<string, RouteInfo>>();
 export function computeRoutes(state: GameState, ignoreLinkId?: string): Record<string, RouteInfo> {
+  const key =
+    ignoreLinkId === undefined
+      ? JSON.stringify([
+          state.nodes.map((n) => [n.id, n.kind, n.down]),
+          state.links.map((l) => [l.id, l.aId, l.bId, l.length, l.down]),
+        ])
+      : null;
+  if (key !== null) {
+    const cached = routeCache.get(key);
+    if (cached) {
+      routeCache.delete(key);
+      routeCache.set(key, cached);
+      return cached;
+    }
+  }
   const adj = buildAdjacency(state, ignoreLinkId);
   const dist: Record<string, number> = {};
   const prev: Record<string, { linkId: string; from: string } | null> = {};
@@ -74,18 +94,79 @@ export function computeRoutes(state: GameState, ignoreLinkId?: string): Record<s
     }
     routes[n.id] = { path, hops, distance: dist[n.id], coreId: coreOf[n.id] };
   }
+  if (key !== null) {
+    if (routeCache.size >= 4) routeCache.delete(routeCache.keys().next().value!);
+    routeCache.set(key, routes);
+  }
   return routes;
 }
 
-// Redundant means it still reaches a core after any single link on its path is cut.
+// Connect live cores to a virtual source, then find bridges once for the whole
+// topology. Nodes reachable without crossing a real bridge survive any one cut.
+// Key by the current route snapshot, whose identity changes with topology values.
+const resilienceCache = new WeakMap<Record<string, RouteInfo>, Set<string>>();
+function resilientNodes(state: GameState, routes: Record<string, RouteInfo>) {
+  const cached = resilienceCache.get(routes);
+  if (cached) return cached;
+  const ids = new Map(state.nodes.map((n, i) => [n.id, i]));
+  const source = state.nodes.length;
+  const edges: Array<Array<{ to: number; edge: number }>> = Array.from({ length: source + 1 }, () => []);
+  const connect = (a: number, b: number, edge: number) => {
+    edges[a].push({ to: b, edge });
+    edges[b].push({ to: a, edge });
+  };
+  state.links.forEach((link, index) => {
+    const a = ids.get(link.aId),
+      b = ids.get(link.bId);
+    if (a !== undefined && b !== undefined && !link.down && !state.nodes[a].down && !state.nodes[b].down)
+      connect(a, b, index);
+  });
+  state.nodes.forEach((node, index) => {
+    if (node.kind === 'core' && !node.down) connect(source, index, state.links.length + index);
+  });
+  const discovery = new Int32Array(source + 1),
+    low = new Int32Array(source + 1);
+  const bridges = new Set<number>();
+  let time = 1;
+  discovery[source] = low[source] = time;
+  const stack = [{ node: source, parent: -1, edge: -1, next: 0 }];
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+    if (frame.next < edges[frame.node].length) {
+      const edge = edges[frame.node][frame.next++];
+      if (edge.edge === frame.edge) continue;
+      if (discovery[edge.to]) low[frame.node] = Math.min(low[frame.node], discovery[edge.to]);
+      else {
+        discovery[edge.to] = low[edge.to] = ++time;
+        stack.push({ node: edge.to, parent: frame.node, edge: edge.edge, next: 0 });
+      }
+    } else {
+      stack.pop();
+      if (frame.parent >= 0) {
+        low[frame.parent] = Math.min(low[frame.parent], low[frame.node]);
+        if (low[frame.node] > discovery[frame.parent] && frame.edge < state.links.length) bridges.add(frame.edge);
+      }
+    }
+  }
+  const visited = new Set([source]),
+    queue = [source];
+  for (let i = 0; i < queue.length; i++) {
+    for (const edge of edges[queue[i]]) {
+      if (bridges.has(edge.edge) || visited.has(edge.to)) continue;
+      visited.add(edge.to);
+      queue.push(edge.to);
+    }
+  }
+  const result = new Set(state.nodes.filter((_, i) => visited.has(i)).map((n) => n.id));
+  resilienceCache.set(routes, result);
+  return result;
+}
+
+// Pass the routes for this state, as for loadServices. No per-span Dijkstra work.
 export function isRedundant(state: GameState, nodeId: string, routes: Record<string, RouteInfo>): boolean {
   const route = routes[nodeId];
   if (!route || route.path.length === 0) return false;
-  for (const linkId of route.path) {
-    const alt = computeRoutes(state, linkId);
-    if (!alt[nodeId]) return false;
-  }
-  return true;
+  return resilientNodes(state, routes).has(nodeId);
 }
 
 // How many of the district's sites survive losing any single span.
