@@ -8,6 +8,8 @@ import { useDialogAccessibility } from './useDialogAccessibility';
 export default function GameOverOverlay() {
   const game = useGame((s) => s.game)!;
   const quit = useGame((s) => s.quitToMenu);
+  const locale = useGame((s) => s.locale);
+  const isTr = locale === 'tr';
   const over = game.gameOver;
   const dialogRef = useDialogAccessibility(Boolean(over));
 
@@ -24,7 +26,7 @@ export default function GameOverOverlay() {
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Game over"
+            aria-label={isTr ? 'Oyun bitti' : 'Game over'}
             tabIndex={-1}
             className="panel max-h-[calc(100dvh-2rem)] w-[440px] max-w-[calc(100%-2rem)] overflow-y-auto border-neon-red/40"
             initial={{ scale: 0.94, y: 14 }}
@@ -32,8 +34,12 @@ export default function GameOverOverlay() {
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
           >
             <div className="border-b border-neon-red/25 bg-neon-red/10 px-6 py-5">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-neon-red">Insolvent</div>
-              <div className="text-2xl font-bold">{game.companyName} is finished</div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-neon-red">
+                {isTr ? 'İflas' : 'Insolvent'}
+              </div>
+              <div className="text-2xl font-bold">
+                {isTr ? `${game.companyName} faaliyetini durdurdu` : `${game.companyName} is finished`}
+              </div>
               <div className="num mt-1 text-[11px] text-white/50">{fmtDate(over.at)}</div>
             </div>
 
@@ -42,30 +48,31 @@ export default function GameOverOverlay() {
 
               <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="chip py-2">
-                  <div className="stat-label">Customers at the end</div>
+                  <div className="stat-label">{isTr ? 'Son müşteri sayısı' : 'Customers at the end'}</div>
                   <div className="num text-lg">{fmtNum(totalCustomers(game))}</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Owed</div>
+                  <div className="stat-label">{isTr ? 'Borç' : 'Owed'}</div>
                   <div className="num text-lg text-neon-red">{fmtMoney(totalDebt(game))}</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Cash</div>
+                  <div className="stat-label">{isTr ? 'Nakit' : 'Cash'}</div>
                   <div className="num text-lg text-neon-red">{fmtMoney(game.money)}</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Reputation</div>
+                  <div className="stat-label">{isTr ? 'İtibar' : 'Reputation'}</div>
                   <div className="num text-lg">{Math.round(game.reputation)}</div>
                 </div>
               </div>
 
               <p className="text-[11px] leading-snug text-white/40">
-                Borrowing buys time to build. It does not pay for itself unless the network you build with it carries
-                more customers than the interest costs.
+                {isTr
+                  ? 'Kredi kurulum için zaman kazandırır. Kurulan şebeke faiz maliyetinden fazla gelir üretmezse kendini ödemez.'
+                  : 'Borrowing buys time to build. It does not pay for itself unless the network you build with it carries more customers than the interest costs.'}
               </p>
 
               <button className="btn-primary w-full" onClick={quit}>
-                Back to the menu
+                {isTr ? 'Menüye dön' : 'Back to the menu'}
               </button>
             </div>
           </motion.div>
