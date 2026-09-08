@@ -1,16 +1,22 @@
 // Tiny WebAudio blips. No assets, and the game is fully playable muted.
 let ctx: AudioContext | null = null;
 
-function audio() {
+// Open the audio device on a menu/user gesture, not on the first mid-game fault.
+// A suspended context must not accumulate unheard oscillators.
+export function prepareAudio() {
   if (typeof window === 'undefined') return null;
-  if (!ctx) {
-    const Ctor =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return null;
-    ctx = new Ctor();
+  try {
+    if (!ctx) {
+      const Ctor =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return null;
+      ctx = new Ctor();
+    }
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+    return ctx;
+  } catch {
+    return null;
   }
-  if (ctx.state === 'suspended') void ctx.resume();
-  return ctx;
 }
 
 type Blip = { freq: number; dur: number; type: OscillatorType; gain: number; sweep?: number };
@@ -25,8 +31,8 @@ const SOUNDS: Record<string, Blip> = {
 
 export function playSound(name: keyof typeof SOUNDS, enabled: boolean) {
   if (!enabled) return;
-  const c = audio();
-  if (!c) return;
+  const c = ctx;
+  if (!c || c.state !== 'running') return;
   const s = SOUNDS[name];
   const osc = c.createOscillator();
   const gain = c.createGain();
@@ -36,6 +42,10 @@ export function playSound(name: keyof typeof SOUNDS, enabled: boolean) {
   gain.gain.setValueAtTime(s.gain, c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + s.dur);
   osc.connect(gain).connect(c.destination);
+  osc.onended = () => {
+    osc.disconnect();
+    gain.disconnect();
+  };
   osc.start();
   osc.stop(c.currentTime + s.dur);
 }
