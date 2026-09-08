@@ -10,6 +10,7 @@ import {
 import { MINUTES_PER_STEP } from '../game/constants';
 import { fmtMoneyExact } from '../game/economy';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 const duration = (minutes: number) => {
@@ -20,6 +21,7 @@ const duration = (minutes: number) => {
 };
 
 export default function IncidentModal() {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const openId = useGame((s) => s.openIncidentId);
   const close = useGame((s) => s.openIncident);
@@ -86,15 +88,15 @@ export default function IncidentModal() {
                     {assigned?.name ?? 'A crew'} is {assigned?.state === 'driving' ? 'on the way' : 'working on it'}
                   </div>
                   <div className="flex justify-between text-xs text-white/60">
-                    <span>Travel remaining</span>
+                    <span>{t(locale, 'travelRemaining')}</span>
                     <span>{duration(travelLeft)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-white/60">
-                    <span>Repair remaining</span>
+                    <span>{t(locale, 'repairRemaining')}</span>
                     <span>{duration(workLeft)}</span>
                   </div>
                   <div className="flex justify-between border-t border-white/10 pt-2 font-semibold">
-                    <span>Estimated restoration</span>
+                    <span>{t(locale, 'estimatedRestoration')}</span>
                     <span>~{duration(travelLeft + workLeft)}</span>
                   </div>
                 </div>
@@ -106,7 +108,7 @@ export default function IncidentModal() {
                     </p>
                   )}
                   <fieldset className="min-w-0">
-                    <legend className="mb-2 text-sm font-semibold">Response pace</legend>
+                    <legend className="mb-2 text-sm font-semibold">{t(locale, 'responsePace')}</legend>
                     <div className="grid grid-cols-2 gap-2">
                       {(['normal', 'emergency'] as const).map((pace) => (
                         <label
@@ -132,7 +134,7 @@ export default function IncidentModal() {
                     </div>
                   </fieldset>
                   <fieldset className="min-w-0">
-                    <legend className="mb-2 text-sm font-semibold">Choose a field crew</legend>
+                    <legend className="mb-2 text-sm font-semibold">{t(locale, 'chooseFieldCrew')}</legend>
                     <div className="max-h-48 space-y-1 overflow-y-auto">
                       {candidates.map((c, index) => (
                         <label
@@ -168,15 +170,13 @@ export default function IncidentModal() {
                       </p>
                     )}
                     {candidates.length > 0 && !selected && (
-                      <p className="mt-2 text-xs text-neon-amber">
-                        Your selected crew is no longer available. Choose another crew.
-                      </p>
+                      <p className="mt-2 text-xs text-neon-amber">{t(locale, 'crewNoLongerAvailable')}</p>
                     )}
                   </fieldset>
                   {selected && (
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-white/60">Travel + repair until restoration</span>
+                        <span className="text-white/60">{t(locale, 'travelPlusRepair')}</span>
                         <strong>~{duration(selected.totalMinutes)}</strong>
                       </div>
                       <div className="flex h-2 overflow-hidden rounded-full bg-white/5" aria-hidden="true">
@@ -210,9 +210,7 @@ export default function IncidentModal() {
                   >
                     Dispatch crew · {fmtMoneyExact(cost)}
                   </button>
-                  <p className="text-[11px] text-white/45">
-                    Estimates use game time. Emergency work cannot shorten the drive.
-                  </p>
+                  <p className="text-[11px] text-white/45">{t(locale, 'estimatesUseGameTime')}</p>
                 </>
               )}
               <button className="btn w-full" onClick={() => close(null)}>
