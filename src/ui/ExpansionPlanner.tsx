@@ -4,14 +4,16 @@ import { computeRoutes } from '../game/network';
 import { strongestRival } from '../game/competitors';
 import { fmtMoneyExact, fmtNum } from '../game/economy';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 
 export function DistrictLaunchProgress({ districtId }: { districtId: string }) {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const progress = useMemo(() => expansionProgress(game, districtId), [game, districtId]);
   if (!progress.sites.length) return null;
   return (
     <section className="rounded border border-white/10 bg-black/10 p-3" aria-label="District launch checklist">
-      <h3 className="text-sm font-semibold">Establish your district</h3>
+      <h3 className="text-sm font-semibold">{t(locale, 'establishYourDistrict')}</h3>
       <ul className="mt-2 space-y-2 text-xs">
         {[
           { done: progress.connected, text: 'Connect a fixed access site' },
@@ -43,6 +45,7 @@ export function DistrictLaunchProgress({ districtId }: { districtId: string }) {
 }
 
 export default function ExpansionPlanner() {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const launch = useGame((s) => s.launchDistrict);
   const setScreen = useGame((s) => s.setScreen);
@@ -77,14 +80,14 @@ export default function ExpansionPlanner() {
   };
   return (
     <section className="mt-4" aria-label="Expansion planner">
-      <h3 className="text-lg font-semibold">Where will you build next?</h3>
+      <h3 className="text-lg font-semibold">{t(locale, 'whereWillYouBuildNext')}</h3>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-white/60">
         Compare local markets, choose your first site, and commission a connected network. A smaller launch preserves
         cash; a POP reaches more homes.
       </p>
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
         <fieldset className="min-w-0">
-          <legend className="mb-2 text-sm font-semibold">Choose a district</legend>
+          <legend className="mb-2 text-sm font-semibold">{t(locale, 'chooseADistrict')}</legend>
           <div className="divide-y divide-white/10 rounded border border-white/10">
             {rows.map((row) => (
               <label
@@ -126,9 +129,7 @@ export default function ExpansionPlanner() {
               </label>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-white/45">
-            Launch totals include any required licence, one site and its shortest available fibre connection.
-          </p>
+          <p className="mt-2 text-[11px] text-white/45">{t(locale, 'launchTotalsBlurb')}</p>
         </fieldset>
         <div className="min-w-0 space-y-3 rounded border border-white/10 bg-black/10 p-4" aria-label="Launch quote">
           <h4 className="font-semibold">{district.name}</h4>
@@ -137,7 +138,7 @@ export default function ExpansionPlanner() {
           ) : (
             <>
               <fieldset className="min-w-0">
-                <legend className="mb-2 text-sm font-semibold">Choose a starter network</legend>
+                <legend className="mb-2 text-sm font-semibold">{t(locale, 'chooseStarterNetwork')}</legend>
                 <div className="grid grid-cols-2 gap-2">
                   {(['access', 'pop'] as const).map((option) => (
                     <label
@@ -180,11 +181,11 @@ export default function ExpansionPlanner() {
                       </div>
                     ))}
                     <div className="flex justify-between border-t border-white/10 pt-2 text-sm font-semibold">
-                      <dt>Total launch cost</dt>
+                      <dt>{t(locale, 'totalLaunchCost')}</dt>
                       <dd>{fmtMoneyExact(quote.total)}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-white/55">Cash after launch</dt>
+                      <dt className="text-white/55">{t(locale, 'cashAfterLaunch')}</dt>
                       <dd className={game.money < quote.total ? 'text-neon-amber' : 'text-white/80'}>
                         {fmtMoneyExact(game.money - quote.total)}
                       </dd>
@@ -224,7 +225,7 @@ export default function ExpansionPlanner() {
             </>
           )}
           <button className="btn w-full text-xs" onClick={inspect}>
-            Inspect district on map
+            {t(locale, 'inspectDistrictOnMap')}
           </button>
         </div>
       </div>
