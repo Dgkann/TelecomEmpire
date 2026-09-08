@@ -364,7 +364,7 @@ export default function ContextPanel() {
                   Upgrade optics · {fmtMoneyExact(Math.round(link.length * FIBER_UPGRADE_COST_PER_UNIT * link.tier))}
                 </button>
                 <button className="btn-danger" onClick={() => sellLink(link.id)}>
-                  Remove
+                  {t(locale, 'remove')}
                 </button>
               </div>
             </div>
@@ -392,7 +392,7 @@ export default function ContextPanel() {
                       <div className="num">{buildingContract.bandwidthGbps} Gbps</div>
                     </div>
                     <div className="chip">
-                      <div className="stat-label">Monthly</div>
+                      <div className="stat-label">{t(locale, 'monthly')}</div>
                       <div className="num">{fmtMoneyExact(buildingContract.monthlyRevenue)}</div>
                     </div>
                     <div className="chip">
@@ -443,7 +443,7 @@ export default function ContextPanel() {
           {district && (
             <div className="space-y-3">
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/40">District</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/40">{t(locale, 'district')}</div>
                 <div className="text-lg font-semibold leading-tight" style={{ color: district.color }}>
                   {district.name}
                 </div>
@@ -459,7 +459,7 @@ export default function ContextPanel() {
                   <div className="num">{fmtNum(district.potential)}</div>
                 </div>
                 <div className="chip">
-                  <div className="stat-label">Income</div>
+                  <div className="stat-label">{t(locale, 'income')}</div>
                   <div className="capitalize">{district.incomeLevel}</div>
                 </div>
                 <div className="chip">

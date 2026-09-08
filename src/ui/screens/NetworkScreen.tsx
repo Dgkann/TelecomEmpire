@@ -280,10 +280,10 @@ export default function NetworkScreen() {
               aria-label="Traffic carried by service class"
             >
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3 bg-black/15 px-3 py-2 text-[10px] text-white/35">
-                <span>Service</span>
+                <span>{t(locale, 'service')}</span>
                 <span>{t(locale, 'requested')}</span>
-                <span>Carried</span>
-                <span>Delivery</span>
+                <span>{t(locale, 'carried')}</span>
+                <span>{t(locale, 'delivery')}</span>
               </div>
               {trafficClasses.map(({ id, label, color }) => {
                 const requested = game.stats.serviceDemandGbps[id];
@@ -447,7 +447,7 @@ export default function NetworkScreen() {
         <div className={`panel panel-tone-green p-5 ${networkView === 'capacity' ? '' : 'hidden'}`}>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Sites</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">{t(locale, 'sites')}</h2>
               <p className="mt-1 text-[11px] text-white/40">
                 A larger T-number means a larger equipment stack and more capacity.
               </p>
@@ -518,7 +518,7 @@ export default function NetworkScreen() {
                         className="chip border-neon-red/40 text-[10px] text-neon-red"
                         title="Neither end can reach a core right now"
                       >
-                        NO ROUTE
+                        {t(locale, 'noRoute')}
                       </span>
                     )}
                     {standby && (
@@ -671,7 +671,7 @@ export default function NetworkScreen() {
                   <div className="num text-sm">{accessCapacity.toFixed(0)}G</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Headroom</div>
+                  <div className="stat-label">{t(locale, 'headroom')}</div>
                   <div
                     className={`num text-sm ${daysLeft !== null && daysLeft < 30 ? 'text-neon-red' : 'text-neon-lime'}`}
                   >
@@ -709,7 +709,7 @@ export default function NetworkScreen() {
             <>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <div className="chip py-2">
-                  <div className="stat-label">Sites</div>
+                  <div className="stat-label">{t(locale, 'sites')}</div>
                   <div className="num text-sm">{dataCenters.length}</div>
                 </div>
                 <div className="chip py-2">
@@ -717,7 +717,7 @@ export default function NetworkScreen() {
                   <div className="num text-sm text-neon-cyan">{Math.round(cacheRatio(game) * 100)}%</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Hosting</div>
+                  <div className="stat-label">{t(locale, 'hosting')}</div>
                   <div className="num text-sm text-neon-lime">{fmtMoney(finance.revenueHosting)}</div>
                 </div>
               </div>
@@ -873,7 +873,9 @@ export default function NetworkScreen() {
 
         {mods.hasMobile && (
           <div className={`panel panel-tone-violet p-5 ${networkView === 'interconnect' ? '' : 'hidden'}`}>
-            <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Spectrum</h2>
+            <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">
+              {t(locale, 'spectrum')}
+            </h2>
             <p className="mb-3 text-[11px] text-white/40">
               Low bands reach further, high bands carry more. Reach comes from your best band, capacity from all of
               them.

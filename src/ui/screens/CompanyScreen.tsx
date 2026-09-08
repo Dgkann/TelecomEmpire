@@ -87,7 +87,7 @@ function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakdown> })
       </div>
       <div className="space-y-1.5">
         <div className="grid grid-cols-[68px_minmax(0,1fr)_64px] items-center gap-2 text-[10px]">
-          <span className="text-white/55">Revenue</span>
+          <span className="text-white/55">{t(locale, 'revenue')}</span>
           <span className="relative h-2 overflow-hidden rounded-sm bg-white/[0.05]">
             <i
               className="absolute h-full rounded-sm bg-neon-lime/75"
@@ -223,7 +223,7 @@ export default function CompanyScreen() {
         <div className="panel p-5 lg:col-span-3">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
             <div>
-              <div className="stat-label">Cash</div>
+              <div className="stat-label">{t(locale, 'cash')}</div>
               <div className={`num text-2xl font-semibold ${game.money < 0 ? 'text-neon-red' : 'text-neon-cyan'}`}>
                 {fmtMoney(game.money)}
               </div>
@@ -491,7 +491,7 @@ export default function CompanyScreen() {
 
                     <div className="mt-3">
                       <div className="flex items-baseline justify-between">
-                        <span className="stat-label">Price</span>
+                        <span className="stat-label">{t(locale, 'price')}</span>
                         <span className="num text-lg font-semibold text-neon-cyan">${p.price}</span>
                       </div>
                       <input
@@ -546,7 +546,7 @@ export default function CompanyScreen() {
                         </div>
                         <div className="num mt-1 text-xs text-white/45">{p.speedMbps} Mbps</div>
                         <div className="mt-3 flex items-baseline justify-between">
-                          <span className="stat-label">Price</span>
+                          <span className="stat-label">{t(locale, 'price')}</span>
                           <span className="num text-lg font-semibold text-neon-violet">${p.price}</span>
                         </div>
                         <input
@@ -616,7 +616,7 @@ export default function CompanyScreen() {
           </h2>
           <div className="divide-y divide-white/5">
             <div className="pb-2">
-              <div className="stat-label mb-1">Income</div>
+              <div className="stat-label mb-1">{t(locale, 'income')}</div>
               <Row label="Residential" value={fmtMoneyExact(money.revenueResidential)} tone="text-neon-lime" />
               {money.revenueMobile > 0 && (
                 <Row label="Mobile" value={fmtMoneyExact(money.revenueMobile)} tone="text-neon-lime" />
@@ -631,7 +631,7 @@ export default function CompanyScreen() {
               <Row label="Enterprise" value={fmtMoneyExact(money.revenueEnterprise)} tone="text-neon-lime" />
             </div>
             <div className="py-2">
-              <div className="stat-label mb-1">Costs</div>
+              <div className="stat-label mb-1">{t(locale, 'costs')}</div>
               <Row label="Salaries" value={fmtMoneyExact(-money.costSalaries)} tone="text-white/70" />
               <Row label="Electricity" value={fmtMoneyExact(-money.costPower)} tone="text-white/70" />
               <Row label="Maintenance" value={fmtMoneyExact(-money.costMaintenance)} tone="text-white/70" />
@@ -891,7 +891,7 @@ export default function CompanyScreen() {
 
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="chip py-2">
-              <div className="stat-label">Owed</div>
+              <div className="stat-label">{t(locale, 'owed')}</div>
               <div className={`num text-sm ${debt > 0 ? 'text-neon-amber' : 'text-white'}`}>{fmtMoney(debt)}</div>
             </div>
             <div className="chip py-2">
@@ -899,7 +899,7 @@ export default function CompanyScreen() {
               <div className="num text-sm text-neon-cyan">{fmtMoney(headroom)}</div>
             </div>
             <div className="chip py-2">
-              <div className="stat-label">Rate</div>
+              <div className="stat-label">{t(locale, 'rate')}</div>
               <div className="num text-sm">{(loanRate(game) * 100).toFixed(1)}%</div>
             </div>
           </div>
@@ -915,7 +915,7 @@ export default function CompanyScreen() {
                     </div>
                   </div>
                   <button className="btn px-2 py-1 text-[11px]" onClick={() => repayLoan(l.id)}>
-                    Clear
+                    {t(locale, 'clear')}
                   </button>
                 </div>
               ))}

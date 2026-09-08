@@ -388,11 +388,11 @@ export default function SidePanel() {
                       <div className="mt-1 text-[11px] leading-snug text-white/65">{r.detail}</div>
                       <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
                         <div className="rounded-sm bg-black/20 px-2 py-1.5">
-                          <div className="text-white/40">Current</div>
+                          <div className="text-white/40">{t(locale, 'current')}</div>
                           <div className="num text-white/80">{currentText}</div>
                         </div>
                         <div className="rounded-sm bg-black/20 px-2 py-1.5">
-                          <div className="text-white/40">Target</div>
+                          <div className="text-white/40">{t(locale, 'target')}</div>
                           <div className="num text-neon-amber">{targetText}</div>
                         </div>
                       </div>
@@ -478,15 +478,15 @@ export default function SidePanel() {
                           <div className="num mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-white/55">
                             <span>{t(locale, 'bandwidth')}</span>
                             <span className="text-right text-white">{o.bandwidthGbps} Gbps</span>
-                            <span>Revenue</span>
+                            <span>{t(locale, 'revenue')}</span>
                             <span className="text-right text-neon-lime">{fmtMoney(o.monthlyRevenue)}/mo</span>
                             <span>SLA</span>
                             <span className="text-right text-white">{o.slaPercent}%</span>
-                            <span>Term</span>
+                            <span>{t(locale, 'term')}</span>
                             <span className="text-right text-white">{o.termMonths} months</span>
                             <span>{t(locale, 'signingBonus')}</span>
                             <span className="text-right text-white">{fmtMoney(o.signingBonus)}</span>
-                            <span>District</span>
+                            <span>{t(locale, 'district')}</span>
                             <span className="text-right text-white">{d?.name}</span>
                           </div>
                           {o.requiresRedundancy && (
@@ -505,7 +505,7 @@ export default function SidePanel() {
                               onClick={() => acceptOffer(o.id, 'standard')}
                               title="Sign the contract exactly as offered."
                             >
-                              <span className="block text-[10px] font-semibold">Standard</span>
+                              <span className="block text-[10px] font-semibold">{t(locale, 'standard')}</span>
                               <span className="num block text-[9px] opacity-70">{fmtMoney(o.monthlyRevenue)}/mo</span>
                             </button>
                             <button
@@ -533,7 +533,7 @@ export default function SidePanel() {
                               </span>
                             </button>
                             <button className="btn py-1.5 text-xs" onClick={() => declineOffer(o.id)}>
-                              Pass
+                              {t(locale, 'pass')}
                             </button>
                           </div>
                           <div className="mt-1.5 text-[10px] leading-snug text-white/35">

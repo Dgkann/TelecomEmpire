@@ -29,7 +29,7 @@ function SettingsDialog({ close }: { close: () => void }) {
         </div>
         <div className="p-5">
           <fieldset>
-            <legend className="mb-2 text-sm font-semibold">Pause on</legend>
+            <legend className="mb-2 text-sm font-semibold">{t(locale, 'pauseOn')}</legend>
             <div className="divide-y divide-white/10">
               {SMART_PAUSE_OPTIONS.map((option) => (
                 <label key={option.id} className="flex cursor-pointer items-start gap-3 py-3">
@@ -62,7 +62,7 @@ function SettingsDialog({ close }: { close: () => void }) {
             the game again when you resume.
           </p>
           <button className="btn mt-4 w-full" onClick={close}>
-            Done
+            {t(locale, 'done')}
           </button>
           <p className="mt-2 text-center text-[11px] text-white/45">{t(locale, 'gamePausedResume')}</p>
         </div>
@@ -100,6 +100,7 @@ export function SmartPauseSettings({ children }: { children: ReactNode }) {
 }
 
 export function SmartPauseBanner() {
+  const locale = useGame((s) => s.locale);
   const notice = useGame((s) => s.smartPauseNotice);
   const dismiss = useGame((s) => s.dismissSmartPause);
   const setSpeed = useGame((s) => s.setSpeed);
@@ -134,7 +135,7 @@ export function SmartPauseBanner() {
             Resume {notice.resumeSpeed}×
           </button>
           <button className="btn px-2 py-1 text-xs" onClick={dismiss}>
-            Dismiss
+            {t(locale, 'dismiss')}
           </button>
         </div>
       </div>

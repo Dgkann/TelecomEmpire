@@ -1600,11 +1600,11 @@ export default function MapView() {
             <div className="mt-2 grid grid-cols-3 gap-2 text-center">
               <div>
                 <div className="num text-sm text-white">{selectedRoute.route.path.length}</div>
-                <div className="stat-label">Hops</div>
+                <div className="stat-label">{t(locale, 'hops')}</div>
               </div>
               <div>
                 <div className="num text-sm text-white">{selectedRoute.route.distance.toFixed(1)}</div>
-                <div className="stat-label">Distance</div>
+                <div className="stat-label">{t(locale, 'distance')}</div>
               </div>
               <div>
                 <div className="num text-sm text-neon-amber">
@@ -1613,7 +1613,7 @@ export default function MapView() {
                     : 0}
                   %
                 </div>
-                <div className="stat-label">Peak</div>
+                <div className="stat-label">{t(locale, 'peak')}</div>
               </div>
               <div className="col-span-3 border-t border-white/[0.07] pt-2 text-left text-[10px] text-white/45">
                 {t(locale, 'routeTraceBlurb')}
@@ -1643,7 +1643,7 @@ export default function MapView() {
               value={quality}
               onChange={(e) => chooseQuality(e.target.value as 'auto' | 'full' | 'performance')}
             >
-              <option value="auto">Auto</option>
+              <option value="auto">{t(locale, 'autoLabel')}</option>
               <option value="full">{t(locale, 'fullDetail')}</option>
               <option value="performance">{t(locale, 'performanceMode')}</option>
             </select>

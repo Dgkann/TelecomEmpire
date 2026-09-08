@@ -55,7 +55,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <button className="btn shrink-0 px-2 text-xs" aria-label="Close company profile" onClick={onClose}>
-            Close
+            {t(locale, 'close')}
           </button>
         </div>
         <div className="space-y-5 p-5">

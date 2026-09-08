@@ -102,7 +102,8 @@ function TenderDetail({ tender }: { tender: CityTender }) {
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/60">{spec.brief}</p>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
               <span>
-                Budget <strong className="block text-lg text-white">{fmtMoneyExact(tender.budget)}</strong>
+                {t(locale, 'budget')}{' '}
+                <strong className="block text-lg text-white">{fmtMoneyExact(tender.budget)}</strong>
               </span>
               <span>
                 {tender.status === 'open'
@@ -361,10 +362,10 @@ function TenderDetail({ tender }: { tender: CityTender }) {
               <table className="w-full text-left text-xs">
                 <thead className="text-white/45">
                   <tr>
-                    <th className="pb-2">Operator</th>
-                    <th className="pb-2 text-right">Payment</th>
+                    <th className="pb-2">{t(locale, 'operator')}</th>
+                    <th className="pb-2 text-right">{t(locale, 'payment')}</th>
                     <th className="pb-2 text-right">{t(locale, 'reputation')}</th>
-                    <th className="pb-2 text-right">Score</th>
+                    <th className="pb-2 text-right">{t(locale, 'score')}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -70,7 +70,7 @@ export default function ResearchScreen() {
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="relative grid h-10 w-10 place-items-center rounded-full border border-neon-cyan/40 bg-neon-cyan/10 font-display text-[11px] font-semibold uppercase text-neon-cyan">
-                  Live
+                  {t(locale, 'live')}
                   <span className="absolute inset-0 animate-ping rounded-full border border-neon-cyan/25" />
                 </div>
                 <div>
@@ -258,7 +258,7 @@ export default function ResearchScreen() {
                             ) : (
                               <div className="mt-3 rounded-md border border-white/[0.055] bg-black/20 px-2.5 py-2 text-[10px] leading-snug text-white/[0.34]">
                                 <span className="mr-1 font-semibold uppercase tracking-wider text-white/25">
-                                  Locked
+                                  {t(locale, 'locked')}
                                 </span>{' '}
                                 Requires {requirements}
                               </div>

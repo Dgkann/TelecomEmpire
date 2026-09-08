@@ -69,15 +69,15 @@ export default function AuctionModal() {
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="chip py-2">
-                <div className="stat-label">Coverage</div>
+                <div className="stat-label">{t(locale, 'coverage')}</div>
                 <div className="num text-sm text-neon-cyan">{spec.radius.toFixed(2)}x</div>
               </div>
               <div className="chip py-2">
-                <div className="stat-label">Capacity</div>
+                <div className="stat-label">{t(locale, 'capacity')}</div>
                 <div className="num text-sm text-neon-cyan">{spec.capacity.toFixed(1)}x</div>
               </div>
               <div className="chip py-2">
-                <div className="stat-label">Reserve</div>
+                <div className="stat-label">{t(locale, 'reserve')}</div>
                 <div className="num text-sm text-white">{fmtMoney(auction.reserve)}</div>
               </div>
             </div>
@@ -123,9 +123,10 @@ export default function AuctionModal() {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
-                    Bid of <span className="num text-neon-cyan">{fmtMoneyExact(auction.playerBid)}</span> is in.
+                    {t(locale, 'bidOf')} <span className="num text-neon-cyan">{fmtMoneyExact(auction.playerBid)}</span>{' '}
+                    is in.
                     <button className="btn mt-3 w-full" onClick={() => setOpen(false)}>
-                      Close
+                      {t(locale, 'close')}
                     </button>
                   </div>
                 )}
@@ -148,7 +149,7 @@ export default function AuctionModal() {
                 </div>
 
                 <div>
-                  <div className="stat-label mb-1.5">All bids</div>
+                  <div className="stat-label mb-1.5">{t(locale, 'allBids')}</div>
                   <div className="flex flex-col gap-1">
                     {result.bids.map((b, i) => (
                       <div
@@ -174,7 +175,7 @@ export default function AuctionModal() {
                     setOpen(false);
                   }}
                 >
-                  Done
+                  {t(locale, 'done')}
                 </button>
               </>
             )}

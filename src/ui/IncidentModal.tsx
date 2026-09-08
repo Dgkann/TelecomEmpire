@@ -214,7 +214,7 @@ export default function IncidentModal() {
                 </>
               )}
               <button className="btn w-full" onClick={() => close(null)}>
-                Close
+                {t(locale, 'close')}
               </button>
             </div>
           </motion.div>
