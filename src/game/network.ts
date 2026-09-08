@@ -223,6 +223,8 @@ export interface TrafficService {
 }
 
 export interface ServiceLoadResult {
+  offeredNodeTraffic: Record<string, number>;
+  offeredLinkTraffic: Record<string, number>;
   nodeTraffic: Record<string, number>;
   linkTraffic: Record<string, number>;
   serviceServed: Record<string, number>;
@@ -300,6 +302,7 @@ export function loadServices(
     priority: number;
   }
   const planned: Record<string, PlannedFlow[]> = {};
+  const balancedWeights = new Map<string, number>();
 
   for (const service of services) {
     const demand = service.demandGbps;
@@ -324,6 +327,8 @@ export function loadServices(
 
     const weightOf = (n: NetNode) => {
       if (!autoBalance) return Math.max(0, n.capacityGbps);
+      const cached = balancedWeights.get(n.id);
+      if (cached !== undefined) return cached;
       const route = routes[n.id];
       if (!route) return Math.max(0, n.capacityGbps);
       let cap = Math.max(0, n.capacityGbps);
@@ -335,7 +340,9 @@ export function loadServices(
         const hop = nodeById[hopId];
         if (hop) cap = Math.min(cap, hop.capacityGbps);
       }
-      return Math.max(cap, n.capacityGbps * 0.15);
+      const weight = Math.max(cap, n.capacityGbps * 0.15);
+      balancedWeights.set(n.id, weight);
+      return weight;
     };
 
     const weights = serving.map((node) => ({ node, weight: weightOf(node) }));
@@ -378,6 +385,10 @@ export function loadServices(
     let worstPressure = 0;
     let servedFraction = 1;
     let blocked = false;
+    // All flows of this service have the same priority. Shared backhaul resources
+    // impose the same limit each time, so inspect each only once per service.
+    const inspectedNodes = new Set<string>();
+    const inspectedLinks = new Set<string>();
     const recordPressure = (traffic: number, weightedTraffic: number, capacity: number, priority: number) => {
       if (traffic <= 0) return;
       if (capacity <= 0) {
@@ -396,12 +407,19 @@ export function loadServices(
     };
 
     for (const { node, route, priority } of flows) {
-      recordPressure(offeredNodeTraffic[node.id], weightedNodeTraffic[node.id], node.capacityGbps, priority);
+      if (!inspectedNodes.has(node.id)) {
+        inspectedNodes.add(node.id);
+        recordPressure(offeredNodeTraffic[node.id], weightedNodeTraffic[node.id], node.capacityGbps, priority);
+      }
       for (const linkId of route.path) {
+        if (inspectedLinks.has(linkId)) continue;
+        inspectedLinks.add(linkId);
         const link = linkById[linkId];
         if (link) recordPressure(offeredLinkTraffic[linkId], weightedLinkTraffic[linkId], link.capacityGbps, priority);
       }
       for (const hopId of route.hops) {
+        if (inspectedNodes.has(hopId)) continue;
+        inspectedNodes.add(hopId);
         const hop = nodeById[hopId];
         if (hop) recordPressure(offeredNodeTraffic[hopId], weightedNodeTraffic[hopId], hop.capacityGbps, priority);
       }
@@ -422,7 +440,17 @@ export function loadServices(
     totalServed += servedHere;
   }
 
-  return { nodeTraffic, linkTraffic, serviceServed, servicePressure, serviceOutage, totalDemand, totalServed };
+  return {
+    offeredNodeTraffic,
+    offeredLinkTraffic,
+    nodeTraffic,
+    linkTraffic,
+    serviceServed,
+    servicePressure,
+    serviceOutage,
+    totalDemand,
+    totalServed,
+  };
 }
 
 export const nodeUtil = (n: NetNode) => (n.capacityGbps > 0 ? n.trafficGbps / n.capacityGbps : 0);
