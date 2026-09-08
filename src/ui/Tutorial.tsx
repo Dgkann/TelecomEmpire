@@ -8,6 +8,8 @@ import type { GameState } from '../game/types';
 interface TutorialStep {
   title: string;
   body: string;
+  titleTr: string;
+  bodyTr: string;
   done: (g: GameState) => boolean;
 }
 
@@ -15,26 +17,42 @@ const STEPS: TutorialStep[] = [
   {
     title: 'Place a second POP',
     body: 'Pick POP and move over the city until the preview turns green, then place the new T1 site inside your licensed district.',
+    titleTr: 'İkinci POP noktasını kur',
+    bodyTr:
+      'POP seçeneğini seç, önizleme yeşil olana kadar şehirde hareket et ve T1 noktasını lisanslı ilçene yerleştir.',
     done: (g) => g.nodes.filter((n) => n.kind === 'pop').length >= 2,
   },
   {
     title: 'Light the fibre',
     body: 'Choose Fibre, click the new POP, then click the core router; eligible endpoints glow cyan and the route shows its price before you build.',
-    done: (g) => g.links.length >= 2,
+    titleTr: 'Fiber hattını etkinleştir',
+    bodyTr:
+      'Fiber seçeneğini seç, yeni POP noktasına ve ardından çekirdek yönlendiriciye tıkla. Uygun uçlar camgöbeği görünür.',
+    done: (g) => {
+      const routes = computeRoutes(g);
+      return g.nodes.filter((n) => n.kind === 'pop' && !n.down && routes[n.id]).length >= 2;
+    },
   },
   {
     title: 'Grow to 400 customers',
     body: 'Coverage spreads out from your sites over the next few days. Watch buildings turn cyan as they subscribe.',
+    titleTr: '400 müşteriye ulaş',
+    bodyTr: 'Kapsama birkaç gün içinde noktalarından çevreye yayılır. Abone olan binaların renk değiştirmesini izle.',
     done: (g) => residentialSubs(g) >= 400,
   },
   {
     title: 'Watch the evening peak',
     body: 'Traffic roughly doubles between 18:00 and 23:00; upgrade a POP from T1 to T2 and watch its map badge and capacity change.',
+    titleTr: 'Akşam yoğunluğunu izle',
+    bodyTr:
+      'Trafik 18:00 ile 23:00 arasında yaklaşık iki katına çıkar. Bir POP noktasını T1 seviyesinden T2 seviyesine yükselt.',
     done: (g) => g.nodes.some((n) => n.tier >= 2),
   },
   {
     title: 'Protect a customer site',
     body: 'Add a second fibre route to a POP or access site so one cut cannot isolate it; protected sites qualify for stricter contracts and audits.',
+    titleTr: 'Müşteri noktasını koru',
+    bodyTr: 'Bir kesintinin noktayı ayırmaması için POP veya erişim noktasına ikinci bir fiber rotası ekle.',
     done: (g) => {
       const sites = g.nodes.filter((node) => node.kind === 'pop' || node.kind === 'access');
       const routes = computeRoutes(g);
@@ -44,6 +62,9 @@ const STEPS: TutorialStep[] = [
   {
     title: 'Expand to a new district',
     body: 'Click a greyed-out district and buy its licence, then plan coverage, capacity and a resilient path back to the core.',
+    titleTr: 'Yeni bir ilçeye genişle',
+    bodyTr:
+      'Gri görünen bir ilçeye tıklayıp lisansını al. Ardından kapsama, kapasite ve çekirdeğe dayanıklı bağlantıyı planla.',
     done: (g) => g.districts.filter((d) => d.unlocked).length >= 2,
   },
 ];
@@ -53,6 +74,8 @@ export default function Tutorial() {
   const advance = useGame((s) => s.advanceTutorial);
   const skip = useGame((s) => s.skipTutorial);
   const selection = useGame((s) => s.selection);
+  const locale = useGame((s) => s.locale);
+  const planning = useGame((s) => s.planning);
   const [expanded, setExpanded] = useState(false);
   const stepIndex = game.tutorialStep;
   const step = STEPS[stepIndex];
@@ -68,7 +91,7 @@ export default function Tutorial() {
 
   useEffect(() => setExpanded(false), [stepIndex]);
 
-  if (game.tutorialDone || !step) return null;
+  if (game.tutorialDone || !step || planning) return null;
 
   return (
     <AnimatePresence mode="wait">
@@ -87,9 +110,9 @@ export default function Tutorial() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-neon-cyan">
-                  Commissioning guide
+                  {locale === 'tr' ? 'Kurulum rehberi' : 'Commissioning guide'}
                 </div>
-                <div className="text-sm font-semibold">{step.title}</div>
+                <div className="text-sm font-semibold">{locale === 'tr' ? step.titleTr : step.title}</div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -97,15 +120,15 @@ export default function Tutorial() {
                   aria-expanded={expanded}
                   onClick={() => setExpanded((value) => !value)}
                 >
-                  {expanded ? 'Less' : 'Details'}
+                  {expanded ? (locale === 'tr' ? 'Azalt' : 'Less') : locale === 'tr' ? 'Ayrıntı' : 'Details'}
                 </button>
                 <button className="text-[11px] text-white/45 hover:text-white" onClick={skip}>
-                  Skip guide
+                  {locale === 'tr' ? 'Rehberi geç' : 'Skip guide'}
                 </button>
               </div>
             </div>
             <p className={`${expanded ? 'block' : 'hidden'} mt-1 text-[12px] leading-snug text-white/60 sm:block`}>
-              {step.body}
+              {locale === 'tr' ? step.bodyTr : step.body}
             </p>
             <div className="mt-2 hidden gap-1 sm:flex">
               {STEPS.map((_, i) => (
