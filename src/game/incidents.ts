@@ -1,5 +1,6 @@
+import { MINUTES_PER_STEP } from './constants';
 import { uid, type Rng } from './rng';
-import type { GameState, Incident, IncidentKind } from './types';
+import type { GameState, Incident, IncidentKind, Technician } from './types';
 
 export type RepairMode = 'emergency' | 'normal';
 
@@ -223,22 +224,71 @@ export function repairCost(incident: Incident, mode: RepairMode) {
 }
 
 export function repairOptions(incident: Incident, techSkill: number): RepairOption[] {
-  const base = incident.repairTotalMinutes;
-  const skillMul = 1 - (techSkill - 1) * 0.12;
   return [
     {
       key: 'emergency',
       label: 'Emergency Repair',
       cost: repairCost(incident, 'emergency'),
-      minutes: Math.max(30, Math.round(base * 0.28 * skillMul)),
+      minutes: repairMinutes(incident, techSkill, 'emergency'),
       note: 'Overtime crew, parts flown in.',
     },
     {
       key: 'normal',
       label: 'Scheduled Repair',
       cost: repairCost(incident, 'normal'),
-      minutes: Math.max(60, Math.round(base * skillMul)),
+      minutes: repairMinutes(incident, techSkill, 'normal'),
       note: 'Cheap, but customers wait.',
     },
   ];
+}
+
+export function incidentLocation(s: GameState, inc: Incident): { gx: number; gy: number } {
+  if (inc.targetType === 'node') {
+    const n = s.nodes.find((x) => x.id === inc.targetId);
+    if (n) return { gx: n.gx, gy: n.gy };
+  } else {
+    const l = s.links.find((x) => x.id === inc.targetId);
+    if (l) {
+      const a = s.nodes.find((n) => n.id === l.aId);
+      const b = s.nodes.find((n) => n.id === l.bId);
+      if (a && b) return { gx: (a.gx + b.gx) / 2, gy: (a.gy + b.gy) / 2 };
+    }
+  }
+  const d = s.districts.find((x) => x.id === inc.districtId);
+  return d ? d.center : { gx: 0, gy: 0 };
+}
+
+export const CREW_SPEED = 0.02;
+
+// Work and travel estimates share the simulation's speed and repair formula.
+export function repairMinutes(incident: Incident, skill: number, mode: RepairMode) {
+  return Math.max(
+    30,
+    Math.round(incident.repairTotalMinutes * (mode === 'emergency' ? 0.28 : 1) * (1 - (skill - 1) * 0.12)),
+  );
+}
+
+export function crewTravelMinutes(state: GameState, incident: Incident, technician: Technician) {
+  const target = incidentLocation(state, incident);
+  const distance = Math.hypot(target.gx - technician.gx, target.gy - technician.gy);
+  return Math.max(1, Math.ceil(distance / (CREW_SPEED * MINUTES_PER_STEP))) * MINUTES_PER_STEP;
+}
+
+export function dispatchCandidates(state: GameState, incident: Incident, mode: RepairMode) {
+  return state.technicians
+    .filter((t) => t.state === 'idle' && t.incidentId === null && t.maintenanceId === null)
+    .map((technician) => {
+      const travelMinutes = crewTravelMinutes(state, incident, technician);
+      const workMinutes =
+        Math.ceil(repairMinutes(incident, technician.skill, mode) / MINUTES_PER_STEP) * MINUTES_PER_STEP;
+      return { technician, travelMinutes, workMinutes, totalMinutes: travelMinutes + workMinutes };
+    })
+    .sort((a, b) => a.totalMinutes - b.totalMinutes || a.technician.id.localeCompare(b.technician.id));
+}
+
+// The incident's recorded customer impact is a stable triage signal; age breaks ties.
+export function pendingIncidents(state: GameState) {
+  return state.incidents
+    .filter((i) => !i.resolved && i.assignedTechId === null && i.repairMinutesLeft === null)
+    .sort((a, b) => b.affected - a.affected || a.startedAt - b.startedAt || a.id.localeCompare(b.id));
 }
