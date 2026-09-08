@@ -1,3 +1,13 @@
+import { buildingPaint } from './cityCanvas';
+import { sameDistrictMap, sameIds, visualConnection } from './mapVisuals';
+import { useMapQuality } from './useMapQuality';
+import { ProjectFootprint, ProjectMapLabel } from './ProjectMap';
+import { failureDrill } from '../game/failureDrill';
+import FailureDrillPanel, { FailureFootprint } from './FailureDrill';
+import { reachGain } from '../game/reach';
+import CityFoundation from './CityFoundation';
+import DistrictNavigator from './DistrictNavigator';
+import { connectedSiteEstimate } from '../game/connectedBuild';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { utilColor, towerRadius } from '../game/constants';
@@ -7,9 +17,11 @@ import { computeRoutes, linkUtil, nodeUtil } from '../game/network';
 import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
 import { daylight, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import { suggestedBackhaul } from '../game/investment';
+import { projectBlueprint } from '../game/blueprint';
 import type { Building, District, GameState, NetLink, NetNode, SpectrumHolding, Technician } from '../game/types';
-import { FLOOR_H, TILE_H, TILE_W, isoX, isoY, mix, shade, tileDiamond, unIso } from './iso';
-import SiteIcon, { SITE_SIZE, SITE_VISUAL, SitePlate } from './SiteIcon';
+import { FLOOR_H, TILE_H, TILE_W, isoX, isoY, mix, tileDiamond, unIso } from './iso';
+import { SITE_SIZE, SITE_VISUAL, SitePlate } from './SiteIcon';
 
 const COMPANY = '#2dd4bf';
 const PLACEMENT_BLOCKER = '[data-map-placement-blocker="true"]';
@@ -19,263 +31,285 @@ function isMapBackgroundTarget(target: EventTarget | null, map: Element) {
 }
 
 const MAP = {
-  ground: '#16253a',
-  groundAlt: '#0f1c2d',
-  road: '#080f1a',
-  roadMark: '#2f4463',
-  locked: '#0a121d',
+  ground: '#536c70',
+  groundAlt: '#455f68',
+  road: '#233a46',
+  roadMark: '#7f9295',
+  locked: '#243c48',
 };
 
-// Buildings sit on a single cool ramp.
-const SLATE = ['#3c4d63', '#47596f', '#53667d', '#5f7288', '#6b7f95'];
+const GroundLayer = memo(
+  function GroundLayer({
+    districts,
+    night,
+    selectedId,
+    outageIds,
+    obligationIds,
+  }: {
+    districts: District[];
+    night: number;
+    selectedId: string | null;
+    outageIds: string[];
+    obligationIds: string[];
+  }) {
+    const tiles: JSX.Element[] = [];
+    const marks: JSX.Element[] = [];
+    const junctions: JSX.Element[] = [];
+    const outages = new Set(outageIds);
+    const obligations = new Set(obligationIds);
 
-const GroundLayer = memo(function GroundLayer({
-  districts,
-  night,
-  selectedId,
-  outageIds,
-  obligationIds,
-}: {
-  districts: District[];
-  night: number;
-  selectedId: string | null;
-  outageIds: string[];
-  obligationIds: string[];
-}) {
-  const tiles: JSX.Element[] = [];
-  const marks: JSX.Element[] = [];
-  const junctions: JSX.Element[] = [];
-  const outages = new Set(outageIds);
-  const obligations = new Set(obligationIds);
+    districts.forEach((d, di) => {
+      // Alternating value, not hue, so five districts read apart without turning the city into a colour chart.
+      const plate = mix(mix(di % 2 === 0 ? MAP.ground : MAP.groundAlt, d.color, 0.1), '#000000', night * 0.3);
+      const statePlate = outages.has(d.id)
+        ? mix(plate, '#d36e76', 0.3)
+        : obligations.has(d.id)
+          ? mix(plate, '#d2a657', 0.16)
+          : selectedId === d.id
+            ? mix(plate, COMPANY, 0.2)
+            : plate;
+      const surface = d.unlocked ? statePlate : mix(MAP.locked, '#000000', night * 0.3);
+      const road = mix(MAP.road, '#000000', night * 0.3);
 
-  districts.forEach((d, di) => {
-    // Alternating value, not hue, so five districts read apart without turning the city into a colour chart.
-    const plate = mix(mix(di % 2 === 0 ? MAP.ground : MAP.groundAlt, d.color, 0.1), '#000000', night * 0.3);
-    const statePlate = outages.has(d.id)
-      ? mix(plate, '#d36e76', 0.3)
-      : obligations.has(d.id)
-        ? mix(plate, '#d2a657', 0.16)
-        : selectedId === d.id
-          ? mix(plate, COMPANY, 0.2)
-          : plate;
-    const surface = d.unlocked ? statePlate : mix(MAP.locked, '#000000', night * 0.3);
-    const road = mix(MAP.road, '#000000', night * 0.3);
-
-    for (const c of d.cells) {
-      const isJunction = c.gx % 5 === 0 && c.gy % 5 === 0;
-      const onRoad = isRoad(c.gx, c.gy);
-      tiles.push(
-        <polygon
-          key={`g${c.gx}_${c.gy}`}
-          points={tileDiamond(c.gx, c.gy, onRoad ? 0 : 0.06)}
-          fill={onRoad ? road : surface}
-        />,
-      );
-
-      if (!onRoad || !d.unlocked) continue;
-      if (isJunction) {
-        junctions.push(
-          <circle
-            key={`j${c.gx}_${c.gy}`}
-            cx={isoX(c.gx, c.gy)}
-            cy={isoY(c.gx, c.gy)}
-            r={1.8}
-            fill={MAP.roadMark}
-            opacity={1}
+      for (const c of d.cells) {
+        const isJunction = c.gx % 5 === 0 && c.gy % 5 === 0;
+        const onRoad = isRoad(c.gx, c.gy);
+        tiles.push(
+          <polygon
+            key={`g${c.gx}_${c.gy}`}
+            points={tileDiamond(c.gx, c.gy, onRoad ? 0 : 0.06)}
+            fill={onRoad ? road : surface}
           />,
         );
-      } else {
-        marks.push(
-          <polygon key={`m${c.gx}_${c.gy}`} points={tileDiamond(c.gx, c.gy, 0.86)} fill={MAP.roadMark} opacity={0.8} />,
-        );
+
+        if (!onRoad || !d.unlocked) continue;
+        if (isJunction) {
+          junctions.push(
+            <circle
+              key={`j${c.gx}_${c.gy}`}
+              cx={isoX(c.gx, c.gy)}
+              cy={isoY(c.gx, c.gy)}
+              r={1.8}
+              fill={MAP.roadMark}
+              opacity={1}
+            />,
+          );
+        } else {
+          marks.push(
+            <polygon
+              key={`m${c.gx}_${c.gy}`}
+              points={tileDiamond(c.gx, c.gy, 0.86)}
+              fill={MAP.roadMark}
+              opacity={0.8}
+            />,
+          );
+        }
       }
-    }
-  });
+    });
 
-  // Boundaries carry the district colour, drawn as the shared edge between two districts rather than a ring around every border tile.
-  const outlines = districts.map((d) => {
-    const set = new Set(d.cells.map((c) => `${c.gx},${c.gy}`));
-    const segments: Array<[number, number, number, number]> = [];
+    // Boundaries carry the district colour, drawn as the shared edge between two districts rather than a ring around every border tile.
+    const outlines = districts.map((d) => {
+      const set = new Set(d.cells.map((c) => `${c.gx},${c.gy}`));
+      const segments: Array<[number, number, number, number]> = [];
 
-    for (const c of d.cells) {
-      const cx = isoX(c.gx, c.gy);
-      const cy = isoY(c.gx, c.gy);
-      const hw = TILE_W / 2;
-      const hh = TILE_H / 2;
-      // Each grid neighbour maps to one side of the diamond.
-      const sides: Array<[number, boolean]> = [
-        [0, !set.has(`${c.gx + 1},${c.gy}`)],
-        [1, !set.has(`${c.gx},${c.gy + 1}`)],
-        [2, !set.has(`${c.gx - 1},${c.gy}`)],
-        [3, !set.has(`${c.gx},${c.gy - 1}`)],
-      ];
-      const corners: Array<[number, number]> = [
-        [cx + hw, cy],
-        [cx, cy + hh],
-        [cx - hw, cy],
-        [cx, cy - hh],
-      ];
-      for (const [i, open] of sides) {
-        if (!open) continue;
-        const a = corners[i];
-        const b = corners[(i + 1) % 4];
-        segments.push([a[0], a[1], b[0], b[1]]);
+      for (const c of d.cells) {
+        const cx = isoX(c.gx, c.gy);
+        const cy = isoY(c.gx, c.gy);
+        const hw = TILE_W / 2;
+        const hh = TILE_H / 2;
+        // Each grid neighbour maps to one side of the diamond.
+        const sides: Array<[number, boolean]> = [
+          [0, !set.has(`${c.gx + 1},${c.gy}`)],
+          [1, !set.has(`${c.gx},${c.gy + 1}`)],
+          [2, !set.has(`${c.gx - 1},${c.gy}`)],
+          [3, !set.has(`${c.gx},${c.gy - 1}`)],
+        ];
+        const corners: Array<[number, number]> = [
+          [cx + hw, cy],
+          [cx, cy + hh],
+          [cx - hw, cy],
+          [cx, cy - hh],
+        ];
+        for (const [i, open] of sides) {
+          if (!open) continue;
+          const a = corners[i];
+          const b = corners[(i + 1) % 4];
+          segments.push([a[0], a[1], b[0], b[1]]);
+        }
       }
-    }
 
-    const stateColor = outages.has(d.id)
-      ? '#d36e76'
-      : obligations.has(d.id)
-        ? '#d2a657'
-        : selectedId === d.id
-          ? COMPANY
-          : d.color;
-    const stateActive = outages.has(d.id) || obligations.has(d.id) || selectedId === d.id;
+      const stateColor = outages.has(d.id)
+        ? '#d36e76'
+        : obligations.has(d.id)
+          ? '#d2a657'
+          : selectedId === d.id
+            ? COMPANY
+            : d.color;
+      const stateActive = outages.has(d.id) || obligations.has(d.id) || selectedId === d.id;
+      return (
+        <g key={`o${d.id}`} className={stateActive ? 'district-state-pulse' : undefined}>
+          {segments.map(([x1, y1, x2, y2], i) => (
+            <line
+              key={i}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke={stateColor}
+              strokeWidth={stateActive ? 1.8 : d.unlocked ? 1 : 0.7}
+              strokeDasharray={!d.unlocked ? '4 4' : undefined}
+              opacity={stateActive ? 0.78 : d.unlocked ? 0.3 : 0.16}
+            />
+          ))}
+        </g>
+      );
+    });
+
     return (
-      <g key={`o${d.id}`} className={stateActive ? 'district-state-pulse' : undefined}>
-        {segments.map(([x1, y1, x2, y2], i) => (
-          <line
-            key={i}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
-            stroke={stateColor}
-            strokeWidth={stateActive ? 1.8 : d.unlocked ? 1 : 0.7}
-            strokeDasharray={!d.unlocked ? '4 4' : undefined}
-            opacity={stateActive ? 0.78 : d.unlocked ? 0.3 : 0.16}
-          />
+      <g data-ground-tiles="true">
+        <CityFoundation districts={districts} />
+        {tiles}
+        {marks}
+        {junctions}
+        {outlines}
+      </g>
+    );
+  },
+  (a, b) =>
+    a.night === b.night &&
+    a.selectedId === b.selectedId &&
+    sameIds(a.outageIds, b.outageIds) &&
+    sameIds(a.obligationIds, b.obligationIds) &&
+    sameDistrictMap(a.districts, b.districts),
+);
+
+const CityTraffic = memo(
+  function CityTraffic({ districts }: { districts: District[] }) {
+    const cars = districts
+      .filter((d) => d.unlocked)
+      .flatMap((d) => {
+        const cells = new Set(d.cells.map((c) => `${c.gx},${c.gy}`));
+        return d.cells.filter((c) => c.gx % 5 === 0 && c.gy % 5 === 1 && cells.has(`${c.gx},${c.gy + 3}`));
+      })
+      .slice(0, 6);
+    return (
+      <g pointerEvents="none" aria-hidden="true">
+        {cars.map((c, i) => (
+          <g key={`${c.gx},${c.gy}`} transform={`translate(${isoX(c.gx, c.gy) + 4} ${isoY(c.gx, c.gy)})`}>
+            <g className="city-car" style={{ animationDelay: `${-i * 1.7}s`, animationDuration: `${7 + (i % 5)}s` }}>
+              <path d="M-4 0L1 -3 5 -1 0 2Z" fill={['#dfba75', '#cedddb', '#85aebc'][i % 3]} />
+              <path d="M-4 0v2l4 2v-2m0 0l5 -3v2L0 4" fill="#344956" />
+            </g>
+          </g>
         ))}
       </g>
     );
-  });
+  },
+  (a, b) => sameDistrictMap(a.districts, b.districts),
+);
 
-  return (
-    <g>
-      {tiles}
-      {marks}
-      {junctions}
-      {outlines}
-    </g>
-  );
-});
-
-const KIND_TONE: Record<Building['kind'], number> = {
-  house: 0,
-  apartment: 2,
-  office: 4,
-  shop: 1,
-  industrial: 0,
-  hospital: 3,
-  university: 3,
-  park: 0,
-};
-
-function BuildingGlyph({
-  b,
-  night,
-  dim,
-  justConnected,
-}: {
-  b: Building;
-  night: number;
-  dim: boolean;
-  justConnected: boolean;
-}) {
-  const cx = isoX(b.gx, b.gy);
-  const cy = isoY(b.gx, b.gy);
-  const hw = TILE_W / 2 - 3;
-  const hh = TILE_H / 2 - 1.5;
-
-  if (b.kind === 'park') {
-    return (
-      <g>
-        <polygon points={tileDiamond(b.gx, b.gy, 0.08)} fill={mix('#1c3a2c', '#0a1712', night * 0.55)} />
-        <circle cx={cx - 5} cy={cy - 1} r={3} fill={mix('#2f6047', '#0f2318', night * 0.5)} />
-        <circle cx={cx + 4} cy={cy + 1} r={3.6} fill={mix('#2f6047', '#0f2318', night * 0.5)} />
-      </g>
-    );
-  }
-
-  const h = Math.max(4, b.floors * FLOOR_H);
-  const base = shade(SLATE[KIND_TONE[b.kind]], ((b.seed >> 11) % 5) * 5 - 10);
-  const connected = b.connected;
-  const tinted = connected > 0.02 ? mix(base, COMPANY, Math.min(0.26, connected * 0.3)) : base;
-  const body = dim ? mix(tinted, '#0d1119', 0.6) : tinted;
-
-  const top = shade(mix(body, '#1a2b41', night * 0.26), 10);
-  const left = shade(mix(body, '#1a2b41', night * 0.3), -18);
-  const right = shade(mix(body, '#1a2b41', night * 0.3), -34);
-
-  const topPts = `${cx},${cy - hh - h} ${cx + hw},${cy - h} ${cx},${cy + hh - h} ${cx - hw},${cy - h}`;
-  const leftPts = `${cx - hw},${cy - h} ${cx},${cy + hh - h} ${cx},${cy + hh} ${cx - hw},${cy}`;
-  const rightPts = `${cx + hw},${cy - h} ${cx},${cy + hh - h} ${cx},${cy + hh} ${cx + hw},${cy}`;
-
-  // Windows only appear after dark, and only on buildings tall enough to show them.
-  const windows: JSX.Element[] = [];
-  if (night > 0.35 && b.floors >= 2) {
-    const rows = Math.min(4, b.floors - 1);
-    for (let r = 0; r < rows; r++) {
-      if ((b.seed >> r) % 3 === 0) continue;
-      const wy = cy - 4 - r * FLOOR_H;
-      const warm = b.connected > 0.15 ? '#7ff0e4' : '#ffd694';
-      windows.push(
-        <rect key={`l${r}`} x={cx - hw + 4} y={wy} width={4} height={3} fill={warm} opacity={0.75 * night} />,
-        <rect key={`r${r}`} x={cx + hw - 8} y={wy} width={4} height={3} fill={warm} opacity={0.55 * night} />,
-      );
-    }
-  }
-
-  return (
-    <g>
-      <polygon points={rightPts} fill={right} />
-      <polygon points={leftPts} fill={left} />
-      <polygon
-        points={topPts}
-        fill={top}
-        stroke={connected > 0.5 ? COMPANY : 'rgba(255,255,255,0.06)'}
-        strokeOpacity={connected > 0.5 ? 0.4 : 1}
-        strokeWidth={0.6}
-      />
-      {windows}
-      {connected > 0.02 && (
-        <circle
-          cx={cx}
-          cy={cy - h - hh - 2}
-          r={0.9 + connected * 0.7}
-          fill={COMPANY}
-          opacity={0.3 + connected * 0.28}
-        />
-      )}
-      {justConnected && (
-        <circle cx={cx} cy={cy - h} r={16} fill="none" stroke={COMPANY} strokeWidth={1.5} opacity={0.9}>
-          <animate attributeName="r" from="4" to="22" dur="0.9s" fill="freeze" />
-          <animate attributeName="opacity" from="0.9" to="0" dur="0.9s" fill="freeze" />
-        </circle>
-      )}
-    </g>
-  );
-}
-
-const MemoBuilding = memo(BuildingGlyph);
-
+// Decorative architecture shares a canvas; network controls remain interactive SVG.
 const BuildingsLayer = memo(function BuildingsLayer({
   buildings,
+  developedIds,
   night,
   dim,
   minutes,
+  economical,
 }: {
   buildings: Building[];
+  developedIds: Set<string>;
   night: number;
   dim: boolean;
   minutes: number;
+  economical: boolean;
 }) {
-  const sorted = useMemo(() => [...buildings].sort((a, b) => a.gx + a.gy - (b.gx + b.gy)), [buildings]);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const lastPaint = useRef('');
+  const bounds = useMemo(() => {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    for (const b of buildings) {
+      const x = isoX(b.gx, b.gy),
+        y = isoY(b.gx, b.gy);
+      minX = Math.min(minX, x - TILE_W);
+      maxX = Math.max(maxX, x + TILE_W + b.floors * FLOOR_H);
+      minY = Math.min(minY, y - b.floors * FLOOR_H - TILE_H - 40);
+      maxY = Math.max(maxY, y + TILE_H);
+    }
+    return buildings.length
+      ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+      : { x: 0, y: 0, width: 1, height: 1 };
+  }, [buildings]);
+  const resolution = Math.min(
+    window.devicePixelRatio || 1,
+    economical ? 1 : 2,
+    4096 / bounds.width,
+    4096 / bounds.height,
+  );
+  useLayoutEffect(() => {
+    const ctx = canvas.current?.getContext('2d');
+    if (!ctx) return;
+    const signature = JSON.stringify([
+      night,
+      dim,
+      resolution,
+      bounds,
+      [...developedIds],
+      buildings.map((b) => [b.id, b.gx, b.gy, b.kind, b.seed, b.floors, visualConnection(b.connected)]),
+    ]);
+    if (lastPaint.current === signature) return;
+    lastPaint.current = signature;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.setTransform(resolution, 0, 0, resolution, -bounds.x * resolution, -bounds.y * resolution);
+    for (const b of [...buildings].sort((a, b) => a.gx + a.gy - b.gx - b.gy)) {
+      for (const op of buildingPaint(b, night, dim, developedIds.has(b.id))) {
+        if (op.fill !== 'none') {
+          ctx.globalAlpha = op.fillAlpha;
+          ctx.fillStyle = op.fill;
+          ctx.fill(op.path);
+        }
+        if (op.stroke && op.stroke !== 'none') {
+          ctx.globalAlpha = op.strokeAlpha;
+          ctx.strokeStyle = op.stroke;
+          ctx.lineWidth = op.width;
+          ctx.stroke(op.path);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }, [buildings, night, dim, developedIds, bounds, resolution]);
   return (
-    <g style={{ pointerEvents: 'none' }}>
-      {sorted.map((b) => (
-        <MemoBuilding key={b.id} b={b} night={night} dim={dim} justConnected={minutes - b.lastConnectedAt < 25} />
-      ))}
+    <g pointerEvents="none" aria-hidden="true">
+      <foreignObject {...bounds}>
+        <canvas
+          ref={canvas}
+          width={Math.ceil(bounds.width * resolution)}
+          height={Math.ceil(bounds.height * resolution)}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+      </foreignObject>
+      {buildings
+        .filter((b) => minutes - b.lastConnectedAt < 25)
+        .slice(0, economical ? 8 : 32)
+        .map((b) => (
+          <circle
+            key={b.id}
+            cx={isoX(b.gx, b.gy)}
+            cy={isoY(b.gx, b.gy) - Math.max(4, b.floors * FLOOR_H)}
+            r={16}
+            fill="none"
+            stroke={COMPANY}
+            strokeWidth={1.5}
+            opacity={0.9}
+          >
+            <animate attributeName="r" from="4" to="22" dur="0.9s" fill="freeze" />
+            <animate attributeName="opacity" from="0.9" to="0" dur="0.9s" fill="freeze" />
+          </circle>
+        ))}
     </g>
   );
 });
@@ -433,7 +467,7 @@ const CustomersLayer = memo(function CustomersLayer({ game }: { game: GameState 
   );
 });
 
-function LinkGlyph({
+const LinkGlyph = memo(function LinkGlyph({
   link,
   a,
   b,
@@ -442,15 +476,17 @@ function LinkGlyph({
   highlight,
   traced,
   bottleneck,
+  ghost,
 }: {
   link: NetLink;
   a: NetNode;
   b: NetNode;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (id: string) => void;
   highlight: boolean;
   traced: boolean;
   bottleneck: boolean;
+  ghost: boolean;
 }) {
   const x1 = isoX(a.gx, a.gy);
   const y1 = isoY(a.gx, a.gy) - 6;
@@ -464,17 +500,17 @@ function LinkGlyph({
 
   return (
     <g
-      className="map-interactive"
+      className={`map-interactive site-arrival${ghost ? ' blueprint-ghost' : ''}`}
       data-map-placement-blocker="true"
       role="button"
       tabIndex={0}
       aria-label={`${a.name} to ${b.name} fibre, tier ${link.tier}, ${Math.round(util * 100)} percent load${link.down ? ', down' : ''}`}
-      onClick={(e) => (e.stopPropagation(), onSelect())}
+      onClick={(e) => (e.stopPropagation(), onSelect(link.id))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           e.stopPropagation();
-          onSelect();
+          onSelect(link.id);
         }
       }}
       style={{ cursor: 'pointer' }}
@@ -500,7 +536,7 @@ function LinkGlyph({
         strokeWidth={width + 6}
         opacity={0.12}
         strokeLinecap="round"
-        filter="url(#fibreBloom)"
+        filter={selected || traced ? 'url(#fibreBloom)' : undefined}
       />
       <line
         x1={x1}
@@ -520,7 +556,7 @@ function LinkGlyph({
           <circle cx={x2} cy={y2} r={width * 0.75} fill={color} opacity={0.9} />
         </>
       )}
-      {!link.down && util > 0.02 && (
+      {!link.down && util > 0.02 && (selected || traced || highlight) && (
         <line
           x1={x1}
           y1={y1}
@@ -534,6 +570,14 @@ function LinkGlyph({
           className="fiber-flow"
           style={{ animationDuration: `${dur}s` }}
         />
+      )}
+      {(highlight || bottleneck) && (
+        <g transform={`translate(${(x1 + x2) / 2} ${(y1 + y2) / 2 - 9})`}>
+          <rect x={-24} y={-10} width={48} height={18} rx={5} fill="#10222d" stroke={color} strokeOpacity={0.7} />
+          <text y={2} textAnchor="middle" fill={color} fontSize={10} fontWeight={700}>
+            {link.down ? 'DOWN' : `${Math.round(util * 100)}%`}
+          </text>
+        </g>
       )}
       {selected && (
         <line
@@ -549,26 +593,30 @@ function LinkGlyph({
       )}
     </g>
   );
-}
+});
 
 // Shape identifies the site type, its own accent identifies its family, and the outer arc reports load.
-function NodeGlyph({
+const NodeGlyph = memo(function NodeGlyph({
   node,
   selected,
   onSelect,
   hasIncident,
   fiberState,
+  ghost,
+  isolated,
 }: {
   node: NetNode;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (id: string) => void;
   hasIncident: boolean;
   fiberState: 'source' | 'eligible' | 'blocked' | null;
+  isolated: boolean;
+  ghost: boolean;
 }) {
   const cx = isoX(node.gx, node.gy);
   const cy = isoY(node.gx, node.gy);
   const util = Math.min(1, nodeUtil(node));
-  const statusColor = node.down ? '#ff6577' : utilColor(util);
+  const statusColor = node.down ? '#ff6577' : isolated ? '#ffc857' : utilColor(util);
   const visual = SITE_VISUAL[node.kind];
   const linking = fiberState === 'source';
 
@@ -583,17 +631,17 @@ function NodeGlyph({
 
   return (
     <g
-      className="map-interactive"
+      className={`map-interactive site-arrival${ghost ? ' blueprint-ghost' : ''}`}
       data-map-placement-blocker="true"
       role="button"
       tabIndex={0}
       aria-label={`${node.name}, ${visual.label}, tier ${node.tier}, ${Math.round(util * 100)} percent load${node.down ? ', down' : ''}`}
-      onClick={(e) => (e.stopPropagation(), onSelect())}
+      onClick={(e) => (e.stopPropagation(), onSelect(node.id))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           e.stopPropagation();
-          onSelect();
+          onSelect(node.id);
         }
       }}
       style={{ cursor: 'pointer' }}
@@ -611,6 +659,14 @@ function NodeGlyph({
         </>
       )}
 
+      {(isolated || node.down) && !fiberState && (
+        <g transform={`translate(${cx} ${my - r - 20})`}>
+          <rect x={-39} y={-10} width={78} height={17} rx={4} fill="#121f2b" stroke={statusColor} />
+          <text textAnchor="middle" y={2} fontSize={8} fontWeight={700} fill={statusColor}>
+            {node.down ? 'OFFLINE' : 'NO BACKHAUL'}
+          </text>
+        </g>
+      )}
       {/* Footprint on the ground, so the marker is anchored to a place. */}
       <ellipse cx={cx} cy={cy + 1} rx={r + 5} ry={(r + 5) * 0.38} fill="#02060c" opacity={0.58} />
       <line x1={cx} y1={cy} x2={cx} y2={my + r * 0.7} stroke={visual.accent} strokeWidth={0.8} strokeOpacity={0.42} />
@@ -622,7 +678,7 @@ function NodeGlyph({
         r={r + 7}
         fill={visual.accent}
         opacity={(selected || linking ? 0.17 : 0.08) + (node.tier - 1) * 0.022}
-        className="pulse-soft"
+        className={selected || linking ? 'pulse-soft' : undefined}
       />
       {fiberState && (
         <circle
@@ -735,7 +791,7 @@ function NodeGlyph({
       )}
     </g>
   );
-}
+});
 
 function TechnicianGlyph({ t }: { t: Technician }) {
   const cx = isoX(t.gx, t.gy);
@@ -759,7 +815,25 @@ interface Camera {
 }
 
 export default function MapView() {
-  const game = useGame((s) => s.game) as GameState;
+  const drillTarget = useGame((s) => s.drillTarget);
+  const liveGame = useGame((s) => s.game) as GameState;
+  const { quality, chooseQuality, economical } = useMapQuality(liveGame.nodes.length);
+  const autoConnect = useGame((s) => s.autoConnect);
+  const planning = useGame((s) => s.planning);
+  const blueprint = useGame((s) => s.blueprint);
+  const game = useMemo(
+    () => (planning ? projectBlueprint(liveGame, blueprint).state : liveGame),
+    [liveGame, planning, blueprint],
+  );
+  const drill = useMemo(() => (drillTarget ? failureDrill(liveGame, drillTarget) : null), [liveGame, drillTarget]);
+  const developedIds = useMemo(
+    () =>
+      new Set(game.strategy.developments.filter((d) => game.minutes - d.at < 7 * 1440).flatMap((d) => d.buildingIds)),
+    [game.strategy.developments, game.minutes],
+  );
+  const plannedIds = useMemo(() => new Set(blueprint.map((entry) => entry.id)), [blueprint]);
+  const setTool = useGame((s) => s.setTool);
+  const tr = useGame((s) => s.locale) === 'tr';
   const overlay = useGame((s) => s.overlay);
   const tool = useGame((s) => s.tool);
   const linkFrom = useGame((s) => s.linkFrom);
@@ -774,6 +848,22 @@ export default function MapView() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState<Camera>({ x: 0, y: -60, zoom: 1 });
+  const worldRef = useRef<SVGGElement>(null);
+  const panCamera = useRef<Camera | null>(null);
+  const panFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (panFrame.current !== null) cancelAnimationFrame(panFrame.current);
+    },
+    [],
+  );
+  const finishPan = () => {
+    if (panFrame.current !== null) cancelAnimationFrame(panFrame.current);
+    panFrame.current = null;
+    if (panCamera.current) setCam(panCamera.current);
+    panCamera.current = null;
+    svgRef.current?.classList.remove('dragging');
+  };
   const [hover, setHover] = useState<{ gx: number; gy: number } | null>(null);
   const drag = useRef<{
     pointerId: number;
@@ -784,7 +874,7 @@ export default function MapView() {
     moved: boolean;
     startedOnBackground: boolean;
   } | null>(null);
-  const didInitialFit = useRef(false);
+  const fittedSize = useRef('');
 
   const worldBounds = useMemo(() => {
     let minX = Infinity;
@@ -819,12 +909,12 @@ export default function MapView() {
   }, [game.districts, game.buildings, game.nodes]);
 
   const fitCamera = useCallback(() => {
-    const safe = { left: 24, right: 24, top: 30, bottom: 142 };
+    const safe = { left: size.w >= 950 ? 295 : 24, right: 35, top: 118, bottom: 142 };
     const worldW = Math.max(1, worldBounds.maxX - worldBounds.minX);
     const worldH = Math.max(1, worldBounds.maxY - worldBounds.minY);
     const availableW = Math.max(240, size.w - safe.left - safe.right);
     const availableH = Math.max(180, size.h - safe.top - safe.bottom);
-    const zoom = Math.min(1.25, Math.max(0.4, Math.min(availableW / worldW, availableH / worldH)));
+    const zoom = Math.min(1.25, Math.max(0.2, Math.min(availableW / worldW, availableH / worldH)));
     const worldCx = (worldBounds.minX + worldBounds.maxX) / 2;
     const worldCy = (worldBounds.minY + worldBounds.maxY) / 2;
     const safeCx = safe.left + availableW / 2;
@@ -860,8 +950,9 @@ export default function MapView() {
   }, []);
 
   useEffect(() => {
-    if (didInitialFit.current || size.w <= 0 || size.h <= 0) return;
-    didInitialFit.current = true;
+    const key = `${size.w}`;
+    if (fittedSize.current === key || size.w <= 0 || size.h <= 0) return;
+    fittedSize.current = key;
     fitCamera();
   }, [fitCamera, size]);
 
@@ -876,7 +967,8 @@ export default function MapView() {
   }, [focusOn]);
 
   // Quantised so the day/night value only changes a few dozen times per game day.
-  const night = Math.round((1 - daylight(game.minutes)) * 16) / 16;
+  const lightingSteps = economical ? 4 : 16;
+  const night = Math.round((1 - daylight(game.minutes)) * lightingSteps) / lightingSteps;
   const nodeById = useMemo(() => {
     const m: Record<string, NetNode> = {};
     for (const n of game.nodes) m[n.id] = n;
@@ -901,9 +993,30 @@ export default function MapView() {
     return m;
   }, [game.incidents]);
 
+  const handleLinkSelect = useCallback(
+    (id: string) => {
+      if (planning || drillTarget) return;
+      if (incidentByTarget[id]) openIncident(incidentByTarget[id]);
+      else select({ type: 'link', id });
+    },
+    [planning, drillTarget, incidentByTarget, openIncident, select],
+  );
+  const handleNodeSelect = useCallback(
+    (id: string) => {
+      if (drillTarget) return;
+      if (planning && tool !== 'fiber') {
+        setTool('fiber');
+        clickNodeForLink(id);
+      } else if (tool === 'fiber') clickNodeForLink(id);
+      else if (incidentByTarget[id]) openIncident(incidentByTarget[id]);
+      else select({ type: 'node', id });
+    },
+    [drillTarget, planning, tool, setTool, clickNodeForLink, incidentByTarget, openIncident, select],
+  );
+  const routes = useMemo(() => computeRoutes(game), [game]);
   const selectedRoute = useMemo(() => {
     if (selection?.type !== 'node') return null;
-    const route = computeRoutes(game)[selection.id];
+    const route = routes[selection.id];
     if (!route) return { route: null, links: new Set<string>(), bottleneck: null as string | null };
     const links = new Set(route.path);
     const bottleneck =
@@ -912,7 +1025,7 @@ export default function MapView() {
         .filter((l): l is NetLink => Boolean(l))
         .sort((a, b) => linkUtil(b) - linkUtil(a))[0]?.id ?? null;
     return { route, links, bottleneck };
-  }, [game, selection]);
+  }, [game, selection, routes]);
 
   const toGrid = useCallback(
     (clientX: number, clientY: number) => {
@@ -957,17 +1070,30 @@ export default function MapView() {
           }
         }
         d.moved = true;
-        setCam((c) => ({ ...c, x: d.camX + dx / c.zoom, y: d.camY + dy / c.zoom }));
+        panCamera.current = { ...cam, x: d.camX + dx / cam.zoom, y: d.camY + dy / cam.zoom };
+        e.currentTarget.classList.add('dragging');
+        if (panFrame.current === null)
+          panFrame.current = requestAnimationFrame(() => {
+            panFrame.current = null;
+            const c = panCamera.current;
+            if (c)
+              worldRef.current?.setAttribute(
+                'transform',
+                `translate(${size.w / 2} ${size.h / 2}) scale(${c.zoom}) translate(${c.x} ${c.y})`,
+              );
+          });
       }
     } else if (tool) {
-      setHover(toGrid(e.clientX, e.clientY));
+      const next = toGrid(e.clientX, e.clientY);
+      setHover((prev) => (prev?.gx === next?.gx && prev?.gy === next?.gy ? prev : next));
     }
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
-    if (!d || d.pointerId !== e.pointerId || d.moved) return;
+    finishPan();
+    if (!d || d.pointerId !== e.pointerId || d.moved || drillTarget) return;
     const cell = toGrid(e.clientX, e.clientY);
     if (!cell) return;
 
@@ -985,14 +1111,16 @@ export default function MapView() {
 
   const cancelPointerGesture = (e: React.PointerEvent) => {
     if (drag.current?.pointerId === e.pointerId) drag.current = null;
+    finishPan();
     setHover(null);
   };
 
   const onWheel = (e: React.WheelEvent) => {
+    finishPan();
     const rect = svgRef.current?.getBoundingClientRect();
     const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
     setCam((c) => {
-      const zoom = Math.min(2.6, Math.max(0.4, c.zoom * factor));
+      const zoom = Math.min(2.6, Math.max(0.2, c.zoom * factor));
       if (!rect || zoom === c.zoom) return { ...c, zoom };
       // Hold whatever is under the pointer still while the scale changes.
       const px = e.clientX - rect.left - size.w / 2;
@@ -1007,10 +1135,26 @@ export default function MapView() {
 
   const linkFromNode = linkFrom ? nodeById[linkFrom] : null;
   const hoveredNode = hover ? (nodeGrid.get(`${hover.gx},${hover.gy}`) ?? null) : null;
-  const placementIssue = tool && tool !== 'fiber' && hover ? nodePlacementIssue(game, tool, hover.gx, hover.gy) : null;
-  const placementCost = tool && tool !== 'fiber' ? nodePlacementCost(game, tool) : null;
+  const connectedQuote =
+    autoConnect && !planning && tool && tool !== 'fiber' && hover
+      ? connectedSiteEstimate(game, tool, hover.gx, hover.gy, routes)
+      : null;
+  const placementIssue =
+    connectedQuote?.error ??
+    (tool && tool !== 'fiber' && hover ? nodePlacementIssue(game, tool, hover.gx, hover.gy, tr ? 'tr' : 'en') : null);
+  const placementCost = connectedQuote?.total ?? (tool && tool !== 'fiber' ? nodePlacementCost(game, tool) : null);
+  const backhaul =
+    tool && tool !== 'fiber' && tool !== 'core' && hover && !placementIssue
+      ? suggestedBackhaul(game, hover.gx, hover.gy, routes)
+      : null;
+  const reachDistrict = hover ? districtGrid.get(`${hover.gx},${hover.gy}`) : null;
+  const newReach =
+    reachDistrict && (tool === 'pop' || tool === 'access') && !placementIssue
+      ? reachGain(game, reachDistrict.id, tool, undefined, routes)
+      : null;
   const placementColor = placementIssue ? '#ff6577' : COMPANY;
-  const fibreIssue = linkFromNode && hoveredNode ? fibreConnectionIssue(game, linkFromNode.id, hoveredNode.id) : null;
+  const fibreIssue =
+    linkFromNode && hoveredNode ? fibreConnectionIssue(game, linkFromNode.id, hoveredNode.id, tr ? 'tr' : 'en') : null;
   const fibreCost = linkFromNode && hoveredNode ? fibreConnectionCost(game, linkFromNode.id, hoveredNode.id) : 0;
   const fibreColor = hoveredNode && !fibreIssue ? COMPANY : '#ff6577';
   const selectedDistrictId = selection?.type === 'district' ? selection.id : null;
@@ -1022,17 +1166,21 @@ export default function MapView() {
     .map((regulation) => regulation.districtId!);
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-ink-900">
+    <div
+      className={`relative h-full w-full overflow-hidden bg-ink-900 ${game.speed === 0 ? 'simulation-paused' : ''} ${economical ? 'map-economical' : ''}`}
+    >
       <div
         className="pointer-events-none absolute inset-0 transition-colors duration-1000"
         style={{
-          background: `linear-gradient(180deg, ${mix('#16243a', '#05070c', night)} 0%, ${mix(
-            '#0d1524',
-            '#04060a',
+          background: `linear-gradient(180deg, ${mix('#294854', '#0c1d30', night)} 0%, ${mix(
+            '#152b38',
+            '#091320',
             night,
           )} 100%)`,
         }}
       />
+      <DistrictNavigator />
+      {drill && <FailureDrillPanel report={drill} />}
       <svg
         ref={svgRef}
         role="application"
@@ -1053,14 +1201,22 @@ export default function MapView() {
             <feGaussianBlur stdDeviation="3" />
           </filter>
         </defs>
-        <g transform={`translate(${size.w / 2} ${size.h / 2}) scale(${cam.zoom}) translate(${cam.x} ${cam.y})`}>
-          <GroundLayer
-            districts={game.districts}
-            night={night}
-            selectedId={selectedDistrictId}
-            outageIds={outageDistrictIds}
-            obligationIds={obligationDistrictIds}
-          />
+        <g
+          ref={worldRef}
+          style={{ pointerEvents: drill ? 'none' : undefined }}
+          transform={`translate(${size.w / 2} ${size.h / 2}) scale(${cam.zoom}) translate(${cam.x} ${cam.y})`}
+        >
+          <g opacity={1 - night * 0.3}>
+            <GroundLayer
+              districts={game.districts}
+              night={0}
+              selectedId={selectedDistrictId}
+              outageIds={outageDistrictIds}
+              obligationIds={obligationDistrictIds}
+            />
+          </g>
+          {!drill && <ProjectFootprint game={game} />}
+          {overlay === 'normal' && !economical && <CityTraffic districts={game.districts} />}
 
           {overlay === 'coverage' && (
             <CoverageLayer nodes={game.nodes} districts={game.districts} spectrum={game.spectrum} />
@@ -1069,6 +1225,8 @@ export default function MapView() {
           {overlay === 'rivals' && <RivalsLayer game={game} />}
 
           <BuildingsLayer
+            economical={economical}
+            developedIds={developedIds}
             buildings={game.buildings}
             night={night}
             dim={overlay === 'load' || overlay === 'rivals' || overlay === 'customers'}
@@ -1079,6 +1237,62 @@ export default function MapView() {
 
           {tool && tool !== 'fiber' && hover && (
             <g opacity={0.92} style={{ pointerEvents: 'none' }}>
+              {backhaul && (
+                <>
+                  <line
+                    x1={isoX(hover.gx, hover.gy)}
+                    y1={isoY(hover.gx, hover.gy) - 6}
+                    x2={isoX(backhaul.node.gx, backhaul.node.gy)}
+                    y2={isoY(backhaul.node.gx, backhaul.node.gy) - 6}
+                    stroke="#edc684"
+                    strokeWidth={2}
+                    strokeDasharray="4 5"
+                  />
+                  <text
+                    x={isoX(hover.gx, hover.gy)}
+                    y={isoY(hover.gx, hover.gy) - 60}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fill="#ffe1a9"
+                    stroke="#112431"
+                    strokeWidth={3}
+                    paintOrder="stroke"
+                  >
+                    {tr ? 'Önerilen fiber' : 'Suggested fibre'} +${backhaul.cost.toLocaleString()}
+                  </text>
+                </>
+              )}
+              {newReach && (
+                <g>
+                  <rect
+                    x={isoX(hover.gx, hover.gy) - 84}
+                    y={isoY(hover.gx, hover.gy) - 78}
+                    width={168}
+                    height={24}
+                    rx={5}
+                    fill="#132b35"
+                    stroke="#73c8ae"
+                  />
+                  <text
+                    x={isoX(hover.gx, hover.gy)}
+                    y={isoY(hover.gx, hover.gy) - 68}
+                    textAnchor="middle"
+                    fill="#9ee8cf"
+                    fontSize={8}
+                  >
+                    +{newReach.homes} potential homes
+                  </text>
+                  <text
+                    x={isoX(hover.gx, hover.gy)}
+                    y={isoY(hover.gx, hover.gy) - 59}
+                    textAnchor="middle"
+                    fill="#a4b7be"
+                    fontSize={7}
+                  >
+                    After backhaul · sign-ups take time
+                  </text>
+                </g>
+              )}
               <polygon points={tileDiamond(hover.gx, hover.gy, 0)} fill={placementColor} opacity={0.3} />
               <circle
                 cx={isoX(hover.gx, hover.gy)}
@@ -1107,7 +1321,8 @@ export default function MapView() {
                 fill={placementColor}
                 className="num"
               >
-                {placementIssue ?? `READY · $${placementCost?.toLocaleString()}`}
+                {placementIssue ??
+                  `${connectedQuote ? 'Site + fibre' : tr ? 'Hazır' : 'Ready'} · ${placementCost?.toLocaleString()}`}
               </text>
             </g>
           )}
@@ -1173,6 +1388,7 @@ export default function MapView() {
             if (!a || !b) return null;
             return (
               <LinkGlyph
+                ghost={plannedIds.has(l.id)}
                 key={l.id}
                 link={l}
                 a={a}
@@ -1181,9 +1397,7 @@ export default function MapView() {
                 highlight={overlay === 'load'}
                 traced={selectedRoute?.links.has(l.id) ?? false}
                 bottleneck={selectedRoute?.bottleneck === l.id}
-                onSelect={() =>
-                  incidentByTarget[l.id] ? openIncident(incidentByTarget[l.id]) : select({ type: 'link', id: l.id })
-                }
+                onSelect={handleLinkSelect}
               />
             );
           })}
@@ -1192,6 +1406,8 @@ export default function MapView() {
             .sort((a, b) => a.gx + a.gy - (b.gx + b.gy))
             .map((n) => (
               <NodeGlyph
+                isolated={!routes[n.id] && !n.down}
+                ghost={plannedIds.has(n.id)}
                 key={n.id}
                 node={n}
                 selected={selection?.type === 'node' && selection.id === n.id}
@@ -1205,14 +1421,12 @@ export default function MapView() {
                         : 'eligible'
                 }
                 hasIncident={!!incidentByTarget[n.id]}
-                onSelect={() => {
-                  if (tool === 'fiber') clickNodeForLink(n.id);
-                  else if (incidentByTarget[n.id]) openIncident(incidentByTarget[n.id]);
-                  else select({ type: 'node', id: n.id });
-                }}
+                onSelect={handleNodeSelect}
               />
             ))}
 
+          {!drill && <ProjectMapLabel game={game} />}
+          {drill && <FailureFootprint game={game} report={drill} />}
           {game.technicians
             .filter((t) => t.state !== 'idle')
             .map((t) => (
@@ -1281,7 +1495,7 @@ export default function MapView() {
                   fill={d.unlocked ? '#eaf1fa' : '#9fb2c9'}
                   opacity={d.unlocked ? 0.95 : 0.7}
                 >
-                  {d.name.toUpperCase()}
+                  {d.name}
                 </text>
                 <line
                   x1={lx - 22}
@@ -1302,7 +1516,7 @@ export default function MapView() {
                     fill="#8ea0b8"
                     opacity={0.75}
                   >
-                    LICENCE ${d.entryCost.toLocaleString()}
+                    {tr ? 'Lisans' : 'Licence'} ${d.entryCost.toLocaleString()}
                   </text>
                 )}
                 {d.unlocked && status && (
@@ -1335,10 +1549,10 @@ export default function MapView() {
 
       {/* Fine grain, so the flat fills do not read as plastic. */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.045] mix-blend-overlay"
+        className="pointer-events-none absolute inset-0 opacity-[0.025]"
         style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>\")",
+          backgroundImage: 'radial-gradient(#ffffff 0.5px, transparent 0.5px)',
+          backgroundSize: '4px 4px',
         }}
       />
 
@@ -1409,32 +1623,45 @@ export default function MapView() {
         </div>
       )}
 
-      <div className="panel pointer-events-none absolute bottom-4 left-4 hidden items-center gap-3 px-3 py-2 lg:flex">
-        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.18em] text-white/35">
-          Site key
-        </span>
-        <div className="h-5 w-px bg-white/10" />
-        {(['core', 'pop', 'access', 'tower', 'datacenter'] as NetNode['kind'][]).map((kind) => {
-          const visual = SITE_VISUAL[kind];
-          return (
-            <span key={kind} className="flex items-center gap-1.5 font-mono text-[9px] text-white/55">
-              <SiteIcon kind={kind} className="h-4 w-4" />
-              {visual.label}
-            </span>
-          );
-        })}
-      </div>
-
       <div className="absolute bottom-24 right-4 flex flex-col gap-1">
+        <details className="relative">
+          <summary
+            aria-label="Map visual settings"
+            className="panel flex h-8 w-8 cursor-pointer list-none items-center justify-center text-[10px]"
+          >
+            FX
+          </summary>
+          <div className="panel absolute bottom-0 right-10 w-52 p-3">
+            <label className="text-xs" htmlFor="map-quality">
+              Map detail
+            </label>
+            <select
+              id="map-quality"
+              className="mt-2 w-full rounded border border-white/20 bg-ink-900 p-2 text-xs"
+              value={quality}
+              onChange={(e) => chooseQuality(e.target.value as 'auto' | 'full' | 'performance')}
+            >
+              <option value="auto">Auto</option>
+              <option value="full">Full detail</option>
+              <option value="performance">Performance</option>
+            </select>
+            <p className="mt-2 text-[11px] text-white/60">
+              {economical ? 'Reduced ambient effects are active.' : 'Full city effects are active.'} Network alerts stay
+              visible.
+            </p>
+          </div>
+        </details>
         <button
           className="panel h-8 w-8 text-lg leading-none hover:bg-white/10"
           onClick={() => setCam((c) => ({ ...c, zoom: Math.min(2.6, c.zoom * 1.2) }))}
+          aria-label={tr ? 'Yakınlaştır' : 'Zoom in'}
         >
           +
         </button>
         <button
           className="panel h-8 w-8 text-lg leading-none hover:bg-white/10"
-          onClick={() => setCam((c) => ({ ...c, zoom: Math.max(0.4, c.zoom / 1.2) }))}
+          onClick={() => setCam((c) => ({ ...c, zoom: Math.max(0.2, c.zoom / 1.2) }))}
+          aria-label={tr ? 'Uzaklaştır' : 'Zoom out'}
         >
           −
         </button>
@@ -1442,6 +1669,7 @@ export default function MapView() {
           className="panel h-8 w-8 text-[10px] leading-none hover:bg-white/10"
           onClick={fitCamera}
           title="Fit city inside the usable map area"
+          aria-label={tr ? 'Şehri ekrana sığdır' : 'Fit city'}
         >
           fit
         </button>
