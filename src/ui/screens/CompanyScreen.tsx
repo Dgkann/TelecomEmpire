@@ -11,18 +11,19 @@ import { contractRisk } from '../../game/operations';
 import { STAFF_ROLE_INFO, staffModifiers } from '../../game/staff';
 import { wholesaleRevenue } from '../../game/strategy';
 import { useGame } from '../../store/gameStore';
+import { t, type TranslationKey } from '../i18n';
 import type { ChurnReason } from '../../game/types';
 import TrendChart from '../TrendChart';
 import ScenarioCard from '../ScenarioCard';
 
-const CHURN_REASON: Record<ChurnReason, string> = {
-  price: 'too expensive',
-  outage: 'outage',
-  congestion: 'slow at peak',
-  support: 'poor support',
-  coverage: 'outside your reach',
-  competition: 'won by a rival',
-  satisfaction: 'low satisfaction',
+const CHURN_REASON: Record<ChurnReason, TranslationKey> = {
+  price: 'churnPrice',
+  outage: 'churnOutage',
+  congestion: 'churnCongestion',
+  support: 'churnSupport',
+  coverage: 'churnCoverage',
+  competition: 'churnCompetition',
+  satisfaction: 'churnSatisfaction',
 };
 
 const HIRE_ROLES = ['network_engineer', 'noc_engineer', 'support', 'sales', 'security'] as const;
@@ -56,6 +57,7 @@ function GrowthDriver({ label, value, fill, tone }: { label: string; value: stri
 }
 
 function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakdown> }) {
+  const locale = useGame((s) => s.locale);
   const network = money.costPower + money.costMaintenance + money.costTransit;
   const growth = money.costMarketing + money.costRetention;
   const other = Math.max(0, money.totalCost - network - money.costSalaries - growth);
@@ -75,8 +77,8 @@ function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakdown> })
     <div className="mt-4 border-t border-white/[0.07] pt-4" aria-label="Monthly profit bridge">
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <div className="stat-label">Monthly profit bridge</div>
-          <div className="text-[10px] text-white/40">Where recurring revenue is consumed</div>
+          <div className="stat-label">{t(locale, 'monthlyProfitBridge')}</div>
+          <div className="text-[10px] text-white/40">{t(locale, 'whereRevenueGoes')}</div>
         </div>
         <div className={`num text-sm font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
           {money.profit >= 0 ? '+' : ''}
@@ -138,6 +140,7 @@ function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakdown> })
 
 export default function CompanyScreen() {
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const updatePackage = useGame((s) => s.updatePackage);
   const setMarketing = useGame((s) => s.setMarketing);
   const setRetention = useGame((s) => s.setRetention);
@@ -191,16 +194,16 @@ export default function CompanyScreen() {
       <div className="mx-auto grid max-w-[1240px] gap-5 lg:grid-cols-3">
         <div className="flex flex-wrap items-end justify-between gap-4 lg:col-span-3">
           <div>
-            <div className="stat-label text-neon-cyan">Commercial control</div>
-            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">Operator performance</h1>
-            <p className="mt-1 text-[13px] text-white/45">
-              Balance growth, service pricing and the cost of keeping the network alive.
-            </p>
+            <div className="stat-label text-neon-cyan">{t(locale, 'commercialControl')}</div>
+            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">
+              {t(locale, 'operatorPerformance')}
+            </h1>
+            <p className="mt-1 text-[13px] text-white/45">{t(locale, 'operatorPerformanceBlurb')}</p>
           </div>
           <div
             className={`rounded-lg border px-3 py-2 text-right ${money.profit >= 0 ? 'border-neon-lime/20 bg-neon-lime/[0.05]' : 'border-neon-red/30 bg-neon-red/[0.07]'}`}
           >
-            <div className="stat-label">Operating position</div>
+            <div className="stat-label">{t(locale, 'operatingPosition')}</div>
             <div className={`text-sm font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
               {money.profit >= 0 ? 'Profitable' : 'Costs exceed revenue'}
             </div>
@@ -208,10 +211,8 @@ export default function CompanyScreen() {
         </div>
         <button className="market-entry lg:col-span-3" onClick={() => useGame.getState().setScreen('market')}>
           <span>
-            <strong className="block text-lg">Open market control</strong>
-            <span className="mt-1 block text-xs text-white/60">
-              District pressure, rival offensives and commercial operations
-            </span>
+            <strong className="block text-lg">{t(locale, 'openMarketControl')}</strong>
+            <span className="mt-1 block text-xs text-white/60">{t(locale, 'marketControlBlurb')}</span>
           </span>
           <span className="shrink-0 text-sm text-[#ed9e77]">
             {game.competition.moves.filter((m) => m.endsAt > game.minutes).length} rival moves
@@ -228,14 +229,14 @@ export default function CompanyScreen() {
               </div>
             </div>
             <div>
-              <div className="stat-label">Operating profit</div>
+              <div className="stat-label">{t(locale, 'operatingProfit')}</div>
               <div className={`num text-2xl font-semibold ${money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
                 {money.profit >= 0 ? '+' : ''}
                 {fmtMoney(money.profit)}
               </div>
             </div>
             <div>
-              <div className="stat-label">Free cash flow MTD</div>
+              <div className="stat-label">{t(locale, 'freeCashFlowMtd')}</div>
               <div
                 className={`num text-2xl font-semibold ${cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
               >
@@ -244,11 +245,11 @@ export default function CompanyScreen() {
               </div>
             </div>
             <div>
-              <div className="stat-label">Fixed lines</div>
+              <div className="stat-label">{t(locale, 'fixedLines')}</div>
               <div className="num text-2xl font-semibold">{fmtNum(subs)}</div>
             </div>
             <div>
-              <div className="stat-label">Contracts</div>
+              <div className="stat-label">{t(locale, 'contracts')}</div>
               <div className="num text-2xl font-semibold">{game.contracts.length}</div>
             </div>
             <div>
@@ -259,7 +260,7 @@ export default function CompanyScreen() {
           <div className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">
             <div>
               <div className="mb-1.5 flex justify-between">
-                <span className="stat-label text-neon-lime">Monthly revenue</span>
+                <span className="stat-label text-neon-lime">{t(locale, 'monthlyRevenue')}</span>
                 <span className="num text-[12px] text-neon-lime">{fmtMoney(money.totalRevenue)}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -273,7 +274,7 @@ export default function CompanyScreen() {
             </div>
             <div>
               <div className="mb-1.5 flex justify-between">
-                <span className="stat-label text-neon-red">Operating cost</span>
+                <span className="stat-label text-neon-red">{t(locale, 'operatingCost')}</span>
                 <span className="num text-[12px] text-neon-red">{fmtMoney(money.totalCost)}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -290,7 +291,9 @@ export default function CompanyScreen() {
         <div className="panel panel-tone-violet p-5 lg:col-span-3">
           <div className="mb-3 flex items-baseline justify-between">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Company standing</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'companyStanding')}
+              </h2>
               <p className="text-[11px] text-white/40">{rankOf(game).blurb}</p>
             </div>
             <div className="text-right">
@@ -335,23 +338,23 @@ export default function CompanyScreen() {
               </div>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-neon-lime">
-              Top of the ladder. Everything from here is your own high score.
-            </p>
+            <p className="mt-4 text-sm text-neon-lime">{t(locale, 'topOfLadder')}</p>
           )}
         </div>
 
         <div className="panel panel-tone-amber p-5 lg:col-span-3">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Wholesale partnerships</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'wholesalePartnerships')}
+              </h2>
               <p className="mt-1 text-[11px] text-white/40">
                 Sell spare reach to partner brands. Revenue arrives immediately; their traffic competes at the lowest
                 priority.
               </p>
             </div>
             <div className="text-right">
-              <div className="stat-label">Wholesale revenue</div>
+              <div className="stat-label">{t(locale, 'wholesaleRevenue')}</div>
               <div className="num text-lg font-semibold text-neon-lime">{fmtMoney(money.revenueWholesale)}/mo</div>
             </div>
           </div>
@@ -360,9 +363,9 @@ export default function CompanyScreen() {
               className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-3 ${game.wholesaleFixed ? 'border-neon-amber/40 bg-neon-amber/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}
             >
               <div>
-                <div className="text-sm font-semibold">Fixed network access</div>
+                <div className="text-sm font-semibold">{t(locale, 'fixedNetworkAccess')}</div>
                 <div className="mt-1 text-[10px] leading-relaxed text-white/40">
-                  Monetise covered homes through reseller ISPs. Adds roughly 18% to fixed traffic.
+                  {t(locale, 'fixedNetworkAccessBlurb')}
                 </div>
                 <div className="num mt-1 text-[10px] text-neon-amber">
                   Up to {fmtMoney(fixedWholesalePotential)}/mo at current delivery quality
@@ -379,9 +382,9 @@ export default function CompanyScreen() {
               className={`flex items-center justify-between gap-4 rounded-xl border p-3 ${game.mvnoEnabled ? 'border-neon-violet/40 bg-neon-violet/[0.07]' : 'border-white/10 bg-white/[0.03]'} ${mods.hasMobile && game.spectrum.length ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
             >
               <div>
-                <div className="text-sm font-semibold">MVNO radio access</div>
+                <div className="text-sm font-semibold">{t(locale, 'mvnoRadioAccess')}</div>
                 <div className="mt-1 text-[10px] leading-relaxed text-white/40">
-                  Host virtual mobile brands. Adds roughly 22% to mobile traffic and needs live spectrum.
+                  {t(locale, 'mvnoRadioAccessBlurb')}
                 </div>
                 <div className="num mt-1 text-[10px] text-neon-violet">
                   Up to {fmtMoney(mvnoPotential)}/mo at current delivery quality
@@ -399,10 +402,10 @@ export default function CompanyScreen() {
         </div>
 
         <div id="pricing" className="panel panel-tone-blue scroll-mt-6 p-5 lg:col-span-2">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Internet packages</h2>
-          <p className="mb-4 text-[11px] text-white/40">
-            Cheap gigabit wins customers fast, and fills your network just as fast.
-          </p>
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'internetPackages')}
+          </h2>
+          <p className="mb-4 text-[11px] text-white/40">{t(locale, 'internetPackagesBlurb')}</p>
 
           <div
             className="mb-4 rounded-lg border border-neon-cyan/20 bg-neon-cyan/[0.035] p-3"
@@ -410,10 +413,8 @@ export default function CompanyScreen() {
           >
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.07] pb-3">
               <div>
-                <div className="stat-label text-neon-cyan">Subscriber momentum</div>
-                <div className="mt-0.5 text-[10px] text-white/40">
-                  Price helps, but customers still need reach and reliable service.
-                </div>
+                <div className="stat-label text-neon-cyan">{t(locale, 'subscriberMomentum')}</div>
+                <div className="mt-0.5 text-[10px] text-white/40">{t(locale, 'subscriberMomentumBlurb')}</div>
               </div>
               <div className="flex gap-5 text-right">
                 <div>
@@ -425,7 +426,7 @@ export default function CompanyScreen() {
                   </div>
                 </div>
                 <div>
-                  <div className="stat-label">Current pace</div>
+                  <div className="stat-label">{t(locale, 'currentPace')}</div>
                   <div
                     className={`num text-lg font-semibold ${projectedDailyNet >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
                   >
@@ -434,7 +435,7 @@ export default function CompanyScreen() {
                   </div>
                 </div>
                 <div>
-                  <div className="stat-label">Target share</div>
+                  <div className="stat-label">{t(locale, 'targetShare')}</div>
                   <div className="num text-lg font-semibold text-neon-cyan">
                     {Math.round(averageTargetShare * 100)}%
                   </div>
@@ -506,7 +507,7 @@ export default function CompanyScreen() {
 
                     <div className="mt-3">
                       <div className="flex justify-between text-[11px] text-white/45">
-                        <span>Share of new sign-ups</span>
+                        <span>{t(locale, 'shareOfNewSignups')}</span>
                         <span className="num">{Math.round(share * 100)}%</span>
                       </div>
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
@@ -524,10 +525,8 @@ export default function CompanyScreen() {
 
           {mods.hasMobile && (
             <div className="mt-5">
-              <h3 className="text-sm font-semibold">Mobile plans</h3>
-              <p className="mb-3 text-[11px] text-white/40">
-                Priced separately from fixed. Radio capacity is finite, so cheap unlimited plans bite quickly.
-              </p>
+              <h3 className="text-sm font-semibold">{t(locale, 'mobilePlans')}</h3>
+              <p className="mb-3 text-[11px] text-white/40">{t(locale, 'mobilePlansBlurb')}</p>
               <div className="grid gap-3 sm:grid-cols-3">
                 {game.packages
                   .filter((p) => p.segment === 'mobile')
@@ -573,10 +572,8 @@ export default function CompanyScreen() {
           <div className="mt-5">
             <div className="flex items-baseline justify-between">
               <div>
-                <h3 className="text-sm font-semibold">Marketing budget</h3>
-                <p className="text-[11px] text-white/40">
-                  Spending pulls in customers faster, whether or not you can carry them.
-                </p>
+                <h3 className="text-sm font-semibold">{t(locale, 'marketingBudget')}</h3>
+                <p className="text-[11px] text-white/40">{t(locale, 'marketingBudgetBlurb')}</p>
               </div>
               <span className="num text-lg font-semibold text-neon-cyan">{fmtMoney(game.marketingBudget)}/mo</span>
             </div>
@@ -595,10 +592,8 @@ export default function CompanyScreen() {
           <div className="mt-5">
             <div className="flex items-baseline justify-between">
               <div>
-                <h3 className="text-sm font-semibold">Retention budget</h3>
-                <p className="text-[11px] text-white/40">
-                  Slows people walking out. It buys time, it does not fix why they are leaving.
-                </p>
+                <h3 className="text-sm font-semibold">{t(locale, 'retentionBudget')}</h3>
+                <p className="text-[11px] text-white/40">{t(locale, 'retentionBudgetBlurb')}</p>
               </div>
               <span className="num text-lg font-semibold text-neon-violet">{fmtMoney(game.retentionBudget)}/mo</span>
             </div>
@@ -617,7 +612,7 @@ export default function CompanyScreen() {
 
         <div className="panel panel-tone-green p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
-            Monthly operating finances
+            {t(locale, 'monthlyOperatingFinances')}
           </h2>
           <div className="divide-y divide-white/5">
             <div className="pb-2">
@@ -666,12 +661,12 @@ export default function CompanyScreen() {
           <div className="mt-4 border-t border-white/[0.07] pt-4">
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
-                <div className="stat-label">Cash bridge · month to date</div>
-                <div className="mt-1 text-[10px] leading-snug text-white/35">
-                  Projects, licences, research, repairs, hiring, bonuses, and asset sales are included below.
-                </div>
+                <div className="stat-label">{t(locale, 'cashBridgeMtd')}</div>
+                <div className="mt-1 text-[10px] leading-snug text-white/35">{t(locale, 'cashBridgeBlurb')}</div>
               </div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-neon-cyan">Actual cash</span>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-neon-cyan">
+                {t(locale, 'actualCash')}
+              </span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-lg border border-white/[0.07] bg-black/15 p-3">
@@ -717,7 +712,7 @@ export default function CompanyScreen() {
             <div className="mt-4 border-t border-white/[0.07] pt-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <div className="stat-label">Operating trend</div>
+                  <div className="stat-label">{t(locale, 'operatingTrend')}</div>
                   <div className="text-[11px] text-white/35">
                     Last {Math.min(14, game.history.length)} completed months
                   </div>
@@ -752,7 +747,9 @@ export default function CompanyScreen() {
         <div className="panel panel-tone-green p-5 lg:col-span-2">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Finance ledger</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'financeLedger')}
+              </h2>
               <p className="mt-1 text-[11px] text-white/35">
                 Operating income, network projects, service work, licences, research, staffing, spectrum, and financing
                 in one place.
@@ -762,7 +759,7 @@ export default function CompanyScreen() {
           </div>
           {game.ledger.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/10 p-4 text-center text-[11px] text-white/40">
-              The first completed month or cash transaction will appear here.
+              {t(locale, 'ledgerEmpty')}
             </div>
           ) : (
             <div className="scroll-thin max-h-[310px] overflow-y-auto rounded-lg border border-white/[0.07]">
@@ -791,13 +788,13 @@ export default function CompanyScreen() {
         </div>
 
         <div className="panel panel-tone-violet p-5 lg:col-span-2">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Contracts</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'contracts')}
+          </h2>
           {game.contracts.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/10 bg-black/10 p-5 text-center">
-              <div className="text-sm text-white/60">No enterprise portfolio yet</div>
-              <div className="mt-1 text-[11px] text-white/35">
-                Increase business-district coverage; qualified offers will appear in the map action stack.
-              </div>
+              <div className="text-sm text-white/60">{t(locale, 'noEnterprisePortfolio')}</div>
+              <div className="mt-1 text-[11px] text-white/35">{t(locale, 'noEnterpriseBlurb')}</div>
               <button
                 className="btn mt-3"
                 onClick={() => {
@@ -805,7 +802,7 @@ export default function CompanyScreen() {
                   setScreen('map');
                 }}
               >
-                Open customer map
+                {t(locale, 'openCustomerMap')}
               </button>
             </div>
           ) : (
@@ -839,7 +836,7 @@ export default function CompanyScreen() {
                     </div>
                     <div className="mt-2">
                       <div className="flex justify-between text-[10px]">
-                        <span className="text-white/40">SLA allowance used</span>
+                        <span className="text-white/40">{t(locale, 'slaAllowanceUsed')}</span>
                         <span className="num" style={{ color: riskTone }}>
                           {Math.round(risk.usage * 100)}%
                         </span>
@@ -867,7 +864,7 @@ export default function CompanyScreen() {
                               select({ type: 'building', id: building.id });
                             }}
                           >
-                            Show on map →
+                            {t(locale, 'showOnMap')}
                           </button>
                         )}
                       </div>
@@ -880,14 +877,14 @@ export default function CompanyScreen() {
         </div>
 
         <div className="panel panel-tone-amber p-5">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Borrowing</h2>
-          <p className="mb-3 text-[11px] text-white/40">
-            Lenders look at what you earn and what you have built. Go past the limit and they come for the company.
-          </p>
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'borrowing')}
+          </h2>
+          <p className="mb-3 text-[11px] text-white/40">{t(locale, 'borrowingBlurb')}</p>
 
           {graceLeft !== null && (
             <div className="alert-blink mb-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3">
-              <div className="text-sm font-semibold text-neon-red">Past the credit limit</div>
+              <div className="text-sm font-semibold text-neon-red">{t(locale, 'pastCreditLimit')}</div>
               <div className="num text-[11px] text-white/60">{Math.ceil(graceLeft)} days before the banks act</div>
             </div>
           )}
@@ -898,7 +895,7 @@ export default function CompanyScreen() {
               <div className={`num text-sm ${debt > 0 ? 'text-neon-amber' : 'text-white'}`}>{fmtMoney(debt)}</div>
             </div>
             <div className="chip py-2">
-              <div className="stat-label">Can borrow</div>
+              <div className="stat-label">{t(locale, 'canBorrow')}</div>
               <div className="num text-sm text-neon-cyan">{fmtMoney(headroom)}</div>
             </div>
             <div className="chip py-2">
@@ -930,7 +927,7 @@ export default function CompanyScreen() {
 
           <div className="mt-4">
             <div className="flex items-baseline justify-between">
-              <span className="stat-label">Draw down</span>
+              <span className="stat-label">{t(locale, 'drawDown')}</span>
               <span className="num text-lg font-semibold text-neon-cyan">{fmtMoney(borrowAmount)}</span>
             </div>
             <input
@@ -958,10 +955,12 @@ export default function CompanyScreen() {
         </div>
 
         <div className="panel panel-tone-red p-5">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Where customers went</h2>
-          <p className="mb-3 text-[11px] text-white/40">Most recent losses first.</p>
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'whereCustomersWent')}
+          </h2>
+          <p className="mb-3 text-[11px] text-white/40">{t(locale, 'mostRecentLossesFirst')}</p>
           {game.churn.length === 0 ? (
-            <p className="text-sm text-white/40">Nobody has left yet.</p>
+            <p className="text-sm text-white/40">{t(locale, 'nobodyHasLeftYet')}</p>
           ) : (
             <div className="scroll-thin flex max-h-[260px] flex-col gap-1.5 overflow-y-auto">
               {game.churn.slice(0, 12).map((c) => {
@@ -977,7 +976,7 @@ export default function CompanyScreen() {
                     </div>
                     <div className="num mt-0.5 flex justify-between text-[10px] text-white/40">
                       <span>{d?.name}</span>
-                      <span>{CHURN_REASON[c.reason]}</span>
+                      <span>{t(locale, CHURN_REASON[c.reason])}</span>
                     </div>
                   </div>
                 );
@@ -987,23 +986,23 @@ export default function CompanyScreen() {
         </div>
 
         <div className="panel panel-tone-blue p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Staff</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">{t(locale, 'staff')}</h2>
 
           <div className="mb-3 grid grid-cols-2 gap-2 text-[10px]">
             <div className="rounded-md bg-white/[0.03] p-2">
-              <div className="text-white/35">Maintenance saving</div>
+              <div className="text-white/35">{t(locale, 'maintenanceSaving')}</div>
               <div className="num text-neon-lime">{Math.round((1 - staff.maintenanceCostMul) * 100)}%</div>
             </div>
             <div className="rounded-md bg-white/[0.03] p-2">
-              <div className="text-white/35">Incident reduction</div>
+              <div className="text-white/35">{t(locale, 'incidentReduction')}</div>
               <div className="num text-neon-lime">{Math.round((1 - staff.incidentRateMul) * 100)}%</div>
             </div>
             <div className="rounded-md bg-white/[0.03] p-2">
-              <div className="text-white/35">Support bonus</div>
+              <div className="text-white/35">{t(locale, 'supportBonus')}</div>
               <div className="num text-neon-cyan">+{staff.supportSatisfaction.toFixed(1)}</div>
             </div>
             <div className="rounded-md bg-white/[0.03] p-2">
-              <div className="text-white/35">Research per day</div>
+              <div className="text-white/35">{t(locale, 'researchPerDay')}</div>
               <div className="num text-neon-cyan">+{staff.researchPointsPerDay} RP</div>
             </div>
           </div>
@@ -1065,9 +1064,7 @@ export default function CompanyScreen() {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-white/35">
-            Skills improve through experience, and every role changes the metric described above.
-          </p>
+          <p className="mt-2 text-[11px] leading-snug text-white/35">{t(locale, 'staffBlurb')}</p>
         </div>
       </div>
     </div>
