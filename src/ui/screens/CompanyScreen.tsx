@@ -1,3 +1,4 @@
+import StrategyDesk from '../StrategyDesk';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { averagePrice, fmtMoney, fmtMoneyExact, fmtNum, monthlyBreakdown, packageMix } from '../../game/economy';
@@ -12,6 +13,7 @@ import { wholesaleRevenue } from '../../game/strategy';
 import { useGame } from '../../store/gameStore';
 import type { ChurnReason } from '../../game/types';
 import TrendChart from '../TrendChart';
+import ScenarioCard from '../ScenarioCard';
 
 const CHURN_REASON: Record<ChurnReason, string> = {
   price: 'too expensive',
@@ -204,6 +206,19 @@ export default function CompanyScreen() {
             </div>
           </div>
         </div>
+        <button className="market-entry lg:col-span-3" onClick={() => useGame.getState().setScreen('market')}>
+          <span>
+            <strong className="block text-lg">Open market control</strong>
+            <span className="mt-1 block text-xs text-white/60">
+              District pressure, rival offensives and commercial operations
+            </span>
+          </span>
+          <span className="shrink-0 text-sm text-[#ed9e77]">
+            {game.competition.moves.filter((m) => m.endsAt > game.minutes).length} rival moves
+          </span>
+        </button>
+        <ScenarioCard game={game} />
+        <StrategyDesk />
         <div className="panel p-5 lg:col-span-3">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
             <div>
