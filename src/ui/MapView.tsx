@@ -17,6 +17,7 @@ import { computeRoutes, linkUtil, nodeUtil } from '../game/network';
 import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
 import { daylight, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { suggestedBackhaul } from '../game/investment';
 import { projectBlueprint } from '../game/blueprint';
 import type { Building, District, GameState, NetLink, NetNode, SpectrumHolding, Technician } from '../game/types';
@@ -815,6 +816,7 @@ interface Camera {
 }
 
 export default function MapView() {
+  const locale = useGame((s) => s.locale);
   const drillTarget = useGame((s) => s.drillTarget);
   const liveGame = useGame((s) => s.game) as GameState;
   const { quality, chooseQuality, economical } = useMapQuality(liveGame.nodes.length);
@@ -1289,7 +1291,7 @@ export default function MapView() {
                     fill="#a4b7be"
                     fontSize={7}
                   >
-                    After backhaul · sign-ups take time
+                    {t(locale, 'afterBackhaulSignups')}
                   </text>
                 </g>
               )}
@@ -1589,7 +1591,7 @@ export default function MapView() {
       {selection?.type === 'node' && selectedRoute && (
         <div className="panel pointer-events-none absolute bottom-[92px] right-4 w-[230px] p-3">
           <div className="flex items-center justify-between">
-            <span className="section-title text-neon-cyan">Route trace</span>
+            <span className="section-title text-neon-cyan">{t(locale, 'routeTrace')}</span>
             <span
               className={`h-2 w-2 rounded-full ${selectedRoute.route ? 'bg-neon-lime shadow-[0_0_9px_#7ee787]' : 'bg-neon-red shadow-[0_0_9px_#ff5d73]'}`}
             />
@@ -1614,11 +1616,11 @@ export default function MapView() {
                 <div className="stat-label">Peak</div>
               </div>
               <div className="col-span-3 border-t border-white/[0.07] pt-2 text-left text-[10px] text-white/45">
-                Cyan spans show the active path. Amber-red marks its tightest link.
+                {t(locale, 'routeTraceBlurb')}
               </div>
             </div>
           ) : (
-            <div className="mt-2 text-[11px] text-neon-red">No live path to a core router.</div>
+            <div className="mt-2 text-[11px] text-neon-red">{t(locale, 'noLivePathToCore')}</div>
           )}
         </div>
       )}
@@ -1633,7 +1635,7 @@ export default function MapView() {
           </summary>
           <div className="panel absolute bottom-0 right-10 w-52 p-3">
             <label className="text-xs" htmlFor="map-quality">
-              Map detail
+              {t(locale, 'mapDetail')}
             </label>
             <select
               id="map-quality"
@@ -1642,8 +1644,8 @@ export default function MapView() {
               onChange={(e) => chooseQuality(e.target.value as 'auto' | 'full' | 'performance')}
             >
               <option value="auto">Auto</option>
-              <option value="full">Full detail</option>
-              <option value="performance">Performance</option>
+              <option value="full">{t(locale, 'fullDetail')}</option>
+              <option value="performance">{t(locale, 'performanceMode')}</option>
             </select>
             <p className="mt-2 text-[11px] text-white/60">
               {economical ? 'Reduced ambient effects are active.' : 'Full city effects are active.'} Network alerts stay
