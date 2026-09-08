@@ -6,6 +6,7 @@ import type { GameState } from './types';
 
 export interface RankRequirement {
   label: string;
+  action: (s: GameState) => { screen: 'map' | 'company' | 'research'; label: string; tool?: 'datacenter' };
   // 0..1 so the UI can draw a bar without knowing what the rule is.
   progress: (s: GameState) => number;
   detail: (s: GameState) => string;
@@ -38,30 +39,38 @@ export function cityShare(s: GameState) {
 }
 
 const customers = (target: number): RankRequirement => ({
+  action: () => ({ screen: 'company', label: 'Review customer growth' }),
   label: `${target.toLocaleString()} customers`,
   progress: (s) => clamp(customerCount(s) / target, 0, 1),
   detail: (s) => `${Math.round(customerCount(s)).toLocaleString()} / ${target.toLocaleString()}`,
 });
 
 const districts = (target: number): RankRequirement => ({
+  action: () => ({ screen: 'map', label: 'Explore districts' }),
   label: `${target} districts licensed`,
   progress: (s) => clamp(s.districts.filter((d) => d.unlocked).length / target, 0, 1),
   detail: (s) => `${s.districts.filter((d) => d.unlocked).length} / ${target}`,
 });
 
 const share = (target: number): RankRequirement => ({
+  action: () => ({ screen: 'company', label: 'Review market position' }),
   label: `${Math.round(target * 100)}% of the city`,
   progress: (s) => clamp(cityShare(s) / target, 0, 1),
   detail: (s) => `${Math.round(cityShare(s) * 100)}% / ${Math.round(target * 100)}%`,
 });
 
 const research = (id: string, label: string): RankRequirement => ({
+  action: () => ({ screen: 'research', label: 'Open research' }),
   label,
   progress: (s) => (s.researchDone.includes(id) ? 1 : 0),
   detail: (s) => (s.researchDone.includes(id) ? 'done' : 'not researched'),
 });
 
 const dataCentres = (target: number): RankRequirement => ({
+  action: (s) =>
+    s.researchDone.includes('edge_compute')
+      ? { screen: 'map', tool: 'datacenter', label: 'Build a data centre' }
+      : { screen: 'research', label: 'Research edge compute' },
   label: `${target} data centre${target > 1 ? 's' : ''}`,
   progress: (s) => clamp(s.nodes.filter((n) => n.kind === 'datacenter').length / target, 0, 1),
   detail: (s) => `${s.nodes.filter((n) => n.kind === 'datacenter').length} / ${target}`,
