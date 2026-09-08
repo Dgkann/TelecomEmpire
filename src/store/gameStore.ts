@@ -1,3 +1,23 @@
+import { startMarketOperation, cancelMarketOperation } from '../game/competition';
+import { commissionCapacityPlan, type CapacityUpgrade } from '../game/capacityLab';
+import type { MarketTactic } from '../game/types';
+import { submitTenderBid, withdrawTenderBid } from '../game/procurement';
+import {
+  SMART_PAUSE_KEY,
+  SMART_PAUSE_OPTIONS,
+  loadSmartPausePreferences,
+  smartPauseEvents,
+  type SmartPausePreferences,
+  type SmartPauseKind,
+  type SmartPauseNotice,
+} from '../game/smartPause';
+import { updateCompanyIdentity } from '../game/identity';
+import { launchDistrict as buildDistrictLaunch, type ExpansionKind } from '../game/expansion';
+import type { FailureTarget } from '../game/failureDrill';
+import { buildBackupRoute } from '../game/redundancyBuild';
+import { buildConnectedSite } from '../game/connectedBuild';
+import { resolveDecision, claimChallenge } from '../game/board';
+import { acquireCompany } from '../game/acquisitions';
 import { create } from 'zustand';
 import {
   FIBER_COST_PER_UNIT,
@@ -10,12 +30,15 @@ import {
 import { effectiveNodeCapacity } from '../game/capacity';
 import { resolveNegotiation, type NegotiationMode } from '../game/contracts';
 import { computeRoutes, districtRedundancy } from '../game/network';
-import { repairCost, type RepairMode } from '../game/incidents';
+import { dispatchCandidates, repairCost, type RepairMode } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
 import { recordLedger } from '../game/financeLedger';
 import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
-import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/save';
+import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/saveStorage';
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
+import { CAMPAIGN_STAGES } from '../game/scenarios';
+import { claimMilestone as grantMilestone, MILESTONES } from '../game/milestones';
+import { projectBlueprint, type BuildStep } from '../game/blueprint';
 import {
   createNewGame,
   dispatch as dispatchTechnician,
@@ -52,6 +75,7 @@ import type {
   StaffRole,
   TrafficPolicy,
 } from '../game/types';
+import type { Locale } from '../ui/i18n';
 
 export type BuildTool = NodeKind | 'fiber' | null;
 
@@ -70,6 +94,12 @@ export interface Toast {
 }
 
 interface UiState {
+  inspectedOfferId: string | null;
+  smartPauseNotice: SmartPauseNotice | null;
+  drillTarget: FailureTarget | null;
+  autoConnect: boolean;
+  planning: boolean;
+  blueprint: BuildStep[];
   screen: Screen;
   overlay: OverlayMode;
   tool: BuildTool;
@@ -84,9 +114,27 @@ interface UiState {
   showSaveManager: boolean;
   activeSaveSlot: number;
   persistenceError: string | null;
+  locale: Locale;
 }
 
 interface Store extends UiState {
+  commissionUpgrades: (items: CapacityUpgrade[]) => boolean;
+  launchMarketOperation: (districtId: string, kind: MarketTactic) => boolean;
+  endMarketOperation: (id: string) => boolean;
+  bidOnTender: (id: string, price: number) => boolean;
+  withdrawTender: (id: string) => boolean;
+  inspectOffer: (id: string | null) => void;
+  smartPause: SmartPausePreferences;
+  setSmartPause: (kind: SmartPauseKind, enabled: boolean) => boolean;
+  dismissSmartPause: () => void;
+  beginFailureDrill: (target: FailureTarget) => void;
+  endFailureDrill: () => void;
+  setAutoConnect: (value: boolean) => void;
+  addBackupRoute: (nodeId: string) => void;
+  beginBlueprint: () => void;
+  discardBlueprint: () => void;
+  undoBlueprint: () => void;
+  commitBlueprint: () => void;
   game: GameState | null;
   started: boolean;
 
@@ -94,7 +142,9 @@ interface Store extends UiState {
   continueGame: (slot?: number) => boolean;
   resetSave: () => void;
   save: () => boolean;
+  updateIdentity: (name: string, logo: string) => boolean;
   quitToMenu: () => boolean;
+  advanceCampaign: () => boolean;
 
   tick: () => void;
   setSpeed: (speed: Speed) => void;
@@ -110,6 +160,7 @@ interface Store extends UiState {
   toggleSound: () => void;
   setShowHelp: (v: boolean) => void;
   setShowSaveManager: (v: boolean) => void;
+  setLocale: (locale: Locale) => void;
   saveToSlot: (slot: number) => boolean;
 
   placeNode: (kind: NodeKind, gx: number, gy: number) => void;
@@ -124,11 +175,12 @@ interface Store extends UiState {
   sellLink: (id: string) => void;
 
   unlockDistrict: (id: string) => void;
+  launchDistrict: (id: string, kind: ExpansionKind) => void;
   updatePackage: (id: string, patch: { price?: number; speedMbps?: number; active?: boolean; name?: string }) => void;
   startResearch: (id: string) => void;
   acceptOffer: (id: string, mode?: NegotiationMode) => void;
   declineOffer: (id: string) => void;
-  dispatchTech: (incidentId: string, mode: RepairMode) => void;
+  dispatchTech: (incidentId: string, mode: RepairMode, techId?: string) => void;
   hireTechnician: () => void;
   hireEmployee: (role: StaffRole) => void;
   fireStaff: (id: string) => void;
@@ -149,9 +201,27 @@ interface Store extends UiState {
   toggleAutoDispatch: () => void;
   advanceTutorial: (stepIndex: number) => void;
   skipTutorial: () => void;
+  claimMilestone: (id: string) => void;
+  resolveBoardDecision: (id: string, option: string) => void;
+  acquireRival: (id: string) => void;
+  claimCharter: () => void;
+}
+
+function initialLocale(): Locale {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('telecom-empire-locale') === 'tr' ? 'tr' : 'en';
+  } catch {
+    return 'en';
+  }
 }
 
 const initialUi: UiState = {
+  inspectedOfferId: null,
+  smartPauseNotice: null,
+  drillTarget: null,
+  autoConnect: false,
+  planning: false,
+  blueprint: [],
   screen: 'map',
   overlay: 'normal',
   tool: null,
@@ -165,6 +235,7 @@ const initialUi: UiState = {
   showSaveManager: false,
   activeSaveSlot: 0,
   persistenceError: null,
+  locale: initialLocale(),
 };
 
 function withGame(set: (fn: (s: Store) => Partial<Store>) => void, mutate: (g: GameState) => void) {
@@ -180,6 +251,7 @@ const isSaveSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot
 
 export const useGame = create<Store>((set, get) => ({
   ...initialUi,
+  smartPause: loadSmartPausePreferences(),
   game: null,
   started: false,
 
@@ -193,7 +265,7 @@ export const useGame = create<Store>((set, get) => ({
       set({ persistenceError: 'The new game could not be saved. Check browser storage and try again.' });
       return false;
     }
-    set({ ...initialUi, activeSaveSlot: slot, game, started: true });
+    set({ ...initialUi, locale: get().locale, activeSaveSlot: slot, game, started: true });
     return true;
   },
 
@@ -201,7 +273,7 @@ export const useGame = create<Store>((set, get) => ({
     if (!isSaveSlot(slot)) return false;
     const game = loadGame(slot);
     if (!game) return false;
-    set({ ...initialUi, activeSaveSlot: slot, game: { ...game, speed: 0 }, started: true });
+    set({ ...initialUi, locale: get().locale, activeSaveSlot: slot, game: { ...game, speed: 0 }, started: true });
     return true;
   },
 
@@ -230,6 +302,15 @@ export const useGame = create<Store>((set, get) => ({
   },
 
   quitToMenu: () => {
+    if (get().planning) {
+      get().toast(
+        get().locale === 'tr'
+          ? 'Çıkmadan önce ağ taslağını kur veya sil.'
+          : 'Build or discard your network plan before exiting.',
+        'info',
+      );
+      return false;
+    }
     const g = get().game;
     if (g && !saveGame(g, get().activeSaveSlot)) {
       const message = 'Exit cancelled because the game could not be saved.';
@@ -241,11 +322,101 @@ export const useGame = create<Store>((set, get) => ({
     return true;
   },
 
+  advanceCampaign: () => {
+    const s = get();
+    const current = s.game;
+    if (!current || current.mode !== 'campaign' || current.victoryAt === null) return false;
+    const nextStage = current.campaignStage + 1;
+    if (!CAMPAIGN_STAGES[nextStage]) return false;
+    const next = createNewGame({
+      companyName: current.companyName,
+      logo: current.logo,
+      difficulty: current.difficulty,
+      cityName: CAMPAIGN_STAGES[nextStage].cityName,
+      mode: 'campaign',
+      campaignStage: nextStage,
+    });
+    next.money += Math.max(0, Math.min(250000, Math.round(current.money * 0.2)));
+    next.reputation = Math.max(50, Math.round(current.reputation * 0.8));
+    if (!saveGame(next, s.activeSaveSlot)) {
+      set({ persistenceError: 'The next campaign city could not be saved.' });
+      return false;
+    }
+    set({ ...initialUi, locale: s.locale, activeSaveSlot: s.activeSaveSlot, game: next, started: true });
+    return true;
+  },
+
+  setSmartPause: (kind, enabled) => {
+    if (!SMART_PAUSE_OPTIONS.some((option) => option.id === kind) || typeof enabled !== 'boolean') return false;
+    const preferences = { ...get().smartPause, [kind]: enabled };
+    set({ smartPause: preferences });
+    try {
+      localStorage.setItem(SMART_PAUSE_KEY, JSON.stringify(preferences));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  dismissSmartPause: () => set({ smartPauseNotice: null }),
+  inspectOffer: (id) => {
+    if (id === null) {
+      set({ inspectedOfferId: null });
+      return;
+    }
+    const s = get();
+    if (s.planning || s.drillTarget || !s.game?.offers.some((offer) => offer.id === id)) return;
+    set({ inspectedOfferId: id, screen: 'map', tool: null, selection: null, linkFrom: null });
+  },
+
+  launchMarketOperation: (districtId, kind) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return false;
+    const game = startMarketOperation(s.game, districtId, kind);
+    if (!game) return false;
+    set({ game });
+    return true;
+  },
+  endMarketOperation: (id) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return false;
+    const game = cancelMarketOperation(s.game, id);
+    if (!game) return false;
+    set({ game });
+    return true;
+  },
+  bidOnTender: (id, price) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return false;
+    const next = submitTenderBid(s.game, id, price);
+    if (!next) return false;
+    set({ game: next });
+    return true;
+  },
+  withdrawTender: (id) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return false;
+    const next = withdrawTenderBid(s.game, id);
+    if (!next) return false;
+    set({ game: next });
+    return true;
+  },
+
   tick: () => {
     const s = get();
+    if (s.planning || s.drillTarget) return;
     if (!s.game || s.game.speed === 0) return;
     let g = s.game;
-    for (let i = 0; i < s.game.speed; i++) g = step(g);
+    let notice = s.smartPauseNotice;
+    for (let i = 0; i < s.game.speed; i++) {
+      const next = step(g);
+      const events = smartPauseEvents(g, next, s.smartPause);
+      g = next;
+      if (events.length) {
+        notice = { at: g.minutes, resumeSpeed: s.game.speed, events };
+        g = { ...g, speed: 0 };
+        break;
+      }
+    }
 
     // Autosave once a game day.
     if (g.minutes - g.autosaveAt > MINUTES_PER_DAY) {
@@ -253,26 +424,134 @@ export const useGame = create<Store>((set, get) => ({
       const saved = saveGame(g, s.activeSaveSlot);
       set({ persistenceError: saved ? null : 'Autosave failed. Progress is only being kept in this tab.' });
     }
-    set({ game: g });
+    set({ game: g, smartPauseNotice: notice });
   },
 
-  setSpeed: (speed) => withGame(set, (g) => void (g.speed = speed)),
+  beginFailureDrill: (target) => {
+    const s = get();
+    if (!s.game || s.game.gameOver || s.planning) return;
+    const item = (target.type === 'node' ? s.game.nodes : s.game.links).find((n) => n.id === target.id);
+    if (!item || item.down) return;
+    set({
+      game: { ...s.game, speed: 0 },
+      drillTarget: target,
+      selection: target,
+      tool: null,
+      linkFrom: null,
+      screen: 'map',
+    });
+  },
+  endFailureDrill: () => set({ drillTarget: null }),
+  setSpeed: (speed) => {
+    if (!get().planning && !get().drillTarget) {
+      withGame(set, (g) => void (g.speed = speed));
+      if (speed > 0) set({ smartPauseNotice: null });
+    }
+  },
 
-  setScreen: (screen) => set({ screen, tool: null, linkFrom: null }),
+  beginBlueprint: () => {
+    if (!get().game || get().game!.gameOver || get().drillTarget) return;
+    withGame(set, (g) => {
+      g.speed = 0;
+    });
+    set({ planning: true, blueprint: [], screen: 'map', tool: 'pop', selection: null, linkFrom: null });
+  },
+  discardBlueprint: () => set({ planning: false, blueprint: [], tool: null, linkFrom: null, selection: null }),
+  undoBlueprint: () => set((s) => ({ blueprint: s.blueprint.slice(0, -1), linkFrom: null, selection: null })),
+  commitBlueprint: () => {
+    const s = get();
+    if (!s.game || !s.planning || !s.blueprint.length) return;
+    const result = projectBlueprint(s.game, s.blueprint, s.locale);
+    if (result.error) {
+      s.toast(result.error, 'bad');
+      return;
+    }
+    if (result.disconnected) {
+      s.toast(
+        s.locale === 'tr'
+          ? 'Önce plandaki tüm noktaları çekirdeğe bağla.'
+          : 'Connect every planned site to a core first.',
+        'bad',
+      );
+      return;
+    }
+    pushLog(result.state, `Network plan commissioned: ${s.blueprint.length} items.`, 'good');
+    set({
+      game: { ...result.state, speed: 0 },
+      planning: false,
+      blueprint: [],
+      tool: null,
+      linkFrom: null,
+      selection: null,
+    });
+    s.toast(s.locale === 'tr' ? 'Ağ planı kuruldu.' : 'Network plan commissioned.', 'good');
+  },
+
+  resolveBoardDecision: (id, option) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return;
+    const next = resolveDecision(s.game, id, option);
+    if (next) set({ game: next });
+  },
+  acquireRival: (id) => {
+    const s = get();
+    if (!s.game || s.planning) return;
+    const next = acquireCompany(s.game, id);
+    if (next) set({ game: next });
+  },
+  claimCharter: () => {
+    const s = get();
+    if (!s.game || s.planning) return;
+    const next = claimChallenge(s.game);
+    if (next) set({ game: next });
+  },
+  claimMilestone: (id) => {
+    const s = get();
+    if (!s.game) return;
+    const next = grantMilestone(s.game, id);
+    if (!next) return;
+    const goal = MILESTONES.find((m) => m.id === id)!;
+    set({ game: next });
+    s.toast(
+      `${goal.title[s.locale === 'tr' ? 1 : 0]} · +$${goal.reward.toLocaleString()} · +${goal.research} ${s.locale === 'tr' ? 'araştırma puanı' : 'research points'}`,
+      'good',
+    );
+  },
+
+  setScreen: (screen) => {
+    if (get().planning && screen !== 'map') {
+      get().toast(
+        get().locale === 'tr' ? 'Önce ağ taslağını kur veya sil.' : 'Build or discard your network plan first.',
+        'info',
+      );
+      return;
+    }
+    set({ screen, tool: null, linkFrom: null, drillTarget: null, inspectedOfferId: null });
+  },
   setOverlay: (overlay) => set({ overlay }),
-  setTool: (tool) => set((s) => ({ tool: s.tool === tool ? null : tool, linkFrom: null, selection: null })),
+  setTool: (tool) =>
+    set((s) => (s.drillTarget ? {} : { tool: s.tool === tool ? null : tool, linkFrom: null, selection: null })),
   select: (selection) => set({ selection }),
   focus: (gx, gy) => set({ focusOn: { gx, gy, at: Date.now() }, screen: 'map' }),
   openIncident: (id) => set({ openIncidentId: id }),
   toast: (text, tone = 'info', gx, gy) => {
     const id = uid('toast');
-    set((s) => ({ toasts: [...s.toasts, { id, text, tone, gx, gy }] }));
+    set((s) => ({ toasts: [...s.toasts.slice(-4), { id, text, tone, gx, gy }] }));
     setTimeout(() => get().dismissToast(id), 2600);
   },
-  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) =>
+    set((s) => (s.toasts.some((t) => t.id === id) ? { toasts: s.toasts.filter((t) => t.id !== id) } : s)),
   toggleSound: () => set((s) => ({ soundOn: !s.soundOn })),
   setShowHelp: (v) => set({ showHelp: v }),
   setShowSaveManager: (v) => set({ showSaveManager: v }),
+  setLocale: (locale) => {
+    try {
+      localStorage.setItem('telecom-empire-locale', locale);
+    } catch {
+      // The preference still applies for this tab when storage is unavailable.
+    }
+    set({ locale });
+  },
   saveToSlot: (slot) => {
     const g = get().game;
     if (!g) return false;
@@ -293,12 +572,54 @@ export const useGame = create<Store>((set, get) => ({
     return false;
   },
 
+  commissionUpgrades: (items) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return false;
+    const next = commissionCapacityPlan(s.game, items);
+    if (!next) {
+      s.toast('Order could not be commissioned. Refresh the lab and check cash, faults and research.', 'bad');
+      return false;
+    }
+    set({ game: next });
+    s.toast(items.length + ' capacity upgrades commissioned', 'good');
+    return true;
+  },
+
+  addBackupRoute: (nodeId) => {
+    const s = get();
+    if (!s.game || s.planning) return;
+    const game = buildBackupRoute(s.game, nodeId);
+    if (!game) {
+      s.toast('No affordable independent route is available.', 'bad');
+      return;
+    }
+    set({ game });
+    s.toast('Backup fibre live · single-cut protection', 'good');
+  },
+  setAutoConnect: (autoConnect) => set({ autoConnect }),
   placeNode: (kind, gx, gy) => {
     const s = get();
     const g = s.game;
-    if (!g) return;
+    if (!g || s.drillTarget) return;
+    if (s.planning) {
+      const steps: BuildStep[] = [...s.blueprint, { type: 'node', id: uid('plan'), kind, gx, gy }];
+      const preview = projectBlueprint(g, steps, s.locale);
+      if (preview.error) s.toast(preview.error, 'bad', gx, gy);
+      else set({ blueprint: steps });
+      return;
+    }
+    if (s.autoConnect) {
+      const result = buildConnectedSite(g, kind, gx, gy);
+      if (result.error) {
+        s.toast(result.error, 'bad', gx, gy);
+        return;
+      }
+      set({ game: result.state });
+      s.toast('Site connected · ready for service', 'good', gx, gy);
+      return;
+    }
     const spec = NODE_SPECS[kind];
-    const issue = nodePlacementIssue(g, kind, gx, gy);
+    const issue = nodePlacementIssue(g, kind, gx, gy, s.locale);
     if (issue) {
       s.toast(issue, 'bad', gx, gy);
       return;
@@ -345,6 +666,13 @@ export const useGame = create<Store>((set, get) => ({
     const s = get();
     const g = s.game;
     if (!g) return;
+    if (s.planning && s.linkFrom && s.linkFrom !== nodeId) {
+      const steps: BuildStep[] = [...s.blueprint, { type: 'link', id: uid('planlink'), aId: s.linkFrom, bId: nodeId }];
+      const preview = projectBlueprint(g, steps, s.locale);
+      if (preview.error) s.toast(preview.error, 'bad');
+      else set({ blueprint: steps, linkFrom: null });
+      return;
+    }
     if (!s.linkFrom) {
       set({ linkFrom: nodeId });
       return;
@@ -612,6 +940,36 @@ export const useGame = create<Store>((set, get) => ({
     set({ selection: null });
   },
 
+  launchDistrict: (id, kind) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget) return;
+    const next = buildDistrictLaunch(s.game, id, kind);
+    if (!next) {
+      s.toast('Launch unavailable. Review the current cash and network requirements.', 'bad');
+      return;
+    }
+    const site = next.nodes[next.nodes.length - 1];
+    pushLog(next, 'Starter network commissioned in ' + next.districts.find((d) => d.id === id)!.name + '.', 'good');
+    set({
+      game: { ...next, speed: 0 },
+      screen: 'map',
+      tool: null,
+      linkFrom: null,
+      selection: { type: 'district', id },
+    });
+    s.focus(site.gx, site.gy);
+    s.toast('District connected. Win your first 100 customers, then protect the route.', 'good');
+  },
+
+  updateIdentity: (name, logo) => {
+    const g = get().game;
+    if (!g) return false;
+    const next = updateCompanyIdentity(g, name, logo);
+    if (!next) return false;
+    set({ game: next });
+    return true;
+  },
+
   unlockDistrict: (id) => {
     const s = get();
     const g = s.game;
@@ -745,19 +1103,20 @@ export const useGame = create<Store>((set, get) => ({
 
   declineOffer: (id) => withGame(set, (draft) => void (draft.offers = draft.offers.filter((o) => o.id !== id))),
 
-  dispatchTech: (incidentId, mode) => {
+  dispatchTech: (incidentId, mode, techId) => {
     const s = get();
     const g = s.game;
-    if (!g) return;
+    if (!g || g.gameOver || s.planning || s.drillTarget) return;
     const inc = g.incidents.find((i) => i.id === incidentId);
     if (!inc || inc.resolved) return;
     if (inc.assignedTechId) {
       s.toast('A crew is already assigned to that incident.', 'bad');
       return;
     }
-    const tech = g.technicians.find((t) => t.state === 'idle' && t.maintenanceId === null);
+    const candidates = dispatchCandidates(g, inc, mode);
+    const tech = (techId ? candidates.find((c) => c.technician.id === techId) : candidates[0])?.technician;
     if (!tech) {
-      s.toast('Every crew is already out.', 'bad');
+      s.toast(techId ? 'That crew is no longer available. Choose another crew.' : 'Every crew is already out.', 'bad');
       return;
     }
     // Emergency work needs cash up front.
@@ -1073,6 +1432,6 @@ export const useGame = create<Store>((set, get) => ({
 
 export const researchList = RESEARCH;
 
-if (import.meta.env.DEV) {
+if (typeof window !== 'undefined' && import.meta.env.VITE_E2E === 'true') {
   (window as unknown as { __game?: typeof useGame }).__game = useGame;
 }

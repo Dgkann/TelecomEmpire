@@ -1,18 +1,17 @@
-import { NODE_SPECS, SAVE_KEY, SAVE_VERSION, SPECTRUM_BANDS, TRANSIT_TIERS } from './constants';
+import { initialCompetition, OPERATION_MINUTES } from './competition';
+import { initialProcurement, bidBond, ACCEPTANCE_MINUTES } from './procurement';
+import { initialStrategy } from './board';
+import { NODE_SPECS, SAVE_VERSION, SPECTRUM_BANDS, TRANSIT_TIERS } from './constants';
 import { RANKS } from './progression';
 import { RESEARCH } from './research';
+import { MILESTONE_IDS } from './milestones';
 import type { GameState, Package } from './types';
-
-interface SaveSlot {
-  version: number;
-  savedAt: number;
-  state: GameState;
-}
 
 type LegacyState = Record<string, unknown>;
 
 // One entry per version bump, keyed by the version it upgrades from.
 const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
+  20: (s) => ({ ...s, competition: initialCompetition(Number(s.minutes) || 0) }),
   // 1 -> 2: the mobile layer added spectrum, auctions and per-district radio coverage, plus three mobile packages.
   1: (s) => {
     const packages = Array.isArray(s.packages) ? (s.packages as Package[]) : [];
@@ -238,6 +237,18 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
       },
     };
   },
+  // Scenarios and the multi-city campaign became part of every save.
+  16: (s) => ({
+    ...s,
+    mode: s.mode ?? 'sandbox',
+    scenarioId: s.scenarioId ?? 'freeplay',
+    scenarioCompletedAt: s.scenarioCompletedAt ?? null,
+    campaignStage: s.campaignStage ?? 0,
+  }),
+  // Development grants are available once per city, including imported networks.
+  17: (s) => ({ ...s, claimedMilestones: [] }),
+  18: (s) => ({ ...s, strategy: initialStrategy(Number(s.minutes) || 0) }),
+  19: (s) => ({ ...s, procurement: initialProcurement(Number(s.minutes) || 0) }),
 };
 
 const DEFAULTS = {
@@ -285,6 +296,10 @@ const DEFAULTS = {
   tutorialStep: 0,
   tutorialDone: true,
   autosaveAt: 0,
+  mode: 'sandbox',
+  scenarioId: 'freeplay',
+  scenarioCompletedAt: null,
+  campaignStage: 0,
 } as const;
 
 // Without these there is no game to resume.
@@ -326,6 +341,8 @@ const CAMPAIGN_KINDS = new Set(['acquisition', 'retention', 'business', 'mobile'
 const TRAFFIC_POLICIES = new Set(['balanced', 'residential', 'business', 'mobile']);
 const INTERCONNECT_PLANS = new Set(['transit', 'ixp', 'cdn']);
 const DATA_CENTER_MODES = new Set(['cache', 'colocation', 'cloud', 'recovery']);
+const GAME_MODES = new Set(['sandbox', 'campaign']);
+const SCENARIO_IDS = new Set(['freeplay', 'rapid_expansion', 'service_standard', 'debt_free', 'market_leader']);
 const FINANCE_CATEGORIES = new Set([
   'residential',
   'mobile',
@@ -345,15 +362,21 @@ const FINANCE_CATEGORIES = new Set([
   'spectrum',
   'research',
   'staff',
+  'strategic_investment',
+  'company_acquisition',
   'network_build',
   'network_upgrade',
   'network_service',
   'district_licence',
+  'market_operation',
+  'tender_bond',
+  'tender_payment',
   'incident_response',
   'contract_bonus',
   'campaign',
   'asset_sale',
   'regulatory_fine',
+  'milestone_reward',
 ]);
 
 type UnknownRecord = Record<string, unknown>;
@@ -961,6 +984,202 @@ function normalizeIncidentReferences(state: LegacyState): LegacyState {
   return { ...state, version: SAVE_VERSION, finance, incidents: normalizedIncidents, maintenanceOrders, technicians };
 }
 
+function isCompetition(value: unknown): boolean {
+  const operation = (v: unknown): boolean =>
+    isRecord(v) &&
+    isId(v.id) &&
+    isId(v.districtId) &&
+    isEnum(v.kind, new Set(['switchers', 'loyalty', 'service'])) &&
+    isNumber(v.startedAt, 0) &&
+    isNumber(v.endsAt, 0) &&
+    v.endsAt === v.startedAt + OPERATION_MINUTES &&
+    isNumber(v.cost, 0) &&
+    isNumber(v.baselineCustomers, 0) &&
+    isNumber(v.qualifiedMinutes, 0, OPERATION_MINUTES) &&
+    (v.kind === 'service' || v.qualifiedMinutes === 0);
+  const result = (v: unknown): boolean =>
+    operation(v) &&
+    isRecord(v) &&
+    isNumber(v.finishedAt, v.startedAt as number) &&
+    typeof v.cancelled === 'boolean' &&
+    isNumber(v.customerDelta) &&
+    isNumber(v.reputationDelta) &&
+    [-3, 0, 3].includes(v.reputationDelta) &&
+    (v.cancelled || (v.finishedAt as number) >= (v.endsAt as number)) &&
+    v.reputationDelta ===
+      (v.kind === 'service' ? (!v.cancelled && (v.qualifiedMinutes as number) / OPERATION_MINUTES >= 0.8 ? 3 : -3) : 0);
+  const move = (v: unknown): boolean =>
+    isRecord(v) &&
+    isId(v.id) &&
+    isId(v.rivalId) &&
+    isId(v.districtId) &&
+    isEnum(v.kind, new Set(['discount', 'publicity', 'rollout'])) &&
+    isNumber(v.startedAt, 0) &&
+    isNumber(v.endsAt, v.startedAt + 1) &&
+    isNumber(v.cost, 0);
+  const snapshot = (v: unknown): boolean =>
+    isRecord(v) &&
+    isNumber(v.at, 0) &&
+    isArrayOf(
+      v.districts,
+      (d) =>
+        isRecord(d) &&
+        isId(d.id) &&
+        isNumber(d.customers, 0) &&
+        isNumber(d.coverage, 0, 1) &&
+        isNumber(d.satisfaction, 0, 100),
+      1000,
+    ) &&
+    hasUniqueIds(v.districts as Array<{ id: string }>);
+  if (
+    !isRecord(value) ||
+    !isNumber(value.nextMoveAt, 0) ||
+    !isInteger(value.sequence, 0, 1000000) ||
+    !isArrayOf(value.operations, operation, 3) ||
+    !isArrayOf(value.history, result, 24) ||
+    !isArrayOf(value.moves, move, 3) ||
+    !isArrayOf(value.snapshots, snapshot, 30)
+  )
+    return false;
+  const operations = value.operations as Array<{ id: string; districtId: string }>;
+  const history = value.history as Array<{ id: string }>;
+  const moves = value.moves as Array<{ id: string; rivalId: string }>;
+  return (
+    hasUniqueIds([...operations, ...history]) &&
+    hasUniqueIds(moves) &&
+    new Set(operations.map((o) => o.districtId)).size === operations.length &&
+    new Set(moves.map((m) => m.rivalId)).size === moves.length
+  );
+}
+
+function isCityTender(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !isId(value.id) ||
+    !isId(value.districtId) ||
+    !isEnum(value.kind, new Set(['schools', 'emergency', 'gigabit'])) ||
+    !isEnum(value.status, new Set(['open', 'delivery', 'completed', 'failed', 'lost'])) ||
+    !isInteger(value.budget, 1, 1000000000) ||
+    !isNumber(value.openedAt, 0) ||
+    !isNumber(value.closesAt, value.openedAt) ||
+    !isNumber(value.bond, 0) ||
+    !isNumber(value.qualifyingMinutes, 0, ACCEPTANCE_MINUTES) ||
+    !isNullable(value.winnerId, isId) ||
+    !isNullable(value.awardedAt, (entry) => isNumber(entry, value.closesAt as number)) ||
+    !isNullable(value.dueAt, (entry) => isNumber(entry, 0)) ||
+    !isNullable(value.finishedAt, (entry) => isNumber(entry, 0))
+  )
+    return false;
+  const validBid = (bid: unknown) =>
+    isRecord(bid) &&
+    isInteger(bid.price, Math.ceil((value.budget as number) * 0.65), value.budget as number) &&
+    isNumber(bid.quality, 0, 100);
+  if (
+    !isNullable(value.playerBid, validBid) ||
+    !isArrayOf(
+      value.rivals,
+      (rival) =>
+        isRecord(rival) && isId(rival.id) && rival.id !== 'player' && isText(rival.name, 240) && validBid(rival),
+      100,
+    ) ||
+    !hasUniqueIds(value.rivals as Array<{ id: string }>)
+  )
+    return false;
+  const live = value.status === 'open' || value.status === 'delivery';
+  const price = isRecord(value.playerBid) ? (value.playerBid.price as number) : null;
+  if (value.bond !== (live && price !== null ? bidBond(price) : 0)) return false;
+  if (value.status === 'open')
+    return (
+      value.winnerId === null &&
+      value.awardedAt === null &&
+      value.dueAt === null &&
+      value.finishedAt === null &&
+      value.qualifyingMinutes === 0
+    );
+  if (value.awardedAt === null) return false;
+  if (value.status === 'lost')
+    return (
+      value.winnerId !== 'player' &&
+      value.dueAt === null &&
+      value.finishedAt === null &&
+      value.qualifyingMinutes === 0 &&
+      (value.winnerId === null || (value.rivals as Array<{ id: string }>).some((r) => r.id === value.winnerId))
+    );
+  if (
+    value.winnerId !== 'player' ||
+    price === null ||
+    typeof value.dueAt !== 'number' ||
+    value.dueAt <= (value.awardedAt as number)
+  )
+    return false;
+  if (value.status === 'delivery') return value.finishedAt === null;
+  if (typeof value.finishedAt !== 'number' || value.finishedAt < (value.awardedAt as number)) return false;
+  return value.status === 'completed'
+    ? value.qualifyingMinutes === ACCEPTANCE_MINUTES && value.finishedAt <= value.dueAt
+    : value.finishedAt >= value.dueAt;
+}
+function isProcurement(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNumber(value.nextTenderAt, 0) &&
+    isInteger(value.sequence, 0, 1000000) &&
+    isArrayOf(value.tenders, isCityTender, 12) &&
+    hasUniqueIds(value.tenders as Array<{ id: string }>) &&
+    (value.tenders as Array<{ status: string }>).filter((t) => t.status === 'open' || t.status === 'delivery').length <=
+      1
+  );
+}
+
+function isStrategy(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    isNumber(value.nextDecisionAt, 0) &&
+    isNumber(value.nextChallengeAt, 0) &&
+    isInteger(value.challengesCompleted, 0, 100000) &&
+    isNullable(
+      value.decision,
+      (d) =>
+        isRecord(d) &&
+        isId(d.id) &&
+        isId(d.districtId) &&
+        isEnum(d.kind, new Set(['renewal', 'festival', 'training'])) &&
+        isNumber(d.dueAt, 0),
+    ) &&
+    isNullable(
+      value.challenge,
+      (c) =>
+        isRecord(c) &&
+        isEnum(c.kind, new Set(['resilience', 'enterprise', 'mobile'])) &&
+        isInteger(c.target, 1, 100000) &&
+        isNumber(c.dueAt, 0),
+    ) &&
+    isArrayOf(
+      value.history,
+      (h) => isRecord(h) && isId(h.id) && isNumber(h.at, 0) && isText(h.text, 500) && isText(h.textTr, 500),
+      24,
+    ) &&
+    hasUniqueIds(value.history as Array<{ id: string }>) &&
+    isArrayOf(
+      value.acquisitions,
+      (a) => isRecord(a) && isId(a.rivalId) && isText(a.name, 240) && isNumber(a.at, 0) && isNumber(a.cost, 0),
+      100,
+    ) &&
+    new Set((value.acquisitions as Array<{ rivalId: string }>).map((a) => a.rivalId)).size ===
+      value.acquisitions.length &&
+    isArrayOf(
+      value.developments,
+      (d) =>
+        isRecord(d) &&
+        isId(d.districtId) &&
+        isNumber(d.at, 0) &&
+        isInteger(d.households, 1) &&
+        isArrayOf(d.buildingIds, isId, 100) &&
+        new Set(d.buildingIds).size === d.buildingIds.length,
+      20,
+    )
+  );
+}
+
 function validateState(value: unknown): GameState | null {
   if (!isRecord(value)) return null;
   const gridSize = value.gridSize;
@@ -972,6 +1191,10 @@ function validateState(value: unknown): GameState | null {
     isText(value.logo, 80) &&
     (value.difficulty === 'casual' || value.difficulty === 'standard' || value.difficulty === 'hard') &&
     isText(value.cityName, 240) &&
+    isEnum(value.mode, GAME_MODES) &&
+    isEnum(value.scenarioId, SCENARIO_IDS) &&
+    isNullable(value.scenarioCompletedAt, (entry) => isNumber(entry, 0)) &&
+    isInteger(value.campaignStage, 0, 100) &&
     isNumber(value.minutes, 0) &&
     (value.speed === 0 || value.speed === 1 || value.speed === 2 || value.speed === 4) &&
     isNumber(value.money) &&
@@ -1001,6 +1224,11 @@ function validateState(value: unknown): GameState | null {
   if (!scalarFieldsValid) return null;
 
   const arraysValid =
+    isArrayOf(
+      value.claimedMilestones,
+      (entry) => typeof entry === 'string' && (MILESTONE_IDS as readonly string[]).includes(entry),
+      MILESTONE_IDS.length,
+    ) &&
     isArrayOf(value.buildings, (entry) => isBuilding(entry, gridSize), gridSize * gridSize) &&
     isArrayOf(value.districts, (entry) => isDistrict(entry, gridSize), 500) &&
     value.districts.length > 0 &&
@@ -1031,6 +1259,9 @@ function validateState(value: unknown): GameState | null {
   if (!arraysValid) return null;
 
   const objectsValid =
+    isStrategy(value.strategy) &&
+    isProcurement(value.procurement) &&
+    isCompetition(value.competition) &&
     isStats(value.stats) &&
     isFinance(value.finance) &&
     isDataCenterModeRecord(value.dataCenterModes) &&
@@ -1078,6 +1309,7 @@ function validateState(value: unknown): GameState | null {
   ];
   if (collections.some((collection) => !hasUniqueIds(collection))) return null;
   if (new Set(state.researchDone).size !== state.researchDone.length) return null;
+  if (new Set(state.claimedMilestones).size !== state.claimedMilestones.length) return null;
   if (new Set(state.spectrum.map((entry) => entry.band)).size !== state.spectrum.length) return null;
 
   const districtIds = new Set(state.districts.map((entry) => entry.id));
@@ -1091,6 +1323,17 @@ function validateState(value: unknown): GameState | null {
   const incidentById = new Map(state.incidents.map((entry) => [entry.id, entry]));
   const maintenanceById = new Map(state.maintenanceOrders.map((entry) => [entry.id, entry]));
   const referencesValid =
+    [...state.competition.operations, ...state.competition.history, ...state.competition.moves].every((o) =>
+      districtIds.has(o.districtId),
+    ) &&
+    state.competition.snapshots.every((p) => p.districts.every((d) => districtIds.has(d.id))) &&
+    state.procurement.tenders.every((t) => districtIds.has(t.districtId)) &&
+    (!state.strategy.decision || districtIds.has(state.strategy.decision.districtId)) &&
+    state.strategy.developments.every(
+      (d) =>
+        districtIds.has(d.districtId) && d.buildingIds.every((id) => buildingById.get(id)?.districtId === d.districtId),
+    ) &&
+    !state.strategy.acquisitions.some((a) => state.competitors.some((c) => c.id === a.rivalId)) &&
     state.buildings.every((entry) => districtIds.has(entry.districtId)) &&
     state.nodes.every((entry) => districtIds.has(entry.districtId)) &&
     state.links.every((entry) => entry.aId !== entry.bId && nodeIds.has(entry.aId) && nodeIds.has(entry.bId)) &&
@@ -1199,11 +1442,11 @@ function validateState(value: unknown): GameState | null {
   return state;
 }
 
-function normalizeAndValidate(state: LegacyState) {
+export function normalizeAndValidate(state: LegacyState) {
   return validateState(normalizeIncidentReferences(normalizePortfolioReferences(state)));
 }
 
-function parseSaveSlot(value: unknown): { version: number; savedAt: number; state: LegacyState } | null {
+export function parseSaveSlot(value: unknown): { version: number; savedAt: number; state: LegacyState } | null {
   if (!isRecord(value) || !isVersion(value.version) || !isNumber(value.savedAt, 0) || !isRecord(value.state))
     return null;
   return { version: value.version, savedAt: value.savedAt, state: value.state };
@@ -1234,113 +1477,6 @@ export function migrate(state: LegacyState, fromVersion: number): GameState | nu
       if (!Array.isArray(current[key])) return null;
     }
     return normalizeAndValidate(current);
-  } catch {
-    return null;
-  }
-}
-
-export const SAVE_SLOT_COUNT = 3;
-
-const keyForSlot = (slot: number) => (slot === 0 ? SAVE_KEY : `${SAVE_KEY}-slot-${slot + 1}`);
-const safeSlot = (slot: number) => Math.max(0, Math.min(SAVE_SLOT_COUNT - 1, Math.floor(slot)));
-
-export function saveGame(state: GameState, slot = 0) {
-  try {
-    const normalized = normalizeAndValidate(state as unknown as LegacyState);
-    if (!normalized) return false;
-    const payload: SaveSlot = { version: SAVE_VERSION, savedAt: Date.now(), state: normalized };
-    localStorage.setItem(keyForSlot(safeSlot(slot)), JSON.stringify(payload));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function loadGame(slot = 0): GameState | null {
-  try {
-    const raw = localStorage.getItem(keyForSlot(safeSlot(slot)));
-    if (!raw) return null;
-    const payload = parseSaveSlot(JSON.parse(raw));
-    return payload ? migrate(payload.state, payload.version) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function hasSave(slot = 0) {
-  try {
-    return localStorage.getItem(keyForSlot(safeSlot(slot))) !== null;
-  } catch {
-    return false;
-  }
-}
-
-export interface SaveMeta {
-  slot: number;
-  savedAt: number;
-  company: string;
-  city: string;
-  customers: number;
-  minutes: number;
-}
-
-export function saveMeta(slot = 0): SaveMeta | null {
-  try {
-    const resolvedSlot = safeSlot(slot);
-    const raw = localStorage.getItem(keyForSlot(resolvedSlot));
-    if (!raw) return null;
-    const payload = parseSaveSlot(JSON.parse(raw));
-    if (!payload) return null;
-    const state = migrate(payload.state, payload.version);
-    if (!state) return null;
-    const fixedSubs = state.buildings.reduce(
-      (s, b) => (b.segment === 'residential' ? s + b.households * b.connected : s),
-      0,
-    );
-    const mobileSubs = state.districts.reduce((sum, district) => sum + district.mobileSubs, 0);
-    return {
-      slot: resolvedSlot,
-      savedAt: payload.savedAt,
-      company: state.companyName,
-      city: state.cityName,
-      customers: Math.round(fixedSubs + mobileSubs) + state.contracts.length,
-      minutes: state.minutes,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function listSaveMeta() {
-  return Array.from({ length: SAVE_SLOT_COUNT }, (_, slot) => saveMeta(slot));
-}
-
-export function clearSave(slot = 0) {
-  try {
-    localStorage.removeItem(keyForSlot(safeSlot(slot)));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function exportSave(slot = 0): string | null {
-  try {
-    return localStorage.getItem(keyForSlot(safeSlot(slot)));
-  } catch {
-    return null;
-  }
-}
-
-export function importSave(raw: string, slot = 0): GameState | null {
-  try {
-    const parsed = parseSaveSlot(JSON.parse(raw));
-    if (!parsed) return null;
-    const state = migrate(parsed.state, parsed.version);
-    if (!state) return null;
-    const payload: SaveSlot = { version: SAVE_VERSION, savedAt: Date.now(), state };
-    localStorage.setItem(keyForSlot(safeSlot(slot)), JSON.stringify(payload));
-    return state;
   } catch {
     return null;
   }

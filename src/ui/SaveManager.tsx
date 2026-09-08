@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { clearSave, exportSave, importSave, listSaveMeta, SAVE_SLOT_COUNT } from '../game/save';
+import { clearSave, exportSave, importSave, listSaveMeta, SAVE_SLOT_COUNT } from '../game/saveStorage';
 import { useGame } from '../store/gameStore';
+import { useDialogAccessibility } from './useDialogAccessibility';
 
 type SaveMeta = NonNullable<ReturnType<typeof listSaveMeta>[number]>;
 type ManagerStatus = { tone: 'good' | 'bad' | 'info'; text: string };
@@ -30,10 +31,13 @@ export default function SaveManager() {
   const close = useGame((s) => s.setShowSaveManager);
   const saveToSlot = useGame((s) => s.saveToSlot);
   const active = useGame((s) => s.activeSaveSlot);
+  const locale = useGame((s) => s.locale);
+  const isTr = locale === 'tr';
   const [metas, setMetas] = useState(() => listSaveMeta());
   const [importSlot, setImportSlot] = useState(() => firstInactiveSlot(active));
   const [status, setStatus] = useState<ManagerStatus | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const dialogRef = useDialogAccessibility(open, () => close(false));
   useEffect(() => {
     if (open) {
       setMetas(listSaveMeta());
@@ -104,25 +108,33 @@ export default function SaveManager() {
       onMouseDown={(e) => e.target === e.currentTarget && close(false)}
     >
       <div
+        ref={dialogRef}
         className="panel max-h-[calc(100dvh-2rem)] w-full max-w-[620px] overflow-y-auto border-white/[0.14] p-5 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="save-manager-title"
         aria-describedby="save-manager-description"
+        tabIndex={-1}
       >
         <div className="flex items-start justify-between">
           <div>
-            <div className="section-title text-neon-cyan">Save archive</div>
+            <div className="section-title text-neon-cyan">{isTr ? 'Kayıt arşivi' : 'Save archive'}</div>
             <h2 id="save-manager-title" className="font-display text-2xl font-semibold uppercase">
-              Network snapshots
+              {isTr ? 'Şebeke kayıtları' : 'Network snapshots'}
             </h2>
           </div>
-          <button className="icon-button" onClick={() => close(false)} aria-label="Close save manager">
+          <button
+            className="icon-button"
+            onClick={() => close(false)}
+            aria-label={isTr ? 'Kayıt yöneticisini kapat' : 'Close save manager'}
+          >
             ×
           </button>
         </div>
         <p id="save-manager-description" className="mt-1 text-[12px] text-white/[0.42]">
-          Autosave follows the active slot once per in-game day.
+          {isTr
+            ? 'Otomatik kayıt her oyun gününde etkin yuvayı günceller.'
+            : 'Autosave follows the active slot once per in-game day.'}
         </p>
         <div className="mt-4 grid gap-2">
           {Array.from({ length: SAVE_SLOT_COUNT }, (_, slot) => {
@@ -138,21 +150,25 @@ export default function SaveManager() {
                   </div>
                   <div className="min-w-[150px] flex-1">
                     <div className="flex items-center gap-2 text-sm font-semibold">
-                      <span>{meta?.company ?? 'Empty slot'}</span>
-                      {active === slot && <span className="chip text-[9px] text-neon-cyan">ACTIVE</span>}
+                      <span>{meta?.company ?? (isTr ? 'Boş yuva' : 'Empty slot')}</span>
+                      {active === slot && (
+                        <span className="chip text-[9px] text-neon-cyan">{isTr ? 'ETKİN' : 'ACTIVE'}</span>
+                      )}
                     </div>
                     <div className="num text-[10px] text-white/[0.38]">
                       {meta
-                        ? `${meta.city} · ${meta.customers.toLocaleString()} customers · ${new Date(meta.savedAt).toLocaleString()}`
-                        : 'Ready for a new snapshot'}
+                        ? `${meta.city} · ${meta.customers.toLocaleString()} ${isTr ? 'müşteri' : 'customers'} · ${new Date(meta.savedAt).toLocaleString()}`
+                        : isTr
+                          ? 'Yeni kayıt için hazır'
+                          : 'Ready for a new snapshot'}
                     </div>
                   </div>
                   <button className="btn py-1.5 text-[11px]" onClick={() => saveHere(slot)}>
-                    Save here
+                    {isTr ? 'Buraya kaydet' : 'Save here'}
                   </button>
                   {meta && (
                     <button className="btn py-1.5 text-[11px]" onClick={() => exportSlot(slot)}>
-                      Export
+                      {isTr ? 'Dışa aktar' : 'Export'}
                     </button>
                   )}
                   {meta && slot !== active && (
@@ -161,7 +177,7 @@ export default function SaveManager() {
                       aria-label={`Delete ${meta.company} from slot ${slot + 1}`}
                       onClick={() => deleteSlot(slot)}
                     >
-                      Delete
+                      {isTr ? 'Sil' : 'Delete'}
                     </button>
                   )}
                 </div>
@@ -246,7 +262,7 @@ export default function SaveManager() {
               }}
             />
             <label htmlFor="save-manager-import-slot" className="stat-label">
-              Import to
+              {isTr ? 'İçe aktarılacak yuva' : 'Import to'}
             </label>
             <select
               id="save-manager-import-slot"
@@ -260,18 +276,24 @@ export default function SaveManager() {
             >
               {Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => (
                 <option key={i} value={i} disabled={i === active}>
-                  Slot {i + 1} — {i === active ? 'active game (unavailable)' : (metas[i]?.company ?? 'empty')}
+                  {isTr ? 'Yuva' : 'Slot'} {i + 1} -{' '}
+                  {i === active
+                    ? isTr
+                      ? 'etkin oyun (kullanılamaz)'
+                      : 'active game (unavailable)'
+                    : (metas[i]?.company ?? (isTr ? 'boş' : 'empty'))}
                 </option>
               ))}
             </select>
             <button className="btn" onClick={() => input.current?.click()}>
-              Choose save file
+              {isTr ? 'Kayıt dosyası seç' : 'Choose save file'}
             </button>
             <span className="ml-auto num text-[10px] text-white/30">FORMAT / JSON · VERSIONED</span>
           </div>
           <p id="active-import-note" className="mt-2 text-[11px] text-white/45">
-            Slot {active + 1} is the running game and cannot be imported over; its next autosave would replace the
-            imported snapshot.
+            {isTr
+              ? `Yuva ${active + 1} çalışan oyundur ve üzerine içe aktarma yapılamaz. Bir sonraki otomatik kayıt içe aktarılan kaydın yerini alır.`
+              : `Slot ${active + 1} is the running game and cannot be imported over; its next autosave would replace the imported snapshot.`}
           </p>
           {status && (
             <div
