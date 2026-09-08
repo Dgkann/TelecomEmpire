@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import { SMART_PAUSE_OPTIONS, type SmartPauseEvent } from '../game/smartPause';
 import { fmtClock } from '../game/simulation';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 function SettingsDialog({ close }: { close: () => void }) {
+  const locale = useGame((s) => s.locale);
   const preferences = useGame((s) => s.smartPause);
   const setPreference = useGame((s) => s.setSmartPause);
   const [status, setStatus] = useState('');
@@ -22,10 +24,8 @@ function SettingsDialog({ close }: { close: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/10 bg-[#19333f] p-5">
-          <h2 className="text-xl font-semibold">Stop when a decision matters</h2>
-          <p className="mt-2 text-sm leading-relaxed text-white/60">
-            Choose which new events pause the simulation, even at 4× speed.
-          </p>
+          <h2 className="text-xl font-semibold">{t(locale, 'stopWhenDecisionMatters')}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-white/60">{t(locale, 'smartPauseBlurb')}</p>
         </div>
         <div className="p-5">
           <fieldset>
@@ -64,7 +64,7 @@ function SettingsDialog({ close }: { close: () => void }) {
           <button className="btn mt-4 w-full" onClick={close}>
             Done
           </button>
-          <p className="mt-2 text-center text-[11px] text-white/45">The game is paused. Resume when you are ready.</p>
+          <p className="mt-2 text-center text-[11px] text-white/45">{t(locale, 'gamePausedResume')}</p>
         </div>
       </div>
     </div>,
