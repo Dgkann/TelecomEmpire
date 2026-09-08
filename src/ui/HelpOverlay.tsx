@@ -35,10 +35,45 @@ const SECTIONS = [
   },
 ];
 
+const SECTIONS_TR = [
+  {
+    title: 'Temel döngü',
+    lines: [
+      'Bir ilçeye POP kur, çekirdek yönlendiriciye fiber çek ve müşterilerin abone olmasını izle.',
+      'Gelir yeni kapasiteyi finanse eder. Daha fazla kapasite daha fazla müşteriyi taşır. Sonraki ilçede tekrarla.',
+    ],
+  },
+  {
+    title: 'Haritayı okumak',
+    lines: [
+      'Fiber rengi kullanımı gösterir: yüzde 50 altı yeşil, yüzde 75 sarı, yüzde 90 turuncu ve üzeri kırmızı.',
+      'Haneler abone oldukça binalar camgöbeği olur. Parlayan nokta binanın şebekende olduğunu gösterir.',
+      'Trafik 18:00 ile 23:00 arasında yaklaşık iki katına çıkar.',
+    ],
+  },
+  {
+    title: 'Arıza olduğunda',
+    lines: [
+      'Arızalar noktaları veya hatları hizmet dışı bırakır. Ekip göndermek için alarma tıkla.',
+      'Acil onarım çok daha pahalıdır ancak kesinti süresini ciddi biçimde azaltır.',
+      'Tek fiber yolu olan nokta hat kesilince kapanır. İkinci rota bu riski önler.',
+    ],
+  },
+  {
+    title: 'Kontroller',
+    lines: [
+      'Haritayı sürükle, yakınlaştırmak için kaydır ve ayrıntılar için bir öğeye tıkla.',
+      'Space duraklatır. 1 / 2 / 3 oyun hızını ayarlar. Esc kurulumu iptal eder.',
+    ],
+  },
+];
+
 export default function HelpOverlay() {
   const show = useGame((s) => s.showHelp);
   const setShow = useGame((s) => s.setShowHelp);
+  const locale = useGame((s) => s.locale);
   const dialogRef = useDialogAccessibility(show, () => setShow(false));
+  const sections = locale === 'tr' ? SECTIONS_TR : SECTIONS;
 
   return (
     <AnimatePresence>
@@ -63,10 +98,10 @@ export default function HelpOverlay() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="help-title" className="text-xl font-bold">
-              How to play
+              {locale === 'tr' ? 'Nasıl oynanır' : 'How to play'}
             </h2>
             <div className="mt-4 space-y-5">
-              {SECTIONS.map((s) => (
+              {sections.map((s) => (
                 <div key={s.title}>
                   <div className="text-[11px] uppercase tracking-widest text-neon-cyan">{s.title}</div>
                   <ul className="mt-1.5 space-y-1.5">
@@ -80,7 +115,7 @@ export default function HelpOverlay() {
               ))}
             </div>
             <button className="btn-primary mt-6 w-full" onClick={() => setShow(false)}>
-              Got it
+              {locale === 'tr' ? 'Anladım' : 'Got it'}
             </button>
           </motion.div>
         </motion.div>
