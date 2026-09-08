@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import CapacityLab from '../CapacityLab';
 import { motion } from 'framer-motion';
 import { BACKUP_TRANSIT_MONTHLY, SPECTRUM_BANDS, TRANSIT_TIERS, towerRadius, utilColor } from '../../game/constants';
 import { fmtMoney, fmtNum, monthlyBreakdown } from '../../game/economy';
@@ -38,10 +39,11 @@ function Meter({ v, label, right }: { v: number; label: string; right: string })
   );
 }
 
-type NetworkView = 'live' | 'policy' | 'capacity' | 'operations' | 'interconnect';
+type NetworkView = 'live' | 'lab' | 'policy' | 'capacity' | 'operations' | 'interconnect';
 
 const NETWORK_VIEWS: Array<{ id: NetworkView; label: string; note: string }> = [
   { id: 'live', label: 'Live', note: 'Quality & delivery' },
+  { id: 'lab', label: 'Network Lab', note: 'Stress test & upgrade' },
   { id: 'policy', label: 'Policy', note: 'QoS & peering' },
   { id: 'capacity', label: 'Capacity', note: 'Sites & forecast' },
   { id: 'operations', label: 'Operations', note: 'Maintenance' },
@@ -148,7 +150,10 @@ export default function NetworkScreen() {
               key={view.id}
               role="tab"
               aria-selected={networkView === view.id}
-              onClick={() => setNetworkView(view.id)}
+              onClick={() => {
+                if (view.id === 'lab') useGame.getState().setSpeed(0);
+                setNetworkView(view.id);
+              }}
               className={`min-w-[112px] flex-1 rounded-sm border px-3 py-2 text-left transition-colors ${
                 networkView === view.id
                   ? 'border-neon-cyan/45 bg-neon-cyan/[0.1] text-white'
@@ -161,6 +166,7 @@ export default function NetworkScreen() {
           ))}
         </div>
 
+        {networkView === 'lab' && <CapacityLab />}
         <div className={`panel panel-tone-blue p-5 lg:col-span-2 ${networkView === 'live' ? '' : 'hidden'}`}>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
@@ -1003,7 +1009,7 @@ export default function NetworkScreen() {
               <div className="text-sm font-medium">Automatic technician dispatch</div>
               <div className="text-[11px] text-white/45">
                 {mods.hasAutoDispatch
-                  ? 'Crews roll to faults without waiting for you.'
+                  ? 'Highest recorded customer impact first; sends the crew with the fastest travel + repair time.'
                   : 'Requires Automatic Dispatch research.'}
               </div>
             </div>
