@@ -1,9 +1,11 @@
 import type { FailureReport } from '../game/failureDrill';
 import type { GameState } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { isoX, isoY, tileDiamond } from './iso';
 
 export function FailureFootprint({ game, report }: { game: GameState; report: FailureReport }) {
+  const locale = useGame((s) => s.locale);
   const affected = report.districts.filter((d) => d.loss > 0.001 || d.disconnectedSites > 0);
   return (
     <g aria-label="Simulated failure footprint" style={{ pointerEvents: 'none' }}>
@@ -45,7 +47,7 @@ export function FailureFootprint({ game, report }: { game: GameState; report: Fa
             strokeWidth={3}
             paintOrder="stroke"
           >
-            Would disconnect
+            {t(locale, 'wouldDisconnect')}
           </text>
         </g>
       ))}
@@ -54,6 +56,7 @@ export function FailureFootprint({ game, report }: { game: GameState; report: Fa
 }
 
 export default function FailureDrillPanel({ report }: { report: FailureReport }) {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const end = useGame((s) => s.endFailureDrill);
   const target =
@@ -66,13 +69,13 @@ export default function FailureDrillPanel({ report }: { report: FailureReport })
       className="panel absolute bottom-3 left-3 right-3 z-30 border-orange-300/40 p-4 lg:bottom-auto lg:right-auto lg:top-3 lg:w-[280px]"
     >
       <div className="flex justify-between gap-2">
-        <h2 className="text-sm font-semibold text-orange-200">Failure drill</h2>
-        <span className="text-[10px] text-white/55">Paused · hypothetical</span>
+        <h2 className="text-sm font-semibold text-orange-200">{t(locale, 'failureDrill')}</h2>
+        <span className="text-[10px] text-white/55">{t(locale, 'pausedHypothetical')}</span>
       </div>
       <p className="mt-1 truncate text-xs text-white/65">{target}</p>
       <div className="my-3 flex items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] text-white/50">Residential peak delivery</div>
+          <div className="text-[10px] text-white/50">{t(locale, 'residentialPeakDelivery')}</div>
           <strong className="text-xl text-teal-200">
             {ratio(report.before.served)}% <span className="text-white/30">→</span>{' '}
             <span className={report.lostGbps > 0.001 ? 'text-orange-200' : 'text-teal-200'}>
@@ -113,7 +116,7 @@ export default function FailureDrillPanel({ report }: { report: FailureReport })
         the simulated impact; the real network is unchanged.
       </p>
       <button className="btn-primary mt-3 w-full text-xs" onClick={end}>
-        End drill
+        {t(locale, 'endDrill')}
       </button>
     </section>
   );
