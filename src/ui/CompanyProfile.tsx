@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import { COMPANY_EMBLEMS, companyIdentityIssue } from '../game/identity';
 import { RANKS, meetsRank, rankOf } from '../game/progression';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 function ProfileDialog({ onClose }: { onClose: () => void }) {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const update = useGame((s) => s.updateIdentity);
   const setScreen = useGame((s) => s.setScreen);
@@ -49,7 +51,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                 {game.cityName} · {rankOf(game).name}
               </p>
               <h2 className="mt-1 break-words text-xl font-semibold">{name.trim() || game.companyName}</h2>
-              <p className="mt-1 text-xs text-white/50">Your company, from its first connection to a global network.</p>
+              <p className="mt-1 text-xs text-white/50">{t(locale, 'companyJourneyBlurb')}</p>
             </div>
           </div>
           <button className="btn shrink-0 px-2 text-xs" aria-label="Close company profile" onClick={onClose}>
@@ -63,7 +65,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
               aria-expanded={editing}
               onClick={() => setEditing(!editing)}
             >
-              <span>Company identity</span>
+              <span>{t(locale, 'companyIdentity')}</span>
               <span className="text-xs text-neon-cyan">{editing ? 'Hide editor −' : 'Edit name & emblem +'}</span>
             </button>
             {editing && (
@@ -90,7 +92,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                   />
                 </label>
                 <fieldset>
-                  <legend className="mb-2 text-xs text-white/60">Company emblem</legend>
+                  <legend className="mb-2 text-xs text-white/60">{t(locale, 'companyEmblem')}</legend>
                   <div className="flex flex-wrap gap-2">
                     {COMPANY_EMBLEMS.map((emblem) => (
                       <label
@@ -122,9 +124,9 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                 )}
                 <div className="flex flex-wrap items-center gap-3">
                   <button className="btn-primary text-xs" disabled={!!issue || !changed}>
-                    Apply identity
+                    {t(locale, 'applyIdentity')}
                   </button>
-                  <p className="text-[11px] text-white/45">Free to change. Included in your game saves.</p>
+                  <p className="text-[11px] text-white/45">{t(locale, 'freeToChange')}</p>
                 </div>
                 <p role="status" className="text-xs text-neon-cyan">
                   {status}
@@ -133,10 +135,8 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
             )}
           </section>
           <section className="border-t border-white/10 pt-4" aria-label="Operator journey">
-            <h3 className="font-semibold">Your operator journey</h3>
-            <p className="mt-1 text-xs text-white/55">
-              Inspect a level to see its requirements. Promotions are checked once per game day, one level at a time.
-            </p>
+            <h3 className="font-semibold">{t(locale, 'yourOperatorJourney')}</h3>
+            <p className="mt-1 text-xs text-white/55">{t(locale, 'inspectLevelBlurb')}</p>
             <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-5" role="group" aria-label="Operator levels">
               {RANKS.map((r, index) => (
                 <button
@@ -165,14 +165,12 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
               </div>
               <div className="text-left text-xs sm:text-right">
                 <strong className="text-neon-amber">×{rank.creditMultiplier.toFixed(1)} credit multiplier</strong>
-                <p className="mt-1 text-[11px] text-white/40">Credit also depends on company finances.</p>
+                <p className="mt-1 text-[11px] text-white/40">{t(locale, 'creditDependsOnFinances')}</p>
               </div>
             </div>
-            {selectedRank === 1 && (
-              <p className="mt-3 text-xs text-neon-cyan">City charters become available after day 30.</p>
-            )}
+            {selectedRank === 1 && <p className="mt-3 text-xs text-neon-cyan">{t(locale, 'chartersAfterDay30')}</p>}
             {selectedRank === 2 && (
-              <p className="mt-3 text-xs text-neon-cyan">Company acquisitions become available at this level.</p>
+              <p className="mt-3 text-xs text-neon-cyan">{t(locale, 'acquisitionsAtThisLevel')}</p>
             )}
             {earned ? (
               <p className="mt-4 rounded border border-neon-cyan/20 bg-neon-cyan/5 p-3 text-sm text-neon-cyan">
@@ -204,7 +202,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                           <div className="h-full bg-neon-cyan" style={{ width: `${progress * 100}%` }} />
                         </div>
                         {progress >= 1 ? (
-                          <span className="text-[11px] text-neon-cyan">Requirement met</span>
+                          <span className="text-[11px] text-neon-cyan">{t(locale, 'requirementMet')}</span>
                         ) : (
                           <button
                             className="btn text-xs"
@@ -223,26 +221,18 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                     );
                   })}
                 </ul>
-                {planning && (
-                  <p className="text-xs text-neon-amber">
-                    Finish your network plan or failure drill before navigating to another activity.
-                  </p>
-                )}
+                {planning && <p className="text-xs text-neon-amber">{t(locale, 'finishPlanFirst')}</p>}
                 {selectedRank === game.rank + 1 && meetsRank(game, rank) && (
-                  <p className="mt-3 text-sm text-neon-cyan">
-                    All requirements met. Keep them met until the next daily review to earn your promotion.
-                  </p>
+                  <p className="mt-3 text-sm text-neon-cyan">{t(locale, 'allRequirementsMet')}</p>
                 )}
                 {selectedRank > game.rank + 1 && (
-                  <p className="mt-3 text-xs text-white/50">
-                    Requirements show your current progress; earn the earlier levels first.
-                  </p>
+                  <p className="mt-3 text-xs text-white/50">{t(locale, 'earnEarlierLevels')}</p>
                 )}
               </>
             )}
           </section>
           <p className="border-t border-white/10 pt-3 text-[11px] text-white/45">
-            The simulation is paused. Resume with the speed controls when you are ready.
+            {t(locale, 'simulationPausedResume')}
           </p>
         </div>
       </div>
