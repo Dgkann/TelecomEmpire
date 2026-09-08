@@ -75,12 +75,24 @@ export function tenderProgress(state: GameState, tender: CityTender) {
   };
 }
 
-export function tenderBidIssue(state: GameState, tender: CityTender | undefined, price: number) {
-  if (state.gameOver) return 'This company has closed.';
-  if (!tender || tender.status !== 'open' || state.minutes >= tender.closesAt) return 'Bidding has closed.';
+export function tenderBidIssue(
+  state: GameState,
+  tender: CityTender | undefined,
+  price: number,
+  locale: 'en' | 'tr' = 'en',
+) {
+  const tr = locale === 'tr';
+  if (state.gameOver) return tr ? 'Bu şirket kapandı.' : 'This company has closed.';
+  if (!tender || tender.status !== 'open' || state.minutes >= tender.closesAt)
+    return tr ? 'Teklif verme süresi kapandı.' : 'Bidding has closed.';
   if (!Number.isInteger(price) || price < Math.ceil(tender.budget * 0.65) || price > tender.budget)
-    return 'Bid between 65% and 100% of the published budget.';
-  if (state.money + tender.bond < bidBond(price)) return 'Not enough cash for the refundable 10% performance bond.';
+    return tr
+      ? 'İlan edilen bütçenin %65 ile %100 arasında teklif ver.'
+      : 'Bid between 65% and 100% of the published budget.';
+  if (state.money + tender.bond < bidBond(price))
+    return tr
+      ? 'İade edilebilir %10 teminat için nakit yetersiz.'
+      : 'Not enough cash for the refundable 10% performance bond.';
   return null;
 }
 export function submitTenderBid(original: GameState, id: string, price: number): GameState | null {

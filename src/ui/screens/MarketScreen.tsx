@@ -116,7 +116,7 @@ function DistrictDesk({ id }: { id: string }) {
   const growth = customerGrowthSnapshot(game, district);
   const pull = districtPull(game, district);
   const cost = operationCost(game, id, kind);
-  const issue = operationIssue(game, id, kind);
+  const issue = operationIssue(game, id, kind, locale);
   const preview = (() => {
     const hypothetical = {
       ...game,

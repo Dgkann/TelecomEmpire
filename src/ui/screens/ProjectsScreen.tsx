@@ -67,7 +67,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
   const spec = TENDER_PROGRAMMES[tender.kind];
   const district = game.districts.find((d) => d.id === tender.districtId)!;
   const progress = useMemo(() => tenderProgress(game, tender), [game, tender]);
-  const issue = tenderBidIssue(game, tender, price);
+  const issue = tenderBidIssue(game, tender, price, locale);
   const phase = tender.status === 'open' ? 0 : tender.status === 'delivery' ? 1 : 2;
   const inspect = () => {
     focus(district.center.gx, district.center.gy);

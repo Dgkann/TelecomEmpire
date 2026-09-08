@@ -22,7 +22,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
   const ref = useDialogAccessibility(true, onClose);
   const rank = RANKS[selectedRank];
   const earned = selectedRank <= game.rank;
-  const issue = companyIdentityIssue(name);
+  const issue = companyIdentityIssue(name, locale);
   const changed = name.trim() !== game.companyName || logo !== game.logo;
   return createPortal(
     <div

@@ -68,14 +68,24 @@ export function operationCost(s: GameState, districtId: string, kind: MarketTact
   const d = s.districts.find((d) => d.id === districtId);
   return Math.round(MARKET_TACTICS[kind].cost * clamp((d?.potential ?? 2000) / 2000, 0.75, 2));
 }
-export function operationIssue(s: GameState, districtId: string, kind: MarketTactic) {
-  if (s.gameOver) return 'This company has closed.';
+export function operationIssue(s: GameState, districtId: string, kind: MarketTactic, locale: 'en' | 'tr' = 'en') {
+  const tr = locale === 'tr';
+  if (s.gameOver) return tr ? 'Bu şirket kapandı.' : 'This company has closed.';
   const d = s.districts.find((d) => d.id === districtId);
-  if (!d?.unlocked || d.coverage < 0.05) return 'License this district and establish at least 5% fixed coverage first.';
+  if (!d?.unlocked || d.coverage < 0.05)
+    return tr
+      ? 'Önce bu ilçenin lisansını al ve en az %5 sabit kapsama kur.'
+      : 'License this district and establish at least 5% fixed coverage first.';
   if (s.competition.operations.some((o) => o.districtId === districtId))
-    return 'Finish or end the current district operation first.';
-  if (s.competition.operations.length >= 3) return 'Your commercial team can run three district operations at a time.';
-  if (s.money < operationCost(s, districtId, kind)) return 'Not enough cash for the full 14-day programme.';
+    return tr
+      ? 'Önce bu ilçedeki mevcut operasyonu bitir veya sonlandır.'
+      : 'Finish or end the current district operation first.';
+  if (s.competition.operations.length >= 3)
+    return tr
+      ? 'Ticari ekibin aynı anda üç ilçe operasyonu yürütebilir.'
+      : 'Your commercial team can run three district operations at a time.';
+  if (s.money < operationCost(s, districtId, kind))
+    return tr ? '14 günlük programın tamamı için nakit yetersiz.' : 'Not enough cash for the full 14-day programme.';
   return null;
 }
 const log = (s: GameState, text: string, tone: 'good' | 'bad' | 'info' = 'info') => {

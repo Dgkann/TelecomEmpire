@@ -11,11 +11,12 @@ export const COMPANY_EMBLEMS = [
   { symbol: '🚀', name: 'Rocket' },
 ] as const;
 
-export function companyIdentityIssue(name: string) {
-  if (!name.trim()) return 'Enter a company name.';
-  if (name.trim().length > 240) return 'Use 240 characters or fewer.';
+export function companyIdentityIssue(name: string, locale: 'en' | 'tr' = 'en') {
+  const tr = locale === 'tr';
+  if (!name.trim()) return tr ? 'Bir şirket adı gir.' : 'Enter a company name.';
+  if (name.trim().length > 240) return tr ? '240 karakter veya daha kısa kullan.' : 'Use 240 characters or fewer.';
   if (Array.from(name).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
-    return 'Use a single line without control characters.';
+    return tr ? 'Kontrol karakteri içermeyen tek satır kullan.' : 'Use a single line without control characters.';
   return null;
 }
 
