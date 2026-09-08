@@ -13,11 +13,14 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tools/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tools/**/*.ts\"",
     "e2e": "playwright test",
-    "check": "esbuild tools/checks.ts --bundle --platform=node --format=esm --define:import.meta.env.DEV=false --outfile=node_modules/.cache/checks.mjs --log-level=error && node node_modules/.cache/checks.mjs",
+    "performance": "playwright test --config playwright.performance.config.ts",
+    "performance:network": "esbuild tools/network-benchmark.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/network-benchmark.mjs --log-level=error && node node_modules/.cache/network-benchmark.mjs",
+    "check": "esbuild tools/checks.ts --bundle --platform=node --format=esm --define:import.meta.env.VITE_E2E=false --outfile=node_modules/.cache/checks.mjs --log-level=error && node node_modules/.cache/checks.mjs",
     "balance": "esbuild tools/balance.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs",
     "mobile-check": "esbuild tools/mobile-check.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/mobile.mjs --log-level=error && node node_modules/.cache/mobile.mjs",
     "audit": "npm audit --audit-level=moderate",
-    "verify-commits": "bash tools/verify-commits.sh"
+    "verify-commits": "bash tools/verify-commits.sh",
+    "build:e2e": "tsc -b && vite build --mode e2e --outDir dist-e2e"
   },
   "dependencies": {
     "framer-motion": "^11.11.9",
