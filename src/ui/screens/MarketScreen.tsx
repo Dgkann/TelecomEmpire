@@ -1,0 +1,541 @@
+import { useState } from 'react';
+import { useGame } from '../../store/gameStore';
+import { districtPull, rivalPosture, rivalArpu } from '../../game/competitors';
+import { customerGrowthSnapshot } from '../../game/simulation';
+import {
+  MARKET_TACTICS,
+  RIVAL_MOVES,
+  OPERATION_MINUTES,
+  districtFixedCustomers,
+  operationCost,
+  operationIssue,
+  marketEffects,
+  servicePromiseReady,
+} from '../../game/competition';
+import { MINUTES_PER_DAY } from '../../game/constants';
+import { fmtMoneyExact } from '../../game/economy';
+import type { GameState, MarketTactic } from '../../game/types';
+import TrendChart from '../TrendChart';
+
+const signed = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(1);
+const daysLeft = (at: number, now: number) => Math.max(0, (at - now) / MINUTES_PER_DAY).toFixed(1);
+const colours = { player: '#80c6b8', unserved: '#344954' };
+
+function MarketMap({
+  game,
+  selected,
+  onSelect,
+}: {
+  game: GameState;
+  selected: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <svg
+      viewBox={`-1 -1 ${game.gridSize + 2} ${game.gridSize + 2}`}
+      className="mx-auto aspect-square w-full max-w-[410px]"
+      aria-label="District competition map"
+      role="group"
+    >
+      {game.districts.map((d) => {
+        const pull = districtPull(game, d);
+        const rival = [...pull.rivals].sort((a, b) => b.pull - a.pull)[0];
+        const leader = !rival || pull.player >= rival.pull ? null : game.competitors.find((c) => c.id === rival.id);
+        const pressure = game.competition.moves.some((m) => m.districtId === d.id && m.endsAt > game.minutes);
+        return (
+          <g
+            key={d.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Inspect ${d.name}`}
+            aria-pressed={selected === d.id}
+            onClick={() => onSelect(d.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect(d.id);
+              }
+            }}
+            className="market-district cursor-pointer"
+            style={{ '--district-colour': leader?.color ?? colours.player } as React.CSSProperties}
+          >
+            {d.cells.map((c) => (
+              <rect
+                key={`${c.gx}-${c.gy}`}
+                x={c.gx}
+                y={c.gy}
+                width={0.93}
+                height={0.93}
+                rx={0.12}
+                fill={leader?.color ?? colours.player}
+                fillOpacity={selected === d.id ? 0.8 : 0.32}
+                stroke={selected === d.id ? '#e2f2ed' : 'transparent'}
+                strokeWidth={0.05}
+              />
+            ))}
+            <circle
+              cx={d.center.gx + 0.5}
+              cy={d.center.gy + 0.5}
+              r={pressure ? 1 : 0.6}
+              fill={pressure ? '#ed9e77' : '#102632'}
+              stroke={selected === d.id ? '#fff' : '#b2c7c8'}
+              strokeWidth={0.12}
+            />
+            {pressure && (
+              <text
+                x={d.center.gx + 0.5}
+                y={d.center.gy + 0.9}
+                fontSize={1.3}
+                textAnchor="middle"
+                fill="#172631"
+                fontWeight={700}
+              >
+                !
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function DistrictDesk({ id }: { id: string }) {
+  const game = useGame((s) => s.game)!;
+  const launch = useGame((s) => s.launchMarketOperation);
+  const end = useGame((s) => s.endMarketOperation);
+  const focus = useGame((s) => s.focus);
+  const select = useGame((s) => s.select);
+  const [kind, setKind] = useState<MarketTactic>('switchers');
+  const [message, setMessage] = useState('');
+  const district = game.districts.find((d) => d.id === id)!;
+  const current = game.competition.operations.find((o) => o.districtId === id);
+  const moves = game.competition.moves.filter((m) => m.districtId === id && m.endsAt > game.minutes);
+  const growth = customerGrowthSnapshot(game, district);
+  const pull = districtPull(game, district);
+  const cost = operationCost(game, id, kind);
+  const issue = operationIssue(game, id, kind);
+  const preview = (() => {
+    const hypothetical = {
+      ...game,
+      competition: {
+        ...game.competition,
+        operations: [
+          ...game.competition.operations.filter((o) => o.districtId !== id),
+          {
+            id: 'preview',
+            districtId: id,
+            kind,
+            startedAt: game.minutes,
+            endsAt: game.minutes + OPERATION_MINUTES,
+            cost,
+            baselineCustomers: 0,
+            qualifiedMinutes: 0,
+          },
+        ],
+      },
+    };
+    return customerGrowthSnapshot(hypothetical, district);
+  })();
+  const samples = game.competition.snapshots.flatMap((p) => {
+    const d = p.districts.find((d) => d.id === id);
+    return d ? [d.customers] : [];
+  });
+  const bars = [
+    { id: 'player', name: game.companyName, value: pull.player, color: colours.player },
+    ...pull.rivals.map((r) => ({
+      id: r.id,
+      name: game.competitors.find((c) => c.id === r.id)!.name,
+      value: r.pull,
+      color: game.competitors.find((c) => c.id === r.id)!.color,
+    })),
+  ].sort((a, b) => b.value - a.value);
+  return (
+    <section className="min-w-0" aria-label="District competition desk">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
+        <div>
+          <p className="text-xs text-white/50">District commercial desk</p>
+          <h2 className="market-heading mt-1">{district.name}</h2>
+        </div>
+        <button
+          className="btn text-xs"
+          onClick={() => {
+            focus(district.center.gx, district.center.gy);
+            select({ type: 'district', id });
+          }}
+        >
+          Inspect network
+        </button>
+      </div>
+      <dl className="my-4 grid grid-cols-3 gap-3 text-xs">
+        <div>
+          <dt className="text-white/50">Fixed customers</dt>
+          <dd className="mt-1 text-xl font-semibold">
+            {Math.round(districtFixedCustomers(game, id)).toLocaleString()}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-white/50">Fixed reach</dt>
+          <dd className="mt-1 text-xl font-semibold">{Math.round(district.coverage * 100)}%</dd>
+        </div>
+        <div>
+          <dt className="text-white/50">Satisfaction</dt>
+          <dd className="mt-1 text-xl font-semibold">
+            {district.satisfaction.toFixed(0)}
+            <span className="text-xs text-white/40"> /100</span>
+          </dd>
+        </div>
+      </dl>
+      {moves.map((m) => (
+        <div key={m.id} className="mb-3 rounded border-l-2 border-[#ed9e77] bg-[#ed9e77]/10 p-3 text-xs" role="note">
+          <strong className="text-[#f4b18f]">
+            {game.competitors.find((c) => c.id === m.rivalId)?.name ?? 'Rival'}: {RIVAL_MOVES[m.kind].title}
+          </strong>
+          <p className="mt-1 text-white/65">
+            {RIVAL_MOVES[m.kind].detail} {daysLeft(m.endsAt, game.minutes)} days remaining.
+          </p>
+        </div>
+      ))}
+      <div className="grid gap-5 md:grid-cols-2">
+        <section aria-label="Local market appeal">
+          <h3 className="text-sm font-semibold">Who wins the next decision?</h3>
+          <p className="mt-1 text-xs text-white/45">
+            Share of market appeal, including customers who do not switch. These are targets, not current subscriber
+            shares.
+          </p>
+          <div className="mt-3 space-y-3">
+            {bars.map((b) => (
+              <div key={b.id}>
+                <div className="mb-1 flex justify-between gap-2 text-xs">
+                  <span>{b.name}</span>
+                  <span>{((b.value / pull.total) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="h-2 rounded bg-white/5">
+                  <div
+                    className="h-full rounded"
+                    style={{ background: b.color, width: (b.value / pull.total) * 100 + '%' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section aria-label="District customer history">
+          <h3 className="text-sm font-semibold">Customer trajectory</h3>
+          <p className="mt-1 text-xs text-white/45">
+            Last {samples.length} daily observations. All market factors included.
+          </p>
+          {samples.length >= 2 ? (
+            <div className="mt-3">
+              <TrendChart
+                series={[{ label: 'Fixed customers', values: samples, color: colours.player }]}
+                formatValue={(n) => n.toFixed(0)}
+                height={105}
+              />
+            </div>
+          ) : (
+            <p className="mt-6 border-l-2 border-white/15 pl-3 text-xs text-white/45">
+              Daily samples appear as the city clock advances.
+            </p>
+          )}
+          <p className="mt-3 text-xs text-white/60">
+            Current model:{' '}
+            <strong className={growth.projectedDailyDelta >= 0 ? 'text-neon-cyan' : 'text-neon-red'}>
+              {signed(growth.projectedDailyDelta)} fixed customers/day
+            </strong>
+          </p>
+        </section>
+      </div>
+      <section
+        className="mt-6 rounded-lg border border-[#80c6b8]/25 bg-[#18323b] p-4 sm:p-5"
+        aria-label="Commercial operation"
+      >
+        {current ? (
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-xs text-neon-cyan">Operation in progress</p>
+                <h3 className="mt-1 text-lg font-semibold">{MARKET_TACTICS[current.kind].title}</h3>
+              </div>
+              <p className="text-sm text-neon-cyan">{daysLeft(current.endsAt, game.minutes)} days left</p>
+            </div>
+            <div
+              className="mt-4 h-1.5 rounded bg-black/20"
+              role="progressbar"
+              aria-label="Operation elapsed"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(Math.min(1, (game.minutes - current.startedAt) / OPERATION_MINUTES) * 100)}
+            >
+              <div
+                className="h-full rounded bg-neon-cyan"
+                style={{ width: Math.min(100, ((game.minutes - current.startedAt) / OPERATION_MINUTES) * 100) + '%' }}
+              />
+            </div>
+            <p className="mt-3 text-sm text-white/65">{MARKET_TACTICS[current.kind].detail}</p>
+            <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs">
+              <div>
+                <dt className="text-white/45">Programme paid</dt>
+                <dd>{fmtMoneyExact(current.cost)}</dd>
+              </div>
+              <div>
+                <dt className="text-white/45">Net fixed-customer change</dt>
+                <dd>{signed(districtFixedCustomers(game, id) - current.baselineCustomers)}</dd>
+              </div>
+              <div>
+                <dt className="text-white/45">Live appeal multiplier</dt>
+                <dd>{marketEffects(game, id).appeal.toFixed(2)}×</dd>
+              </div>
+            </dl>
+            {current.kind === 'service' && (
+              <div className="mt-4 border-t border-white/10 pt-3 text-xs">
+                <strong className={servicePromiseReady(game, id) ? 'text-neon-cyan' : 'text-neon-amber'}>
+                  {servicePromiseReady(game, id) ? 'Service standard met now' : 'Service standard not met'}
+                </strong>
+                <p className="mt-1 text-white/60">
+                  Qualified: {((current.qualifiedMinutes / OPERATION_MINUTES) * 100).toFixed(1)}% of the fortnight / 80%
+                  required. Network health {game.stats.health.toFixed(0)}%; district outage{' '}
+                  {game.stats.outages[id] ? 'active' : 'clear'}.
+                </p>
+                <p className="mt-2 text-white/50">{MARKET_TACTICS.service.tradeoff}</p>
+              </div>
+            )}
+            <button
+              className="btn mt-4 text-xs"
+              onClick={() =>
+                setMessage(
+                  end(current.id)
+                    ? 'Operation ended. The upfront cost is not refunded.'
+                    : 'Operation is no longer available.',
+                )
+              }
+            >
+              End operation · no refund{current.kind === 'service' ? ' · −3 reputation' : ''}
+            </button>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold">Choose your response</h3>
+            <p className="mt-1 text-xs text-white/55">
+              One operation per district, up to three citywide. Each lasts 14 days and is paid upfront.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Market response">
+              {(Object.keys(MARKET_TACTICS) as MarketTactic[]).map((k) => (
+                <label
+                  key={k}
+                  className={`cursor-pointer rounded border p-3 text-xs ${kind === k ? 'border-neon-cyan/50 bg-neon-cyan/10' : 'border-white/10'}`}
+                >
+                  <input
+                    type="radio"
+                    name="market-tactic"
+                    value={k}
+                    checked={kind === k}
+                    onChange={() => {
+                      setKind(k);
+                      setMessage('');
+                    }}
+                    className="mr-2 accent-teal-400"
+                  />
+                  {MARKET_TACTICS[k].title}
+                </label>
+              ))}
+            </div>
+            <p className="mt-3 text-sm text-white/80">{MARKET_TACTICS[kind].detail}</p>
+            <p className="mt-2 text-xs leading-relaxed text-white/50">{MARKET_TACTICS[kind].tradeoff}</p>
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-4">
+              <div>
+                <p className="text-xs text-white/50">Full programme cost</p>
+                <strong className="text-xl">{fmtMoneyExact(cost)}</strong>
+              </div>
+              <div className="text-xs">
+                <p className="text-white/50">Daily net change at today's conditions</p>
+                <p className="mt-1">
+                  <span>{signed(growth.projectedDailyDelta)}</span>
+                  <span className="mx-2 text-white/30">→</span>
+                  <strong className="text-neon-cyan">{signed(preview.projectedDailyDelta)} customers</strong>
+                </p>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-white/40">
+              A model estimate, not guaranteed growth. Prices, rival moves, service and capacity keep changing.
+            </p>
+            {issue && (
+              <p role="alert" className="mt-3 text-xs text-neon-amber">
+                {issue}
+              </p>
+            )}
+            <button
+              className="btn-primary mt-4 w-full sm:w-auto"
+              disabled={!!issue}
+              onClick={() =>
+                setMessage(
+                  launch(id, kind)
+                    ? 'Programme launched. Advance the clock to see its effect.'
+                    : 'Unable to launch. Review cash and district availability.',
+                )
+              }
+            >
+              Launch {MARKET_TACTICS[kind].title}
+            </button>
+          </>
+        )}
+        <p role="status" className="mt-2 text-xs text-neon-cyan">
+          {message}
+        </p>
+      </section>
+    </section>
+  );
+}
+
+export default function MarketScreen() {
+  const game = useGame((s) => s.game)!;
+  const setScreen = useGame((s) => s.setScreen);
+  const selected = useGame((s) => s.selection);
+  const [id, setId] = useState(
+    selected?.type === 'district' ? selected.id : game.districts.find((d) => d.unlocked)!.id,
+  );
+  const liveMoves = game.competition.moves.filter(
+    (m) => m.endsAt > game.minutes && game.competitors.some((c) => c.id === m.rivalId),
+  );
+  return (
+    <div className="screen-shell">
+      <div className="mx-auto max-w-[1360px] space-y-5">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold">The city is contested</h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/55">
+              Read local pressure. Back a commercial response with a network that can deliver.
+            </p>
+          </div>
+          <button className="btn text-xs" onClick={() => setScreen('company')}>
+            Company finances
+          </button>
+        </header>
+        <div className="market-command-grid grid items-start gap-5 xl:grid-cols-[330px_minmax(0,1fr)]">
+          <aside className="min-w-0 rounded-lg bg-[#132832] p-4" aria-label="City market board">
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <h2 className="font-semibold">District pressure</h2>
+              <span className={liveMoves.length ? 'text-[#ed9e77]' : 'text-white/40'}>
+                {liveMoves.length} rival moves
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-[110px_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[180px_minmax(0,1fr)] xl:block">
+              <MarketMap game={game} selected={id} onSelect={setId} />
+              <div className="space-y-1" role="group" aria-label="District selector">
+                {game.districts.map((d) => (
+                  <button
+                    key={d.id}
+                    aria-pressed={id === d.id}
+                    onClick={() => setId(d.id)}
+                    className={`flex w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-xs ${id === d.id ? 'bg-white/10 text-white' : 'text-white/55 hover:bg-white/5'}`}
+                  >
+                    <span>{d.name}</span>
+                    <span className={liveMoves.some((m) => m.districtId === d.id) ? 'text-[#ed9e77]' : 'text-white/40'}>
+                      {!d.unlocked
+                        ? 'Licence needed'
+                        : liveMoves.some((m) => m.districtId === d.id)
+                          ? 'Under pressure'
+                          : `${Math.round(districtFixedCustomers(game, d.id))} customers`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-white/45">
+              Colour shows the operator with the strongest local appeal. Amber markers flag an active rival offensive.
+            </p>
+            <p className="mt-4 border-t border-white/10 pt-3 text-xs text-white/45">
+              Commercial capacity: {game.competition.operations.length} / 3 operations
+            </p>
+          </aside>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-[#142b36] p-4 sm:p-6">
+            <DistrictDesk key={id} id={id} />
+          </div>
+        </div>
+        <section aria-label="Rival intelligence" className="rounded-lg border border-white/10 bg-[#142b36] p-4 sm:p-5">
+          <h2 className="market-heading">Rival intelligence</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {game.competitors.map((c) => {
+              const move = liveMoves.find((m) => m.rivalId === c.id);
+              const posture = rivalPosture(game, c);
+              return (
+                <article key={c.id} className="border-t-2 pt-3" style={{ borderColor: c.color }}>
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <h3 className="font-semibold" style={{ color: c.color }}>
+                      {c.name}
+                    </h3>
+                    <span className="text-xs text-white/45">{posture.label}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-white/55">{posture.detail}</p>
+                  <dl className="mt-3 flex flex-wrap gap-5 text-xs">
+                    <div>
+                      <dt className="text-white/40">Cash reserves</dt>
+                      <dd>{fmtMoneyExact(c.cash)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-white/40">Base monthly ARPU</dt>
+                      <dd>{fmtMoneyExact(rivalArpu(c))}</dd>
+                    </div>
+                  </dl>
+                  {move ? (
+                    <button
+                      className="mt-3 text-left text-xs text-[#ed9e77] underline underline-offset-4"
+                      onClick={() => {
+                        setId(move.districtId);
+                        document.querySelector('.market-command-grid')?.scrollIntoView({ block: 'start' });
+                      }}
+                    >
+                      {RIVAL_MOVES[move.kind].title} · {daysLeft(move.endsAt, game.minutes)}d
+                    </button>
+                  ) : (
+                    <p className="mt-3 text-xs text-white/35">No active district offensive.</p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+        <section className="rounded-lg border border-white/10 p-4 sm:p-5" aria-label="Operation results">
+          <h2 className="market-heading">After the campaign</h2>
+          <p className="mt-1 text-xs text-white/50">
+            Observed district results include the wider market and network changes; they are not a claim that the
+            programme caused every sign-up.
+          </p>
+          {game.competition.history.length ? (
+            <div className="mt-4 space-y-3">
+              {game.competition.history.map((o) => (
+                <article
+                  key={o.id}
+                  className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3 text-xs"
+                >
+                  <div>
+                    <strong className="text-sm">{MARKET_TACTICS[o.kind].title}</strong>
+                    <p className="mt-1 text-white/50">
+                      {game.districts.find((d) => d.id === o.districtId)?.name} ·{' '}
+                      {o.cancelled ? 'Ended early' : 'Completed'} · Day {Math.floor(o.finishedAt / MINUTES_PER_DAY) + 1}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2">
+                    <span>{fmtMoneyExact(o.cost)} spent</span>
+                    <span className={o.customerDelta >= 0 ? 'text-neon-cyan' : 'text-neon-red'}>
+                      {signed(o.customerDelta)} fixed customers
+                    </span>
+                    {o.reputationDelta !== 0 && (
+                      <span className={o.reputationDelta > 0 ? 'text-neon-cyan' : 'text-neon-red'}>
+                        {signed(o.reputationDelta)} reputation
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-5 text-sm text-white/40">
+              Complete an operation to compare the outcome with your starting position.
+            </p>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
