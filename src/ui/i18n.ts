@@ -335,6 +335,11 @@ const tr = {
   signingBonus: 'İmza primi',
   flexibleSla: 'Esnek SLA',
   premiumCounter: 'Primli karşı teklif',
+  campaignStageBlurb: 'Sonraki şehre geçmek için her hedefi tamamla.',
+  includeFibreToNearest: 'En yakın canlı noktaya fiber dahil et',
+  coverageSettlesBlurb: 'Kapsama zamanla oturur; abonelikler fiyata ve hizmete bağlıdır.',
+  openProjectBrief: 'Proje özetini aç',
+  hireFieldCrew: 'Saha ekibi işe al',
 } as const;
 
 export type TranslationKey = keyof typeof tr;
@@ -673,6 +678,11 @@ const en: Record<TranslationKey, string> = {
   signingBonus: 'Signing bonus',
   flexibleSla: 'Flexible SLA',
   premiumCounter: 'Premium counter',
+  campaignStageBlurb: 'Complete each objective to move to the next city.',
+  includeFibreToNearest: 'Include fibre to nearest live site',
+  coverageSettlesBlurb: 'Coverage settles over time; sign-ups depend on price and service.',
+  openProjectBrief: 'Open project brief',
+  hireFieldCrew: 'Hire field crew',
 };
 export function t(locale: Locale, key: TranslationKey) {
   return locale === 'tr' ? tr[key] : en[key];

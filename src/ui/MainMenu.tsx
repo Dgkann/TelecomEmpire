@@ -342,9 +342,7 @@ export default function MainMenu() {
               {mode === 'campaign' ? (
                 <div className="rounded-lg border border-neon-cyan/25 bg-neon-cyan/[0.06] p-3 text-sm">
                   Marmara - Campaign stage 1 of 3
-                  <div className="mt-1 text-[11px] text-white/45">
-                    Complete each objective to move to the next city.
-                  </div>
+                  <div className="mt-1 text-[11px] text-white/45">{t(locale, 'campaignStageBlurb')}</div>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
