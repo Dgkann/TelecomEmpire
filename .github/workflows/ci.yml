@@ -27,11 +27,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Formatting
+        run: npm run format:check
+
       - name: Build
         run: npm run build
 
       - name: Install browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Browser smoke tests
         run: npm run e2e
