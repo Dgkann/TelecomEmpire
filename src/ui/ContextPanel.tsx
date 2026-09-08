@@ -1,3 +1,6 @@
+import { DistrictProjectCard } from './ProjectMap';
+import { DistrictLaunchProgress } from './ExpansionPlanner';
+import { backupRouteEstimate } from '../game/redundancyBuild';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, linkCapacity, nodeUpgradeCost, utilColor } from '../game/constants';
 import { effectiveNodeCapacity } from '../game/capacity';
@@ -12,6 +15,7 @@ import type { CampaignKind, MaintenanceMode } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { useMemo } from 'react';
 import SiteIcon, { TierBadge } from './SiteIcon';
+import InvestmentPreview from './InvestmentPreview';
 
 const fmtMins = (m: number) => (m < 120 ? `${Math.round(m)} min` : `${Math.round(m / 60)}h`);
 
@@ -36,6 +40,8 @@ function Bar({ value, label, right }: { value: number; label: string; right?: st
 }
 
 export default function ContextPanel() {
+  const addBackupRoute = useGame((s) => s.addBackupRoute);
+  const beginDrill = useGame((s) => s.beginFailureDrill);
   const game = useGame((s) => s.game)!;
   const selection = useGame((s) => s.selection);
   const select = useGame((s) => s.select);
@@ -107,6 +113,12 @@ export default function ContextPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node?.id, topology]);
 
+  const backup = useMemo(
+    () => (node ? backupRouteEstimate(game, node.id) : null),
+    // Traffic and the cash balance cannot change which fibre path is independent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [node?.id, topology],
+  );
   return (
     <AnimatePresence>
       {selection && (
@@ -116,7 +128,7 @@ export default function ContextPanel() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 24 }}
           transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-          className="panel absolute right-4 top-4 z-20 w-[310px] overflow-hidden border-white/[0.14] p-4 shadow-[0_24px_64px_-24px_rgba(0,0,0,.9)]"
+          className="panel scroll-thin absolute right-2 top-12 z-20 max-h-[calc(100%-160px)] w-[min(330px,calc(100%-16px))] overflow-y-auto border-white/[0.14] p-4 shadow-[0_24px_64px_-24px_rgba(0,0,0,.9)] sm:right-4 sm:top-4"
         >
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-neon-cyan/80 via-neon-cyan/20 to-transparent" />
           <button
@@ -170,6 +182,29 @@ export default function ContextPanel() {
                 </div>
               </div>
 
+              {!node.down && (
+                <button
+                  className="btn w-full border-orange-300/30 text-xs text-orange-200"
+                  onClick={() => beginDrill({ type: 'node', id: node.id })}
+                >
+                  Test site failure
+                </button>
+              )}
+              {backup && (
+                <div className="rounded-md border border-teal-300/25 bg-teal-300/5 p-3">
+                  <div className="text-xs font-semibold text-teal-200">Protect against a fibre cut</div>
+                  <p className="my-2 text-[11px] text-white/60">
+                    Independent path via {backup.node.name}. Validated against every cut on the current route.
+                  </p>
+                  <button
+                    className="btn-primary w-full text-xs"
+                    disabled={game.money < backup.cost}
+                    onClick={() => addBackupRoute(node.id)}
+                  >
+                    Build backup fibre · {fmtMoneyExact(backup.cost)}
+                  </button>
+                </div>
+              )}
               {!redundant && node.kind !== 'core' && (
                 <p className="text-[11px] leading-snug text-white/45">
                   One fibre cut takes this site dark. A second span from another site keeps it alive.
@@ -200,6 +235,7 @@ export default function ContextPanel() {
                 </div>
               )}
 
+              {nextNodeCapacity !== null && <InvestmentPreview kind={node.kind} nodeId={node.id} />}
               {nodeMaintenance ? (
                 <div className="rounded-lg border border-neon-amber/25 bg-neon-amber/[0.06] p-2.5">
                   <div className="flex items-center justify-between">
@@ -300,6 +336,14 @@ export default function ContextPanel() {
                 label="Utilisation"
                 right={`${link.trafficGbps.toFixed(1)} / ${link.capacityGbps.toFixed(0)} Gbps`}
               />
+              {!link.down && (
+                <button
+                  className="btn w-full border-orange-300/30 text-xs text-orange-200"
+                  onClick={() => beginDrill({ type: 'link', id: link.id })}
+                >
+                  Test fibre cut
+                </button>
+              )}
               <div className="text-[11px] text-white/45">Length {link.length.toFixed(1)} km</div>
               {nextLinkCapacity !== null && (
                 <div className="flex items-center justify-between rounded-lg border border-neon-blue/15 bg-neon-blue/[0.045] px-3 py-2 text-[11px]">
@@ -422,6 +466,11 @@ export default function ContextPanel() {
                 </div>
               </div>
 
+              <button className="btn w-full text-xs" onClick={() => useGame.getState().setScreen('market')}>
+                Open district competition
+              </button>
+              <DistrictProjectCard districtId={district.id} />
+              <DistrictLaunchProgress districtId={district.id} />
               <Bar value={district.coverage} label="Your coverage" />
               <Bar
                 value={district.satisfaction / 100}
