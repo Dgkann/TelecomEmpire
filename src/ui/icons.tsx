@@ -115,3 +115,11 @@ export function SoundIcon({ off = false, ...props }: IconProps & { off?: boolean
     </IconBase>
   );
 }
+
+export function ProjectsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 21V7l8-4 8 4v14M2 21h20M8 10v7M12 10v7M16 10v7M8 3V1h8v2" />
+    </IconBase>
+  );
+}
