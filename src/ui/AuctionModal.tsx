@@ -3,10 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { SPECTRUM_BANDS } from '../game/constants';
 import { fmtMoney, fmtMoneyExact } from '../game/economy';
 import { useGame } from '../store/gameStore';
+import { t } from './i18n';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
 // Sealed bid: one number, no second chances, no idea what the others wrote down.
 export default function AuctionModal() {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const placeBid = useGame((s) => s.placeBid);
   const dismiss = useGame((s) => s.dismissAuction);
@@ -51,7 +53,9 @@ export default function AuctionModal() {
           transition={{ type: 'spring', stiffness: 330, damping: 28 }}
         >
           <div className="border-b border-neon-violet/25 bg-neon-violet/10 px-5 py-4">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-neon-violet">Spectrum auction</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-neon-violet">
+              {t(locale, 'spectrumAuction')}
+            </div>
             <div className="text-xl font-bold">
               {spec.label} · {auction.blocks} block{auction.blocks > 1 ? 's' : ''}
             </div>
@@ -100,12 +104,10 @@ export default function AuctionModal() {
                       <span>reserve {fmtMoney(auction.reserve)}</span>
                       <span>cash {fmtMoney(game.money)}</span>
                     </div>
-                    <p className="mt-2 text-[11px] leading-snug text-white/45">
-                      You only pay if you win. Bid high and you overpay, bid low and a rival gets the band.
-                    </p>
+                    <p className="mt-2 text-[11px] leading-snug text-white/45">{t(locale, 'auctionBidBlurb')}</p>
                     <div className="mt-3 flex gap-2">
                       <button className="btn flex-1" onClick={() => setOpen(false)}>
-                        Sit this one out
+                        {t(locale, 'sitThisOneOut')}
                       </button>
                       <button
                         className="btn-primary flex-[2]"
@@ -160,7 +162,7 @@ export default function AuctionModal() {
                       </div>
                     ))}
                     {auction.playerBid === null && (
-                      <div className="px-2 py-1 text-[11px] text-white/35">You did not bid.</div>
+                      <div className="px-2 py-1 text-[11px] text-white/35">{t(locale, 'youDidNotBid')}</div>
                     )}
                   </div>
                 </div>
