@@ -4,6 +4,7 @@ import { RESEARCH, isAvailable } from '../../game/research';
 import { totalCustomers } from '../../game/simulation';
 import { staffModifiers } from '../../game/staff';
 import { useGame } from '../../store/gameStore';
+import { t } from '../i18n';
 
 const BRANCH = {
   fixed: { label: 'Fixed network', code: 'FX', color: '#2dd4bf', description: 'Fibre, access and backbone capacity.' },
@@ -17,6 +18,7 @@ const BRANCH = {
 } as const;
 
 export default function ResearchScreen() {
+  const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const startResearch = useGame((s) => s.startResearch);
   const active = game.researchActive;
@@ -30,8 +32,10 @@ export default function ResearchScreen() {
       <div className="mx-auto max-w-[1240px]">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="stat-label text-neon-cyan">Technology programme</div>
-            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">Network evolution map</h1>
+            <div className="stat-label text-neon-cyan">{t(locale, 'technologyProgramme')}</div>
+            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">
+              {t(locale, 'networkEvolutionMap')}
+            </h1>
             <p className="mt-1 max-w-xl text-[13px] text-white/45">
               Follow each branch from field infrastructure to city-scale capability. Cross-branch requirements are named
               on locked nodes.
@@ -39,21 +43,21 @@ export default function ResearchScreen() {
           </div>
           <div className="flex gap-2">
             <div className="kpi min-w-[110px]">
-              <div className="stat-label">Research points</div>
+              <div className="stat-label">{t(locale, 'researchPoints')}</div>
               <div className="num text-lg text-neon-cyan">{game.researchPoints}</div>
             </div>
             <div className="kpi min-w-[110px]">
-              <div className="stat-label">Completed</div>
+              <div className="stat-label">{t(locale, 'completed')}</div>
               <div className="num text-lg text-neon-lime">
                 {completed} / {RESEARCH.length}
               </div>
             </div>
             <div className="kpi min-w-[110px]">
-              <div className="stat-label">Research output</div>
+              <div className="stat-label">{t(locale, 'researchOutput')}</div>
               <div className="num text-lg text-neon-cyan">+{researchPerDay}/day</div>
             </div>
             <div className="kpi min-w-[120px]">
-              <div className="stat-label">Lab status</div>
+              <div className="stat-label">{t(locale, 'labStatus')}</div>
               <div className={`text-sm font-semibold ${activeNode ? 'text-neon-cyan' : 'text-white/55'}`}>
                 {activeNode ? 'Researching' : 'Available'}
               </div>
@@ -70,7 +74,7 @@ export default function ResearchScreen() {
                   <span className="absolute inset-0 animate-ping rounded-full border border-neon-cyan/25" />
                 </div>
                 <div>
-                  <div className="stat-label">In progress</div>
+                  <div className="stat-label">{t(locale, 'inProgress')}</div>
                   <div className="text-base font-semibold">{activeNode.name}</div>
                 </div>
               </div>
@@ -261,7 +265,7 @@ export default function ResearchScreen() {
                             ))}
                           {activeHere && (
                             <div className="mt-3 rounded-md border border-neon-cyan/20 bg-neon-cyan/[0.06] px-2.5 py-2 text-center text-[11px] font-semibold text-neon-cyan">
-                              Programme running
+                              {t(locale, 'programmeRunning')}
                             </div>
                           )}
                         </div>
