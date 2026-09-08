@@ -19,6 +19,7 @@ import {
 } from '../../game/strategy';
 import type { DataCenterMode, InterconnectPlan, TrafficClass, TrafficPolicy } from '../../game/types';
 import { useGame } from '../../store/gameStore';
+import { t } from '../i18n';
 import SiteIcon, { TierBadge } from '../SiteIcon';
 import TrendChart from '../TrendChart';
 
@@ -52,6 +53,7 @@ const NETWORK_VIEWS: Array<{ id: NetworkView; label: string; note: string }> = [
 
 export default function NetworkScreen() {
   const game = useGame((s) => s.game)!;
+  const locale = useGame((s) => s.locale);
   const focus = useGame((s) => s.focus);
   const select = useGame((s) => s.select);
   const setTransitTier = useGame((s) => s.setTransitTier);
@@ -116,16 +118,16 @@ export default function NetworkScreen() {
       <div className="mx-auto grid max-w-[1240px] gap-5 lg:grid-cols-2">
         <div className="flex flex-wrap items-end justify-between gap-4 lg:col-span-2">
           <div>
-            <div className="stat-label text-neon-cyan">Network operations</div>
-            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">Live service control</h1>
-            <p className="mt-1 text-[13px] text-white/45">
-              Capacity, quality and resilience across every active route.
-            </p>
+            <div className="stat-label text-neon-cyan">{t(locale, 'networkOperations')}</div>
+            <h1 className="font-display text-3xl font-semibold uppercase tracking-wide">
+              {t(locale, 'liveServiceControl')}
+            </h1>
+            <p className="mt-1 text-[13px] text-white/45">{t(locale, 'liveServiceBlurb')}</p>
           </div>
           <div
             className={`rounded-lg border px-3 py-2 text-right ${daysLeft !== null && daysLeft < 30 ? 'border-neon-red/30 bg-neon-red/[0.07]' : 'border-neon-lime/20 bg-neon-lime/[0.05]'}`}
           >
-            <div className="stat-label">Capacity outlook</div>
+            <div className="stat-label">{t(locale, 'capacityOutlook')}</div>
             <div
               className={`num text-sm font-semibold ${daysLeft !== null && daysLeft < 30 ? 'text-neon-red' : 'text-neon-lime'}`}
             >
@@ -173,9 +175,7 @@ export default function NetworkScreen() {
               <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
                 24-hour traffic timeline
               </h2>
-              <p className="mt-1 text-[11px] text-white/40">
-                Hourly demand, carried traffic and loss across the current operating day.
-              </p>
+              <p className="mt-1 text-[11px] text-white/40">{t(locale, 'capacityOutlookBlurb')}</p>
             </div>
             <div className="num text-[10px] text-white/35">{dayTelemetry.length}/24 SAMPLES</div>
           </div>
@@ -197,10 +197,8 @@ export default function NetworkScreen() {
           ) : (
             <div className="flex items-center justify-between gap-4 rounded-md border border-dashed border-white/10 bg-black/10 px-4 py-3">
               <div>
-                <div className="text-sm text-white/70">Building the first traffic baseline</div>
-                <div className="mt-0.5 text-[11px] text-white/45">
-                  Next sample arrives at the end of the in-game hour.
-                </div>
+                <div className="text-sm text-white/70">{t(locale, 'buildingBaseline')}</div>
+                <div className="mt-0.5 text-[11px] text-white/45">{t(locale, 'nextSampleHour')}</div>
               </div>
               <div className="flex shrink-0 items-end gap-1" aria-hidden="true">
                 {[35, 55, 42, 72, 60].map((height, index) => (
@@ -245,8 +243,8 @@ export default function NetworkScreen() {
           <div className="mt-5 border-t border-white/[0.07] pt-4">
             <div className="mb-2 flex items-center justify-between gap-4">
               <div>
-                <div className="stat-label">Live delivery path</div>
-                <div className="text-[12px] text-white/40">Traffic accepted by the network at this instant</div>
+                <div className="stat-label">{t(locale, 'liveDeliveryPath')}</div>
+                <div className="text-[12px] text-white/40">{t(locale, 'trafficAcceptedNow')}</div>
               </div>
               <div className="num text-[12px] text-white/55">
                 <span className="text-neon-cyan">{game.stats.servedGbps.toFixed(2)}G carried</span> /{' '}
@@ -265,15 +263,15 @@ export default function NetworkScreen() {
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]">
               <div className="rounded-md bg-white/[0.03] p-2">
-                <div className="text-white/35">Fixed access</div>
+                <div className="text-white/35">{t(locale, 'fixedAccess')}</div>
                 <div className="num text-neon-blue">{game.stats.fixedDemandGbps.toFixed(2)} Gbps</div>
               </div>
               <div className="rounded-md bg-white/[0.03] p-2">
-                <div className="text-white/35">Mobile radio</div>
+                <div className="text-white/35">{t(locale, 'mobileRadio')}</div>
                 <div className="num text-neon-violet">{game.stats.mobileDemandGbps.toFixed(2)} Gbps</div>
               </div>
               <div className="rounded-md bg-white/[0.03] p-2">
-                <div className="text-white/35">Offered upstream</div>
+                <div className="text-white/35">{t(locale, 'offeredUpstream')}</div>
                 <div className="num text-neon-cyan">{game.stats.transitGbps.toFixed(2)} Gbps</div>
               </div>
             </div>
@@ -283,7 +281,7 @@ export default function NetworkScreen() {
             >
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3 bg-black/15 px-3 py-2 text-[10px] text-white/35">
                 <span>Service</span>
-                <span>Requested</span>
+                <span>{t(locale, 'requested')}</span>
                 <span>Carried</span>
                 <span>Delivery</span>
               </div>
@@ -327,16 +325,18 @@ export default function NetworkScreen() {
         >
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Traffic engineering</h2>
-              <p className="mt-1 text-[11px] text-white/40">
-                Choose who keeps moving under congestion, then decide where internet traffic exits.
-              </p>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'trafficEngineering')}
+              </h2>
+              <p className="mt-1 text-[11px] text-white/40">{t(locale, 'trafficEngineeringBlurb')}</p>
             </div>
-            <div className="chip border-neon-violet/30 text-[10px] text-neon-violet">GAIN ↔ OPERATING COST</div>
+            <div className="chip border-neon-violet/30 text-[10px] text-neon-violet">
+              {t(locale, 'gainVsOperatingCost')}
+            </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
-              <div className="stat-label mb-2">Service policy</div>
+              <div className="stat-label mb-2">{t(locale, 'servicePolicy')}</div>
               <div className="grid grid-cols-2 gap-2">
                 {(
                   Object.entries(TRAFFIC_POLICY_CONFIG) as Array<
@@ -386,7 +386,7 @@ export default function NetworkScreen() {
             </div>
             <div>
               <div id="interconnect" className="stat-label mb-2 scroll-mt-20">
-                Interconnection
+                {t(locale, 'interconnection')}
               </div>
               <div className="flex flex-col gap-2">
                 {(
@@ -409,7 +409,7 @@ export default function NetworkScreen() {
                         </div>
                         {game.interconnectPlan === id && id === 'cdn' && !interconnectOnline && (
                           <div className="mt-1 text-[10px] font-semibold text-neon-red">
-                            Suspended · restore a routed data centre; the monthly commitment remains.
+                            {t(locale, 'cdnSuspended')}
                           </div>
                         )}
                         {!locked && (
@@ -488,12 +488,12 @@ export default function NetworkScreen() {
         </div>
 
         <div className={`panel panel-tone-blue p-5 ${networkView === 'capacity' ? '' : 'hidden'}`}>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Fibre spans</h2>
-          <p className="mb-3 text-[11px] text-white/40">
-            Traffic takes the shortest way to a core, so a spare span sits at zero until the one it backs up fails.
-          </p>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'fibreSpans')}
+          </h2>
+          <p className="mb-3 text-[11px] text-white/40">{t(locale, 'fibreSpansBlurb')}</p>
           <div className="flex flex-col gap-2">
-            {game.links.length === 0 && <p className="text-sm text-white/40">No fibre built yet.</p>}
+            {game.links.length === 0 && <p className="text-sm text-white/40">{t(locale, 'noFibreBuilt')}</p>}
             {game.links.map((l) => {
               const a = game.nodes.find((n) => n.id === l.aId);
               const b = game.nodes.find((n) => n.id === l.bId);
@@ -547,8 +547,10 @@ export default function NetworkScreen() {
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Maintenance board</h2>
-              <p className="mt-1 text-[11px] text-white/40">Planned interventions wait for a free field crew.</p>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'maintenanceBoard')}
+              </h2>
+              <p className="mt-1 text-[11px] text-white/40">{t(locale, 'maintenanceBoardBlurb')}</p>
             </div>
             <span className="chip border-neon-amber/30 text-[10px] text-neon-amber">{openMaintenance.length} OPEN</span>
           </div>
@@ -585,14 +587,16 @@ export default function NetworkScreen() {
               })
             ) : (
               <div className="rounded-lg border border-dashed border-white/10 p-4 text-center text-[11px] text-white/35">
-                No work orders. Select a site on the map to book maintenance.
+                {t(locale, 'noWorkOrders')}
               </div>
             )}
           </div>
         </div>
 
         <div className={`panel panel-tone-violet p-5 ${networkView === 'capacity' ? '' : 'hidden'}`}>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Districts</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'districts')}
+          </h2>
           <div className="flex flex-col gap-2">
             {game.districts.map((d) => (
               <button
@@ -623,7 +627,9 @@ export default function NetworkScreen() {
         </div>
 
         <div className={`panel panel-tone-amber p-5 lg:col-span-2 ${networkView === 'capacity' ? '' : 'hidden'}`}>
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">Demand forecast</h2>
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'demandForecast')}
+          </h2>
           <p className="mb-3 text-[11px] text-white/40">
             Straight line through recent peaks. Capacity takes time to build, so the useful moment to act is before the
             line crosses.
@@ -648,20 +654,20 @@ export default function NetworkScreen() {
           )}
 
           {!forecast.confident ? (
-            <p className="text-sm text-white/40">Not enough history yet. Give it a couple of weeks.</p>
+            <p className="text-sm text-white/40">{t(locale, 'notEnoughHistory')}</p>
           ) : (
             <>
               <div className="grid grid-cols-4 gap-2 text-center">
                 <div className="chip py-2">
-                  <div className="stat-label">Peak today</div>
+                  <div className="stat-label">{t(locale, 'peakToday')}</div>
                   <div className="num text-sm">{forecast.today.toFixed(1)}G</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">In 30 days</div>
+                  <div className="stat-label">{t(locale, 'inThirtyDays')}</div>
                   <div className="num text-sm text-neon-cyan">{forecast.projected.toFixed(1)}G</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Access capacity</div>
+                  <div className="stat-label">{t(locale, 'accessCapacity')}</div>
                   <div className="num text-sm">{accessCapacity.toFixed(0)}G</div>
                 </div>
                 <div className="chip py-2">
@@ -692,8 +698,10 @@ export default function NetworkScreen() {
         <div className={`panel panel-tone-green p-5 ${networkView === 'interconnect' ? '' : 'hidden'}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Data centre operations</h2>
-              <p className="mt-1 text-[11px] text-white/40">Edge cache offload and hosting economics.</p>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'dataCentreOperations')}
+              </h2>
+              <p className="mt-1 text-[11px] text-white/40">{t(locale, 'dataCentreBlurb')}</p>
             </div>
             <SiteIcon kind="datacenter" className="h-8 w-8" />
           </div>
@@ -705,7 +713,7 @@ export default function NetworkScreen() {
                   <div className="num text-sm">{dataCenters.length}</div>
                 </div>
                 <div className="chip py-2">
-                  <div className="stat-label">Cache offload</div>
+                  <div className="stat-label">{t(locale, 'cacheOffload')}</div>
                   <div className="num text-sm text-neon-cyan">{Math.round(cacheRatio(game) * 100)}%</div>
                 </div>
                 <div className="chip py-2">
@@ -775,16 +783,12 @@ export default function NetworkScreen() {
                   );
                 })}
               </div>
-              <div className="mt-2 text-[10px] leading-relaxed text-white/35">
-                Mode changes trade hosting income for cache offload, SLA protection, power draw and network load.
-              </div>
+              <div className="mt-2 text-[10px] leading-relaxed text-white/35">{t(locale, 'dataCentreModeBlurb')}</div>
             </>
           ) : (
             <div className="mt-4 rounded-lg border border-dashed border-white/10 p-4 text-center">
-              <div className="text-sm text-white/55">No edge infrastructure yet</div>
-              <div className="mt-1 text-[11px] text-white/35">
-                Research Edge Compute, then place a data centre to reduce transit load.
-              </div>
+              <div className="text-sm text-white/55">{t(locale, 'noEdgeInfrastructure')}</div>
+              <div className="mt-1 text-[11px] text-white/35">{t(locale, 'noEdgeBlurb')}</div>
               <button
                 className="btn mt-3"
                 onClick={() => {
@@ -792,7 +796,7 @@ export default function NetworkScreen() {
                   setTool('datacenter');
                 }}
               >
-                Open build tools
+                {t(locale, 'openBuildTools')}
               </button>
             </div>
           )}
@@ -801,8 +805,10 @@ export default function NetworkScreen() {
         <div className={`panel panel-tone-violet p-5 ${networkView === 'interconnect' ? '' : 'hidden'}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">Competitor intelligence</h2>
-              <p className="mt-1 text-[11px] text-white/40">Coverage, pricing posture and strongest district.</p>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+                {t(locale, 'competitorIntelligence')}
+              </h2>
+              <p className="mt-1 text-[11px] text-white/40">{t(locale, 'competitorIntelBlurb')}</p>
             </div>
             <button
               className="btn py-1.5 text-[10px]"
@@ -811,7 +817,7 @@ export default function NetworkScreen() {
                 setScreen('map');
               }}
             >
-              Open overlay
+              {t(locale, 'openOverlay')}
             </button>
           </div>
           <div className="mt-4 flex flex-col gap-2">
@@ -874,7 +880,7 @@ export default function NetworkScreen() {
             </p>
 
             {game.spectrum.length === 0 ? (
-              <p className="text-sm text-white/40">No licences held. Towers cannot transmit.</p>
+              <p className="text-sm text-white/40">{t(locale, 'noLicencesHeld')}</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {game.spectrum.map((h) => {
@@ -900,17 +906,17 @@ export default function NetworkScreen() {
 
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               <div className="chip py-2">
-                <div className="stat-label">Tower reach</div>
+                <div className="stat-label">{t(locale, 'towerReach')}</div>
                 <div className="num text-sm text-neon-cyan">
                   {game.spectrum.length ? `${towerRadius(game.spectrum, 1).toFixed(1)} km` : '-'}
                 </div>
               </div>
               <div className="chip py-2">
-                <div className="stat-label">Mobile subs</div>
+                <div className="stat-label">{t(locale, 'mobileSubs')}</div>
                 <div className="num text-sm">{fmtNum(mobileSubs(game))}</div>
               </div>
               <div className="chip py-2">
-                <div className="stat-label">Next auction</div>
+                <div className="stat-label">{t(locale, 'nextAuction')}</div>
                 <div className="num text-sm">
                   {isFinite(game.nextAuctionAt)
                     ? `${Math.max(0, Math.round((game.nextAuctionAt - game.minutes) / 1440))}d`
@@ -920,7 +926,7 @@ export default function NetworkScreen() {
             </div>
 
             <div className="mt-3">
-              <div className="stat-label mb-1.5">Mobile coverage by district</div>
+              <div className="stat-label mb-1.5">{t(locale, 'mobileCoverageByDistrict')}</div>
               <div className="flex flex-col gap-1.5">
                 {game.districts
                   .filter((d) => d.unlocked)
@@ -941,7 +947,9 @@ export default function NetworkScreen() {
           id="transit"
           className={`panel panel-tone-blue scroll-mt-20 p-5 ${networkView === 'interconnect' ? '' : 'hidden'}`}
         >
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Upstream & automation</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(locale, 'upstreamAndAutomation')}
+          </h2>
           <Meter
             v={transitUse}
             label="Transit usage"
@@ -986,7 +994,7 @@ export default function NetworkScreen() {
 
           <label className="mt-3 flex cursor-pointer items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] p-3">
             <div>
-              <div className="text-sm font-medium">Backup transit provider</div>
+              <div className="text-sm font-medium">{t(locale, 'backupTransitProvider')}</div>
               <div className="text-[11px] text-white/45">+35% headroom from a diverse second upstream.</div>
             </div>
             <div className="flex items-center gap-3">
@@ -1006,7 +1014,7 @@ export default function NetworkScreen() {
             }`}
           >
             <div>
-              <div className="text-sm font-medium">Automatic technician dispatch</div>
+              <div className="text-sm font-medium">{t(locale, 'automaticTechnicianDispatch')}</div>
               <div className="text-[11px] text-white/45">
                 {mods.hasAutoDispatch
                   ? 'Highest recorded customer impact first; sends the crew with the fastest travel + repair time.'
