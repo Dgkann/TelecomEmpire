@@ -138,7 +138,7 @@ export function tickCompetitors(s: GameState, rng: Rng, aggressionMul: number) {
     // Radio rollout requires spectrum and scales with the rival's own holdings.
     if (c.spectrum.length && rng() < 0.25 * aggression) {
       const d = bestExpansion(s, { ...c, coverage: mobileCoverage }) ?? pick(rng, s.districts);
-      const cost = 40000;
+      const cost = 800000;
       if (cash > cost * 2) {
         cash -= cost;
         const reach = spectrumRadiusFactor(c.spectrum);
@@ -151,7 +151,7 @@ export function tickCompetitors(s: GameState, rng: Rng, aggressionMul: number) {
 
     // Technology, which lifts how attractive they look everywhere at once.
     if (cash > 700000 && tech < 0.95 && rng() < (0.04 + (1 - tech) * 0.04) * aggression) {
-      cash -= 500000;
+      cash -= 10000000;
       tech = clamp(tech + 0.05, 0, 1);
       lastMove = 'upgrading their network';
     }

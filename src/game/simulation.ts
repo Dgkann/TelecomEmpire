@@ -257,7 +257,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         id: 'pkg_start',
         name: 'Starter Fibre',
         speedMbps: 100,
-        price: 20,
+        price: 400,
         segment: 'residential',
         active: true,
         subscribers: 0,
@@ -266,7 +266,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         id: 'pkg_plus',
         name: 'Fibre Plus',
         speedMbps: 500,
-        price: 35,
+        price: 700,
         segment: 'residential',
         active: true,
         subscribers: 0,
@@ -275,7 +275,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         id: 'pkg_ultra',
         name: 'Ultra Fibre',
         speedMbps: 1000,
-        price: 50,
+        price: 1000,
         segment: 'residential',
         active: true,
         subscribers: 0,
@@ -285,7 +285,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         id: 'pkg_mob_lite',
         name: 'Mobile Lite',
         speedMbps: 40,
-        price: 12,
+        price: 240,
         segment: 'mobile',
         active: true,
         subscribers: 0,
@@ -294,7 +294,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         id: 'pkg_mob_std',
         name: 'Mobile Standard',
         speedMbps: 100,
-        price: 22,
+        price: 440,
         segment: 'mobile',
         active: true,
         subscribers: 0,
@@ -303,7 +303,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         id: 'pkg_mob_max',
         name: 'Mobile Unlimited',
         speedMbps: 300,
-        price: 38,
+        price: 760,
         segment: 'mobile',
         active: true,
         subscribers: 0,
@@ -315,8 +315,8 @@ export function createNewGame(opts: NewGameOptions): GameState {
     maintenanceOrders: [],
     technicians: [makeTechnician(rng, popGx, popGy), makeTechnician(rng, popGx, popGy)],
     employees: [
-      { id: uid('e'), name: personName(rng), role: 'network_engineer', salary: 4200, skill: 3, experience: 0 },
-      { id: uid('e'), name: personName(rng), role: 'support', salary: 2400, skill: 2, experience: 0 },
+      { id: uid('e'), name: personName(rng), role: 'network_engineer', salary: 84000, skill: 3, experience: 0 },
+      { id: uid('e'), name: personName(rng), role: 'support', salary: 48000, skill: 2, experience: 0 },
     ],
     researchDone: [],
     researchActive: null,
@@ -328,7 +328,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         aggression: 0.9,
         share: {},
         priceIndex: 1,
-        cash: 250000,
+        cash: 5000000,
         coverage: {},
         mobileCoverage: {},
         spectrum: [],
@@ -342,7 +342,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         aggression: 1.1,
         share: {},
         priceIndex: 0.92,
-        cash: 250000,
+        cash: 5000000,
         coverage: {},
         mobileCoverage: {},
         spectrum: [],
@@ -356,7 +356,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
         aggression: 0.7,
         share: {},
         priceIndex: 1.12,
-        cash: 250000,
+        cash: 5000000,
         coverage: {},
         mobileCoverage: {},
         spectrum: [],
@@ -401,7 +401,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     ledger: [],
     history: [],
     monthAccumulator: { revenue: 0, expense: 0 },
-    marketingBudget: 2000,
+    marketingBudget: 40000,
     retentionBudget: 0,
     campaigns: [],
     campaignHistory: [],
@@ -463,7 +463,7 @@ function makeTechnician(rng: Rng, gx: number, gy: number): Technician {
     id: uid('t'),
     name: personName(rng),
     skill: randInt(rng, 1, 3),
-    salary: 2200 + randInt(rng, 0, 600),
+    salary: 44000 + randInt(rng, 0, 12000),
     experience: 0,
     incidentId: null,
     maintenanceId: null,
@@ -1022,7 +1022,7 @@ export function customerGrowthSnapshot(s: GameState, d: District): CustomerGrowt
   const satisfactionMultiplier = clamp(d.satisfaction / 65, 0.15, 1.5);
   const reputationMultiplier = clamp(0.6 + s.reputation / 110, 0.4, 1.6);
   const demandMultiplier = 0.8 + d.demandFactor * 0.4;
-  const marketingMultiplier = (1 + Math.min(1.2, s.marketingBudget / 25000)) * staff.customerGrowthMul;
+  const marketingMultiplier = (1 + Math.min(1.2, s.marketingBudget / 500000)) * staff.customerGrowthMul;
   const appeal =
     priceMultiplier *
     satisfactionMultiplier *
@@ -1033,7 +1033,7 @@ export function customerGrowthSnapshot(s: GameState, d: District): CustomerGrowt
   const gap = addressable - current;
   const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
   const retention =
-    clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention * marketEffects(s, d.id).retention;
+    clamp(1 - s.retentionBudget / 600000, 0.45, 1) * campaignRetention * marketEffects(s, d.id).retention;
   const companyAgeDays = Math.max(0, (s.minutes - 8 * 60) / MINUTES_PER_DAY);
   const marketLossExposure = clamp((companyAgeDays - STARTER_CUSTOMER_GRACE_DAYS) / STARTER_CUSTOMER_RAMP_DAYS, 0, 1);
   const marketLoss = gap < 0 ? -gap * CUSTOMER_MARKET_LOSS_RATE * retention * marketLossExposure : 0;
@@ -1066,7 +1066,7 @@ function growCustomers(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayF
     const gap = growth.addressable - growth.current;
     const campaignRetention = activeCampaign(s, d.id, 'retention') ? 0.6 : 1;
     const retention =
-      clamp(1 - s.retentionBudget / 30000, 0.45, 1) * campaignRetention * marketEffects(s, d.id).retention;
+      clamp(1 - s.retentionBudget / 600000, 0.45, 1) * campaignRetention * marketEffects(s, d.id).retention;
     // Two different ways to lose people.
     const marketLoss = gap < 0 ? -gap * CUSTOMER_MARKET_LOSS_RATE * dayFrac * retention * growth.marketLossExposure : 0;
     const churnRate = clamp((62 - d.satisfaction) / 62, 0, 1) * 0.18 * diff.churnMul * retention;
@@ -1720,8 +1720,8 @@ function makeOffer(s: GameState, mods: ResearchMods, rng: Rng) {
     ? Math.max(1, Math.round(baseBandwidth * profile.bandwidthMul))
     : Math.max(0.2, Math.round(baseBandwidth * profile.bandwidthMul * 10) / 10);
   // Priced per Gbps of headline bandwidth. Enterprise pays a premium for the SLA.
-  const rate = wantEnterprise ? rand(rng, 1000, 1600) : rand(rng, 450, 700);
-  const monthlyRevenue = Math.round((bandwidth * rate * profile.revenueMul * mods.contractRevenueMul) / 50) * 50;
+  const rate = wantEnterprise ? rand(rng, 20000, 32000) : rand(rng, 9000, 14000);
+  const monthlyRevenue = Math.round((bandwidth * rate * profile.revenueMul * mods.contractRevenueMul) / 1000) * 1000;
   const sampledSla = wantEnterprise ? pick(rng, [99.9, 99.95, 99.99]) : pick(rng, [99, 99.5, 99.9]);
   const sla = Math.max(sampledSla, profile.slaFloor);
 

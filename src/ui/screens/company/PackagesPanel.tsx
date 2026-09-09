@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { fmtMoney, fmtNum } from '../../../game/economy';
+import { fmtMoneyExact, fmtMoney, fmtNum } from '../../../game/economy';
 import { t } from '../../i18n';
 import { GrowthDriver } from './shared';
 import type { CompanyModel } from './model';
@@ -97,13 +97,13 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                 <div className="mt-3">
                   <div className="flex items-baseline justify-between">
                     <span className="stat-label">{t(vm.locale, 'price')}</span>
-                    <span className="num text-lg font-semibold text-neon-cyan">${p.price}</span>
+                    <span className="num text-lg font-semibold text-neon-cyan">{fmtMoneyExact(p.price)}</span>
                   </div>
                   <input
                     type="range"
                     aria-label={`${p.name} monthly price`}
-                    min={5}
-                    max={140}
+                    min={100}
+                    max={2800}
                     value={p.price}
                     onChange={(e) => vm.updatePackage(p.id, { price: Number(e.target.value) })}
                     className="mt-1 w-full"
@@ -149,13 +149,13 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                     <div className="num mt-1 text-xs text-white/45">{p.speedMbps} Mbps</div>
                     <div className="mt-3 flex items-baseline justify-between">
                       <span className="stat-label">{t(vm.locale, 'price')}</span>
-                      <span className="num text-lg font-semibold text-neon-violet">${p.price}</span>
+                      <span className="num text-lg font-semibold text-neon-violet">{fmtMoneyExact(p.price)}</span>
                     </div>
                     <input
                       type="range"
                       aria-label={`${p.name} monthly price`}
-                      min={4}
-                      max={90}
+                      min={80}
+                      max={1800}
                       value={p.price}
                       onChange={(e) => vm.updatePackage(p.id, { price: Number(e.target.value) })}
                       className="mt-1 w-full"
@@ -183,8 +183,8 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
           type="range"
           aria-label="Monthly marketing budget"
           min={0}
-          max={40000}
-          step={500}
+          max={800000}
+          step={10000}
           value={vm.game.marketingBudget}
           onChange={(e) => vm.setMarketing(Number(e.target.value))}
           className="mt-2 w-full"
@@ -203,8 +203,8 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
           type="range"
           aria-label="Monthly retention budget"
           min={0}
-          max={30000}
-          step={500}
+          max={600000}
+          step={10000}
           value={vm.game.retentionBudget}
           onChange={(e) => vm.setRetention(Number(e.target.value))}
           className="mt-2 w-full"

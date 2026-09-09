@@ -41,7 +41,7 @@ export const DECISIONS = {
           'Develop up to 8 buildings, add homes and earn 4 reputation. Requires 40% coverage and 65 satisfaction.',
           'En fazla 8 binayı geliştir, yeni haneler ekle ve 4 itibar kazan. %40 kapsama ve 65 memnuniyet gerekir.',
         ],
-        cost: 18000,
+        cost: 360000,
       },
       {
         id: 'survey',
@@ -50,7 +50,7 @@ export const DECISIONS = {
           'Gain 12 research points; housing stays unchanged.',
           '12 araştırma puanı kazan; konut sayısı değişmez.',
         ],
-        cost: 3500,
+        cost: 70000,
       },
       {
         id: 'decline',
@@ -74,13 +74,13 @@ export const DECISIONS = {
           '+6 reputation and +8 research points. City traffic increases 60% for 3 days.',
           '+6 itibar ve +8 araştırma puanı. Şehir trafiği 3 gün boyunca %60 artar.',
         ],
-        cost: 12000,
+        cost: 240000,
       },
       {
         id: 'community',
         title: ['Support the community', 'Yerel topluluğu destekle'],
         detail: ['+2 reputation, no additional traffic.', '+2 itibar, ek trafik yok.'],
-        cost: 4000,
+        cost: 80000,
       },
       {
         id: 'decline',
@@ -104,13 +104,13 @@ export const DECISIONS = {
           'Every current field crew gains one skill level, up to level 5.',
           'Mevcut tüm saha ekipleri bir beceri seviyesi kazanır; üst sınır 5.',
         ],
-        cost: 9000,
+        cost: 180000,
       },
       {
         id: 'lab',
         title: ['Sponsor the lab', 'Laboratuvarı destekle'],
         detail: ['Gain 30 research points.', '30 araştırma puanı kazan.'],
-        cost: 7000,
+        cost: 140000,
       },
       {
         id: 'decline',

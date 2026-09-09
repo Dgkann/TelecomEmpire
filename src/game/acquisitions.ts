@@ -27,7 +27,7 @@ export function acquisitionQuote(state: GameState, rivalId: string) {
   const price = rival
     ? Math.round(
         Math.max(
-          150000,
+          3000000,
           state.districts.reduce((sum, d) => sum + (rival.share[d.id] ?? 0) * d.potential * rivalArpu(rival) * 6, 0) +
             Math.max(0, rival.cash) * 0.15,
         ),

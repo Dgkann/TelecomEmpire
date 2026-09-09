@@ -9,7 +9,7 @@ export const TENDER_PROGRAMMES = {
   schools: {
     title: 'School fibre programme',
     brief: 'Bring dependable fixed access to the district learning network.',
-    budget: 65000,
+    budget: 1300000,
     reach: 0.4,
     sites: 2,
     protectedSites: 0,
@@ -19,7 +19,7 @@ export const TENDER_PROGRAMMES = {
   emergency: {
     title: 'Emergency services ring',
     brief: 'Build independent fibre paths so local services can withstand a cut.',
-    budget: 110000,
+    budget: 2200000,
     reach: 0.55,
     sites: 2,
     protectedSites: 2,
@@ -29,7 +29,7 @@ export const TENDER_PROGRAMMES = {
   gigabit: {
     title: 'District fibre rollout',
     brief: 'Deliver broad fixed access with protected service hubs across the district.',
-    budget: 165000,
+    budget: 3300000,
     reach: 0.7,
     sites: 3,
     protectedSites: 2,
@@ -238,7 +238,7 @@ export function tickProcurement(state: GameState, dt: number) {
       return {
         id: c.id,
         name: c.name,
-        price: Math.round((spec.budget * fraction) / 100) * 100,
+        price: Math.round((spec.budget * fraction) / 2000) * 2000,
         quality: Math.min(95, Math.max(30, 35 + c.tech * 35 + (c.coverage[district.id] ?? 0) * 30)),
       };
     });

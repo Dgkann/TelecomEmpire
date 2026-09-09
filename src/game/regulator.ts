@@ -29,7 +29,7 @@ export function makeRegulation(s: GameState, rng: Rng, customers: number): Regul
       districtId: thin.id,
       target,
       dueAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 60, 120),
-      fine: Math.round((30000 + customers * 22) / 1000) * 1000,
+      fine: Math.round((600000 + customers * 440) / 20000) * 20000,
       status: 'pending',
     };
   }
@@ -45,7 +45,7 @@ export function makeRegulation(s: GameState, rng: Rng, customers: number): Regul
       districtId: null,
       target,
       dueAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 60, 110),
-      fine: Math.round((35000 + customers * 20) / 1000) * 1000,
+      fine: Math.round((700000 + customers * 400) / 20000) * 20000,
       status: 'pending',
     };
   }
@@ -60,7 +60,7 @@ export function makeRegulation(s: GameState, rng: Rng, customers: number): Regul
     districtId: null,
     target: cap,
     dueAt: s.minutes + MINUTES_PER_DAY * randInt(rng, 45, 90),
-    fine: Math.round((25000 + customers * 16) / 1000) * 1000,
+    fine: Math.round((500000 + customers * 320) / 20000) * 20000,
     status: 'pending',
   };
 }

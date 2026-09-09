@@ -20,7 +20,7 @@ const RATES: Record<keyof typeof DIFFICULTY, number> = {
 // What your network would fetch if it were sold off.
 export function assetValue(s: GameState) {
   const nodes = s.nodes.reduce((sum, n) => sum + NODE_SPECS[n.kind].baseCost * n.tier * 0.45, 0);
-  const links = s.links.reduce((sum, l) => sum + l.length * 1400 * l.tier * 0.3, 0);
+  const links = s.links.reduce((sum, l) => sum + l.length * 28000 * l.tier * 0.3, 0);
   const spectrum = s.spectrum.reduce((sum, h) => sum + h.paid * 0.5, 0);
   return nodes + links + spectrum;
 }
@@ -31,7 +31,7 @@ export function creditLimit(s: GameState) {
   const owed = s.loans.reduce((sum, l) => sum + l.remaining, 0);
   const raw = (money.totalRevenue * 5 + assetValue(s) * 0.4) * rankOf(s).creditMultiplier;
   // Apply the facility floor before subtracting debt so it cannot become renewable headroom.
-  const facility = Math.max(40000, Math.round(raw));
+  const facility = Math.max(800000, Math.round(raw));
   return Math.max(0, Math.round(facility - owed));
 }
 

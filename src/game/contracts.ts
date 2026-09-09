@@ -68,7 +68,7 @@ const PROFILES: Record<BuildingKind, ContractProfile> = {
 
 export const contractProfile = (kind: BuildingKind) => PROFILES[kind];
 
-const roundMoney = (value: number) => Math.max(0, Math.round(value / 50) * 50);
+const roundMoney = (value: number) => Math.max(0, Math.round(value / 1000) * 1000);
 
 // Counters settle immediately.
 export function negotiatedTerms(offer: ContractOffer, mode: NegotiationMode): ContractOffer {

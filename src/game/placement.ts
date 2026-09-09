@@ -27,8 +27,8 @@ export function nodePlacementIssue(
   const cost = nodePlacementCost(state, kind);
   if (state.money < cost)
     return tr
-      ? `${Math.ceil((cost - state.money) / 100) * 100} daha gerekiyor.`
-      : `Need ${Math.ceil((cost - state.money) / 100) * 100} more.`;
+      ? `${Math.ceil((cost - state.money) / 2000) * 2000} daha gerekiyor.`
+      : `Need ${Math.ceil((cost - state.money) / 2000) * 2000} more.`;
   return null;
 }
 
@@ -62,7 +62,7 @@ export function fibreConnectionIssue(
   const cost = fibreConnectionCost(state, source.id, destination.id);
   if (state.money < cost)
     return tr
-      ? `${Math.ceil((cost - state.money) / 100) * 100} daha gerekiyor.`
-      : `Need ${Math.ceil((cost - state.money) / 100) * 100} more.`;
+      ? `${Math.ceil((cost - state.money) / 2000) * 2000} daha gerekiyor.`
+      : `Need ${Math.ceil((cost - state.money) / 2000) * 2000} more.`;
   return null;
 }

@@ -219,8 +219,8 @@ export interface RepairOption {
 // Priced off the fault, not the clock - the size penalty is time, not parts.
 export function repairCost(incident: Incident, mode: RepairMode) {
   const base = incident.repairBaseMinutes ?? incident.repairTotalMinutes;
-  const raw = mode === 'emergency' ? 800 + base * 9 : 200 + base * 2.2;
-  return Math.round(raw / 100) * 100;
+  const raw = mode === 'emergency' ? 16000 + base * 180 : 4000 + base * 44.0;
+  return Math.round(raw / 2000) * 2000;
 }
 
 export function repairOptions(incident: Incident, techSkill: number): RepairOption[] {

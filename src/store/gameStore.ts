@@ -336,7 +336,7 @@ export const useGame = create<Store>((set, get) => ({
       mode: 'campaign',
       campaignStage: nextStage,
     });
-    next.money += Math.max(0, Math.min(250000, Math.round(current.money * 0.2)));
+    next.money += Math.max(0, Math.min(5000000, Math.round(current.money * 0.2)));
     next.reputation = Math.max(50, Math.round(current.reputation * 0.8));
     if (!saveGame(next, s.activeSaveSlot)) {
       set({ persistenceError: 'The next campaign city could not be saved.' });
@@ -1136,7 +1136,7 @@ export const useGame = create<Store>((set, get) => ({
     const s = get();
     const g = s.game;
     if (!g) return;
-    const cost = 4000;
+    const cost = 80000;
     if (g.money < cost) {
       s.toast('Not enough money.', 'bad');
       return;
@@ -1152,7 +1152,7 @@ export const useGame = create<Store>((set, get) => ({
           id: uid('t'),
           name: personName(rng),
           skill: 1 + Math.floor(rng() * 3),
-          salary: 2200 + Math.floor(rng() * 700),
+          salary: 44000 + Math.floor(rng() * 14000),
           experience: 0,
           incidentId: null,
           maintenanceId: null,
@@ -1171,7 +1171,7 @@ export const useGame = create<Store>((set, get) => ({
     const s = get();
     const g = s.game;
     if (!g) return;
-    const cost = 6000;
+    const cost = 120000;
     if (g.money < cost) {
       s.toast('Not enough money.', 'bad');
       return;
@@ -1179,12 +1179,12 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       const rng = makeRng(Math.floor(Math.random() * 1e9));
       const salary = {
-        network_engineer: 4600,
-        noc_engineer: 4200,
-        field_tech: 2600,
-        support: 2500,
-        sales: 3800,
-        security: 5200,
+        network_engineer: 92000,
+        noc_engineer: 84000,
+        field_tech: 52000,
+        support: 50000,
+        sales: 76000,
+        security: 104000,
       }[role];
       draft.money -= cost;
       recordLedger(draft, 'staff', `${role.replace(/_/g, ' ')} recruitment`, -cost);

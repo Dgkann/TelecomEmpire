@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -33,52 +33,52 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     kind: 'core',
     label: 'Core Router',
     icon: '◈',
-    baseCost: 45000,
+    baseCost: 900000,
     baseCapacity: 10,
     tierCapacityMul: 2.4,
     tierCostMul: 2.2,
     maxTier: 5,
     powerKw: 12,
-    maintenance: 900,
+    maintenance: 18000,
     description: 'The spine of your network. Everything ultimately routes through a core.',
   },
   pop: {
     kind: 'pop',
     label: 'POP',
     icon: '▣',
-    baseCost: 18000,
+    baseCost: 360000,
     baseCapacity: 4,
     tierCapacityMul: 2.2,
     tierCostMul: 2.0,
     maxTier: 5,
     powerKw: 5,
-    maintenance: 380,
+    maintenance: 7600,
     description: 'A point of presence brings your network into a district and serves local customers.',
   },
   access: {
     kind: 'access',
     label: 'Access Node',
     icon: '▤',
-    baseCost: 6500,
+    baseCost: 130000,
     baseCapacity: 2,
     tierCapacityMul: 2.0,
     tierCostMul: 1.9,
     maxTier: 4,
     powerKw: 2,
-    maintenance: 140,
+    maintenance: 2800,
     description: 'Street-level cabinet. Cheap way to push coverage deeper into a district.',
   },
   datacenter: {
     kind: 'datacenter',
     label: 'Data Center',
     icon: '▦',
-    baseCost: 220000,
+    baseCost: 4400000,
     baseCapacity: 40,
     tierCapacityMul: 2.5,
     tierCostMul: 2.4,
     maxTier: 3,
     powerKw: 90,
-    maintenance: 5200,
+    maintenance: 104000,
     description: 'Hosting, caching and edge compute. Cuts transit costs and unlocks enterprise deals.',
     requires: 'edge_compute',
   },
@@ -86,37 +86,37 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     kind: 'tower',
     label: 'Mobile Tower',
     icon: '⌁',
-    baseCost: 60000,
+    baseCost: 1200000,
     baseCapacity: 6,
     tierCapacityMul: 2.0,
     tierCostMul: 2.0,
     maxTier: 4,
     powerKw: 8,
-    maintenance: 700,
+    maintenance: 14000,
     description: 'Radio site for mobile subscribers. Needs fiber backhaul to a POP or core.',
     requires: 'mobile_4g',
   },
 };
 
-export const FIBER_COST_PER_UNIT = 1400;
+export const FIBER_COST_PER_UNIT = 28000;
 export const FIBER_BASE_CAPACITY = 10;
 export const FIBER_TIER_MUL = 4;
-export const FIBER_UPGRADE_COST_PER_UNIT = 2200;
-export const FIBER_MAINTENANCE_PER_UNIT = 22;
+export const FIBER_UPGRADE_COST_PER_UNIT = 44000;
+export const FIBER_MAINTENANCE_PER_UNIT = 440;
 
-export const POWER_COST_PER_KW_MONTH = 130;
+export const POWER_COST_PER_KW_MONTH = 2600;
 
 // The reference residential price the whole market is measured against.
-export const BASELINE_ARPU = 34;
+export const BASELINE_ARPU = 680;
 
 export const TRANSIT_TIERS = [
-  { label: 'Basic transit', capacity: 12, monthly: 3200, reliability: 0.9 },
-  { label: 'Metro peering', capacity: 26, monthly: 6200, reliability: 0.92 },
-  { label: 'Dual-homed transit', capacity: 45, monthly: 11000, reliability: 0.95 },
-  { label: 'Tier-1 blend', capacity: 160, monthly: 34000, reliability: 0.98 },
-  { label: 'Global backbone', capacity: 700, monthly: 96000, reliability: 0.995 },
+  { label: 'Basic transit', capacity: 12, monthly: 64000, reliability: 0.9 },
+  { label: 'Metro peering', capacity: 26, monthly: 124000, reliability: 0.92 },
+  { label: 'Dual-homed transit', capacity: 45, monthly: 220000, reliability: 0.95 },
+  { label: 'Tier-1 blend', capacity: 160, monthly: 680000, reliability: 0.98 },
+  { label: 'Global backbone', capacity: 700, monthly: 1920000, reliability: 0.995 },
 ];
-export const BACKUP_TRANSIT_MONTHLY = 15000;
+export const BACKUP_TRANSIT_MONTHLY = 300000;
 // A month of breaches cannot cost more than this many months of the fee.
 export const SLA_PENALTY_CAP = 2;
 
@@ -138,7 +138,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     label: '700 MHz',
     radius: 1.7,
     capacity: 0.5,
-    blockValue: 210000,
+    blockValue: 4200000,
     note: 'Reaches across a district and through walls. Not much room in it.',
   },
   '1800': {
@@ -146,7 +146,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     label: '1800 MHz',
     radius: 1.15,
     capacity: 1,
-    blockValue: 180000,
+    blockValue: 3600000,
     note: 'The workhorse. Decent reach, decent capacity, nothing spectacular.',
   },
   '2600': {
@@ -154,7 +154,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     label: '2600 MHz',
     radius: 0.8,
     capacity: 1.8,
-    blockValue: 240000,
+    blockValue: 4800000,
     note: 'Good capacity if you are willing to build more sites.',
   },
   '3500': {
@@ -162,7 +162,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     label: '3.5 GHz',
     radius: 0.6,
     capacity: 3.2,
-    blockValue: 420000,
+    blockValue: 8400000,
     requires: 'mobile_5g',
     note: 'The 5G mid band. Heavy capacity, and you will feel every metre of range you lost.',
   },
@@ -171,7 +171,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     label: '26 GHz',
     radius: 0.28,
     capacity: 7,
-    blockValue: 560000,
+    blockValue: 11200000,
     requires: 'mobile_5g',
     note: 'Enormous capacity over a couple of streets. Stadiums and city centres only.',
   },
@@ -199,7 +199,7 @@ export const DIFFICULTY: Record<
 > = {
   casual: {
     label: 'Casual',
-    startMoney: 160000,
+    startMoney: 3200000,
     incidentRate: 0.45,
     churnMul: 0.7,
     growthMul: 1.25,
@@ -208,7 +208,7 @@ export const DIFFICULTY: Record<
   },
   standard: {
     label: 'Standard',
-    startMoney: 100000,
+    startMoney: 2000000,
     incidentRate: 1,
     churnMul: 1,
     growthMul: 1,
@@ -217,7 +217,7 @@ export const DIFFICULTY: Record<
   },
   hard: {
     label: 'Hard',
-    startMoney: 70000,
+    startMoney: 1400000,
     incidentRate: 1.6,
     churnMul: 1.35,
     growthMul: 0.85,
@@ -227,7 +227,7 @@ export const DIFFICULTY: Record<
 };
 
 // A data centre earns from hosting and colocation.
-export const DATACENTER_HOSTING_BASE = 38000;
+export const DATACENTER_HOSTING_BASE = 760000;
 
 // Edge caching serves popular traffic locally, so it never crosses your network at all.
 export const DATACENTER_CACHE_PER_TIER = 0.08;

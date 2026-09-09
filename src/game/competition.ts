@@ -7,28 +7,28 @@ import type { GameState, MarketOperation, CompetitionState, MarketTactic } from 
 export const MARKET_TACTICS = {
   switchers: {
     title: 'Switcher programme',
-    cost: 7000,
+    cost: 140000,
     detail: '28% more local market appeal. Pays for switching assistance, not instant subscribers.',
     tradeoff: 'More sign-ups also add traffic. Expand capacity before inviting demand.',
   },
   loyalty: {
     title: 'Loyalty desk',
-    cost: 4500,
+    cost: 90000,
     detail: '45% less fixed-customer loss from dissatisfaction and competition; 6% more market appeal.',
     tradeoff: 'Protects your current base. It cannot restore an outage or expand your reach.',
   },
   service: {
     title: 'Service promise',
-    cost: 6000,
+    cost: 120000,
     detail:
       '20% more local appeal while reach is at least 40%, satisfaction at least 70 and network health at least 90%.',
     tradeoff: 'Meet the standard for 80% of the fortnight: +3 reputation. Miss it or cancel early: −3 reputation.',
   },
 } as const;
 export const RIVAL_MOVES = {
-  discount: { title: 'Local price offensive', detail: '15% lower effective local price for 10 days.', cost: 16000 },
-  publicity: { title: 'Brand campaign', detail: '25% more local market appeal for 10 days.', cost: 12000 },
-  rollout: { title: 'Fibre land grab', detail: 'Adds 8 percentage points of permanent fixed coverage.', cost: 24000 },
+  discount: { title: 'Local price offensive', detail: '15% lower effective local price for 10 days.', cost: 320000 },
+  publicity: { title: 'Brand campaign', detail: '25% more local market appeal for 10 days.', cost: 240000 },
+  rollout: { title: 'Fibre land grab', detail: 'Adds 8 percentage points of permanent fixed coverage.', cost: 480000 },
 } as const;
 export const OPERATION_MINUTES = 14 * MINUTES_PER_DAY;
 export function initialCompetition(minutes: number): CompetitionState {

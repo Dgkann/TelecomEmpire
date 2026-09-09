@@ -163,7 +163,7 @@ export function generateCity(seed: number, cityName = 'Marmara'): GeneratedCity 
     const own = buildings.filter((b) => b.districtId === d.id);
     d.population = own.reduce((s, b) => s + b.households * 2.4, 0) | 0;
     d.potential = own.filter((b) => b.segment === 'residential').reduce((s, b) => s + b.households, 0);
-    d.entryCost = d.unlocked ? 0 : Math.round(((18000 + d.potential * 12) * city.licenceCostMul) / 1000) * 1000;
+    d.entryCost = d.unlocked ? 0 : Math.round(((360000 + d.potential * 240) * city.licenceCostMul) / 20000) * 20000;
   }
 
   return { districts, buildings };
