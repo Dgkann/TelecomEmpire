@@ -42,7 +42,7 @@ export default function FibreSpansPanel({ m }: { m: NetworkModel }) {
                 {standby && (
                   <span
                     className="chip border-white/20 text-[10px] text-white/50"
-                    title="Nothing m.routes over this span today. It is what keeps the district redundant."
+                    title="Nothing routes over this span today. It is what keeps the district redundant."
                   >
                     STANDBY
                   </span>

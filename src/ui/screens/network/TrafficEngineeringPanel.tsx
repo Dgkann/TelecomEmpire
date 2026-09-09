@@ -68,7 +68,7 @@ export default function TrafficEngineeringPanel({ m }: { m: NetworkModel }) {
           </div>
         </div>
         <div>
-          <div id="m.interconnect" className="stat-label mb-2 scroll-mt-20">
+          <div id="interconnect" className="stat-label mb-2 scroll-mt-20">
             {t(m.locale, 'interconnection')}
           </div>
           <div className="flex flex-col gap-2">

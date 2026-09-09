@@ -7,7 +7,7 @@ import type { NetworkModel } from './model';
 export default function UpstreamPanel({ m }: { m: NetworkModel }) {
   return (
     <div
-      id="m.transit"
+      id="transit"
       className={`panel panel-tone-blue scroll-mt-20 p-5 ${m.networkView === 'interconnect' ? '' : 'hidden'}`}
     >
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
