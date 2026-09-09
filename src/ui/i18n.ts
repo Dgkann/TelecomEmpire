@@ -381,6 +381,16 @@ const tr = {
   standard: 'Standart',
   target: 'Hedef',
   term: 'Vade',
+  energyDesk: 'Enerji masası',
+  energyDeskBlurb: 'Toptan elektrik her ay oynar. Bu dalgalanmanın ne kadarını taşıyacağını seç.',
+  monthlyPowerBill: 'Aylık elektrik faturası',
+  tariffIndex: 'Tarife',
+  wholesaleTrend: 'Toptan fiyat, son 12 ay',
+  currentTariff: 'Yürürlükteki tarife',
+  switchTariff: 'Geç',
+  onsiteGeneration: 'Saha üstü üretim',
+  onsiteGenerationBlurb: 'Bir noktaya panel kurarak şebekeden çektiğini kalıcı olarak azalt.',
+  onsiteGenerationLocked: 'Kendi üretimini kurmak için Saha Üstü Üretim araştırmasını tamamla.',
 } as const;
 
 export type TranslationKey = keyof typeof tr;
@@ -765,6 +775,16 @@ const en: Record<TranslationKey, string> = {
   standard: 'Standard',
   target: 'Target',
   term: 'Term',
+  energyDesk: 'Energy desk',
+  energyDeskBlurb: 'Wholesale power moves every month. Choose how much of that swing you carry.',
+  monthlyPowerBill: 'Monthly power bill',
+  tariffIndex: 'Tariff',
+  wholesaleTrend: 'Wholesale price, last 12 months',
+  currentTariff: 'Current tariff',
+  switchTariff: 'Switch',
+  onsiteGeneration: 'On-site generation',
+  onsiteGenerationBlurb: 'Fit panels at a site to cut what it draws from the grid, permanently.',
+  onsiteGenerationLocked: 'Finish the On-site Generation research to fit your own supply.',
 };
 export function t(locale: Locale, key: TranslationKey) {
   return locale === 'tr' ? tr[key] : en[key];

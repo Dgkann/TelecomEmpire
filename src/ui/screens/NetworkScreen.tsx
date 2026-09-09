@@ -14,6 +14,7 @@ import DataCentrePanel from './network/DataCentrePanel';
 import CompetitorPanel from './network/CompetitorPanel';
 import SpectrumPanel from './network/SpectrumPanel';
 import UpstreamPanel from './network/UpstreamPanel';
+import EnergyPanel from './network/EnergyPanel';
 
 const NETWORK_VIEWS: Array<{ id: NetworkView; label: string; note: string }> = [
   { id: 'live', label: 'Live', note: 'Quality & delivery' },
@@ -95,6 +96,7 @@ export default function NetworkScreen() {
         <DataCentrePanel m={m} />
         <CompetitorPanel m={m} />
         <SpectrumPanel m={m} />
+        <EnergyPanel m={m} />
         <UpstreamPanel m={m} />
       </div>
     </div>
