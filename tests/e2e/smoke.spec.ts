@@ -80,7 +80,7 @@ test('network lab rehearses a surge and commissions a saved capacity programme',
       game: {
         ...g,
         speed: 0,
-        money: 2000000,
+        money: 40000000,
         tutorialDone: true,
         buildings: g.buildings.map((b: any) => ({ ...b, connected: 0.8 })),
       },
@@ -379,7 +379,7 @@ test('development rewards persist and cannot be claimed again', async ({ page },
   const goals = page.getByRole('region', { name: 'Development goals' });
   const cash = await page.evaluate(() => (window as any).__game.getState().game.money);
   await goals.getByRole('button', { name: 'Claim reward' }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__game.getState().game.money)).toBe(cash + 3500);
+  await expect.poll(() => page.evaluate(() => (window as any).__game.getState().game.money)).toBe(cash + 70000);
   await expect(goals.getByRole('button', { name: 'Connect your city 1/7 +' })).toBeVisible();
   await page.getByRole('button', { name: 'Save and exit' }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
@@ -443,7 +443,7 @@ test('strategy decisions persist and acquisition is reviewed before purchase', a
         ...g,
         speed: 0,
         rank: 2,
-        money: 50000000,
+        money: 1000000000,
         competitors: g.competitors.map((c: any) => ({
           ...c,
           coverage: { ...c.coverage, [g.districts.find((d: any) => d.unlocked).id]: 0.5 },
@@ -569,7 +569,7 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
       game: {
         ...g,
         speed: 0,
-        money: 10000,
+        money: 200000,
         autoDispatch: false,
         incidents: [fault],
         nodes: g.nodes.map((n: any) => (n.id === site.id ? { ...n, down: true } : n)),
@@ -596,7 +596,7 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
   await expect(dialog.getByText(/Scheduled repairs can proceed with negative cash/)).toBeVisible();
   await page.evaluate(() => {
     const store = (window as any).__game;
-    store.setState({ game: { ...store.getState().game, money: 10000 } });
+    store.setState({ game: { ...store.getState().game, money: 200000 } });
   });
   await dialog.getByRole('radio', { name: /Emergency/ }).check();
   await dialog.getByRole('radio', { name: 'Distant Expert', exact: true }).check();
@@ -614,7 +614,7 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
     const g = (window as any).__game.getState().game;
     return { assigned: g.incidents[0].assignedTechId, money: g.money, work: g.incidents[0].repairMinutesLeft };
   });
-  expect(result).toEqual({ assigned: 'far-expert', money: 8300, work: 30 });
+  expect(result).toEqual({ assigned: 'far-expert', money: 166000, work: 30 });
   await page.evaluate(() => (window as any).__game.getState().openIncident('crew-preview'));
   await expect(dialog.getByText('Distant Expert is on the way')).toBeVisible();
   await expect(dialog.getByText('Estimated restoration', { exact: true })).toBeVisible();
@@ -631,7 +631,7 @@ test('compares and commissions an atomic district starter network', async ({ pag
   const before = await page.evaluate(() => {
     const store = (window as any).__game;
     const g = store.getState().game;
-    store.setState({ game: { ...g, speed: 0, money: 1000000 } });
+    store.setState({ game: { ...g, speed: 0, money: 20000000 } });
     return {
       district: g.districts.find((d: any) => !d.unlocked),
       nodes: g.nodes.length,
@@ -648,7 +648,8 @@ test('compares and commissions an atomic district starter network', async ({ pag
   await planner.getByRole('radio', { name: before.district.name, exact: true }).check();
   const quote = planner.getByLabel('Launch quote', { exact: true });
   const totalText = () => quote.getByText('Total launch cost', { exact: true }).locator('..').locator('dd').innerText();
-  const amount = (text: string) => Number(text.replace(/[^0-9.]/g, ''));
+  // Money renders with Turkish grouping (1.234.567 ₺), so dots are separators, not decimals.
+  const amount = (text: string) => Number(text.replace(/[^0-9]/g, ''));
   const accessCost = amount(await totalText());
   await quote.getByRole('radio', { name: 'POP', exact: true }).check();
   const popCost = amount(await totalText());
@@ -662,7 +663,7 @@ test('compares and commissions an atomic district starter network', async ({ pag
   await expect(quote.getByText(/Insufficient cash/)).toBeVisible();
   await page.evaluate(() => {
     const store = (window as any).__game;
-    store.setState({ game: { ...store.getState().game, money: 1000000 } });
+    store.setState({ game: { ...store.getState().game, money: 20000000 } });
   });
   expect(await planner.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await quote.screenshot({ path: testInfo.outputPath('launch-quote.png') });
@@ -684,7 +685,7 @@ test('compares and commissions an atomic district starter network', async ({ pag
     };
   });
   expect(after).toEqual({
-    money: 1000000 - popCost,
+    money: 20000000 - popCost,
     nodes: before.nodes + 1,
     links: before.links + 1,
     kind: 'pop',
@@ -860,7 +861,7 @@ test('bids for a city project, builds its network and collects verified payment'
   const quote = await page.evaluate(() => {
     const store = (window as any).__game;
     const g = store.getState().game;
-    store.setState({ game: { ...g, speed: 0, money: 1000000, reputation: 100 } });
+    store.setState({ game: { ...g, speed: 0, money: 20000000, reputation: 100 } });
     const t = g.procurement.tenders[0];
     return { id: t.id, price: Math.ceil(t.budget * 0.65), districtId: t.districtId };
   });
@@ -872,9 +873,9 @@ test('bids for a city project, builds its network and collects verified payment'
   await brief.getByRole('button', { name: 'Submit sealed bid', exact: true }).click();
   await expect(brief.getByRole('status')).toContainText('Sealed bid submitted');
   const bond = Math.ceil(quote.price * 0.1);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(1000000 - bond);
+  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(20000000 - bond);
   await brief.getByRole('button', { name: 'Withdraw bid & recover bond', exact: true }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(1000000);
+  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(20000000);
   await brief.getByRole('button', { name: 'Submit sealed bid', exact: true }).click();
   expect(await brief.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('city-tender-bid.png') });
@@ -959,7 +960,7 @@ test('market control launches, saves and settles a paid district operation', asy
   const districts = await page.evaluate(() => {
     const store = (window as any).__game;
     const g = store.getState().game;
-    store.setState({ game: { ...g, speed: 0, money: 100000, reputation: 60 } });
+    store.setState({ game: { ...g, speed: 0, money: 2000000, reputation: 60 } });
     return {
       home: g.districts.find((d: any) => d.unlocked),
       locked: g.districts.find((d: any) => !d.unlocked),
@@ -989,7 +990,7 @@ test('market control launches, saves and settles a paid district operation', asy
       customers: g.packages.reduce((n: number, p: any) => n + p.subscribers, 0),
     };
   });
-  expect(launched.money).toBe(100000 - launched.operation.cost);
+  expect(launched.money).toBe(2000000 - launched.operation.cost);
   expect(launched.customers).toBe(districts.customers);
   await page.screenshot({ path: testInfo.outputPath('market-operation.png') });
   await page.getByRole('button', { name: 'Save and exit', exact: true }).click();
@@ -1037,7 +1038,7 @@ test('rival offensive pauses play and service promises carry cancellation risk',
     store.setState({
       game: {
         ...g,
-        money: 100000,
+        money: 2000000,
         reputation: 60,
         speed: 0,
         competition: { ...g.competition, nextMoveAt: g.minutes + 5 },

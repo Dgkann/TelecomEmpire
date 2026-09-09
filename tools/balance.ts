@@ -121,7 +121,7 @@ for (let day = 0; day < DAYS; day++) {
   }
   for (const l of g.links) {
     if (l.capacityGbps > 0 && l.trafficGbps / l.capacityGbps > 0.8 && l.tier < 2) {
-      const cost = Math.round(l.length * 2200 * l.tier);
+      const cost = Math.round(l.length * 44000 * l.tier);
       if (g.money > cost * 2) {
         g.money -= cost;
         g.links = g.links.map((x) =>
@@ -135,10 +135,10 @@ for (let day = 0; day < DAYS; day++) {
     if (inc.resolved || inc.assignedTechId) continue;
     const t = g.technicians.find((x) => x.state === 'idle');
     if (!t) break;
-    const rush = Math.round((1200 + inc.repairTotalMinutes * 22) / 100) * 100;
+    const rush = Math.round((24000 + inc.repairTotalMinutes * 440) / 2000) * 2000;
     const canRush = g.money > rush * 3;
     if (canRush) g.money -= rush;
-    else g.money -= Math.round((300 + inc.repairTotalMinutes * 5) / 100) * 100;
+    else g.money -= Math.round((6000 + inc.repairTotalMinutes * 100) / 2000) * 2000;
     const minutes = Math.round(inc.repairTotalMinutes * (canRush ? 0.28 : 1));
     g.incidents = g.incidents.map((x) =>
       x.id === inc.id ? { ...x, repairMinutesLeft: minutes, assignedTechId: t.id } : x,

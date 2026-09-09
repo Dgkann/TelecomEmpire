@@ -892,11 +892,11 @@ group('pricing does not spiral');
 
   const marketPriced = {
     ...strong,
-    packages: strong.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 34 } : p)),
+    packages: strong.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 680 } : p)),
   };
   const valuePriced = {
     ...strong,
-    packages: strong.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 24 } : p)),
+    packages: strong.packages.map((p) => (p.segment === 'residential' ? { ...p, price: 480 } : p)),
   };
   const marketPull = districtPull(marketPriced, marketPriced.districts[0]).player;
   const valuePull = districtPull(valuePriced, valuePriced.districts[0]).player;
@@ -1646,10 +1646,10 @@ group('pricing is a lever the game points at');
   });
   const idOf = (s: GameState) => operationsInsights(s).map((i) => i.id);
 
-  check('being well above the market is raised', idOf(priced(rivalsAt(0.8), 60)).includes('pricing-high'));
-  check('being well under it is raised', idOf(priced(rivalsAt(1.2), 18)).includes('pricing-low'));
+  check('being well above the market is raised', idOf(priced(rivalsAt(0.8), 1200)).includes('pricing-high'));
+  check('being well under it is raised', idOf(priced(rivalsAt(1.2), 360)).includes('pricing-low'));
 
-  const matched = priced(rivalsAt(1), 34);
+  const matched = priced(rivalsAt(1), 680);
   check(
     'sitting at the market is left alone',
     !idOf(matched).some((id) => id.startsWith('pricing-')),
@@ -1657,10 +1657,10 @@ group('pricing is a lever the game points at');
   );
 
   // Undercutting a full network is not an opportunity, it is a problem.
-  const busy = { ...priced(rivalsAt(1.2), 18), stats: { ...g.stats, demandGbps: 999 } };
+  const busy = { ...priced(rivalsAt(1.2), 360), stats: { ...g.stats, demandGbps: 999 } };
   check('cheap is not suggested when the network is full', !idOf(busy).includes('pricing-low'));
 
-  const high = operationsInsights(priced(rivalsAt(0.8), 60)).find((i) => i.id === 'pricing-high');
+  const high = operationsInsights(priced(rivalsAt(0.8), 1200)).find((i) => i.id === 'pricing-high');
   check('it sends you to the pricing panel', high?.target.type === 'screen' && high.target.anchor === 'pricing');
 }
 
@@ -2451,15 +2451,15 @@ group('phase-two staff, research points and finance ledger');
 
   const originalToast = useGame.getState().toast;
   useGame.setState({ toast: () => undefined });
-  const researchState: GameState = { ...g, money: 100000, researchPoints: 12, researchActive: null, ledger: [] };
+  const researchState: GameState = { ...g, money: 2000000, researchPoints: 12, researchActive: null, ledger: [] };
   useGame.setState({ game: researchState, started: true });
   useGame.getState().startResearch('ftth');
   const researching = useGame.getState().game!;
   check('research consumes its research-point cost', researching.researchPoints === 0);
-  check('research still consumes its cash cost', researching.money === 60000);
+  check('research still consumes its cash cost', researching.money === 1200000);
   check(
     'research spending appears in the finance ledger',
-    researching.ledger.some((entry) => entry.category === 'research' && entry.amount === -40000),
+    researching.ledger.some((entry) => entry.category === 'research' && entry.amount === -800000),
   );
 
   useGame.setState({ game: { ...researchState, researchPoints: 11, researchActive: null } });
@@ -2671,13 +2671,13 @@ group('contract negotiation');
     districtId: building.districtId,
     buildingId: building.id,
     bandwidthGbps: 1.5,
-    monthlyRevenue: 2000,
+    monthlyRevenue: 40000,
     slaPercent: 99.9,
     termMonths: 24,
     segment: 'business',
     requiresRedundancy: false,
     expiresAt: g.minutes + MINUTES_PER_DAY * 10,
-    signingBonus: 1000,
+    signingBonus: 20000,
   };
 
   const standard = negotiatedTerms(offer, 'standard');
@@ -3264,12 +3264,12 @@ group('development grants and investment planning');
   const granted = claimMilestone(g, 'customers')!;
   check(
     'a completed milestone pays its grant',
-    granted.money === originalCash + 3500 && granted.researchPoints === g.researchPoints + 5,
+    granted.money === originalCash + 70000 && granted.researchPoints === g.researchPoints + 5,
   );
   check('claim leaves the previous state untouched', g.money === originalCash && g.claimedMilestones.length === 0);
   check(
     'milestone grants are recorded as one-off cash',
-    granted.ledger[0].category === 'milestone_reward' && currentMonthCashFlow(granted).otherOneOffNet === 3500,
+    granted.ledger[0].category === 'milestone_reward' && currentMonthCashFlow(granted).otherOneOffNet === 70000,
   );
   check('milestones cannot pay twice', claimMilestone(granted, 'customers') === null);
   const restored = migrate(JSON.parse(JSON.stringify(granted)), SAVE_VERSION)!;
@@ -3282,7 +3282,7 @@ group('development grants and investment planning');
   const upgraded = migrate(legacy, 17);
   check(
     'v17 saves acquire an empty grant history without changing cash',
-    upgraded?.claimedMilestones.length === 0 && upgraded.money === originalCash,
+    upgraded?.claimedMilestones.length === 0 && upgraded.money === originalCash * 20,
   );
   check(
     'duplicate grant history is rejected',
@@ -3415,7 +3415,7 @@ group('Atomic network planning and strategy persistence');
   const migrated = migrate(legacy, 18);
   check(
     'v18 saves migrate without changing money',
-    !!migrated && migrated.money === g.money && migrated.strategy.decision === null,
+    !!migrated && migrated.money === g.money * 20 && migrated.strategy.decision === null,
   );
   check('current strategy saves round-trip', !!migrate(JSON.parse(JSON.stringify(g)), SAVE_VERSION));
   for (const bad of [
@@ -3439,7 +3439,7 @@ group('Atomic network planning and strategy persistence');
   const chosen = resolveDecision(proposal, 'decision-test', 'survey')!;
   check(
     'decision charges once and awards research',
-    chosen.money === g.money - 3500 &&
+    chosen.money === g.money - 70000 &&
       chosen.researchPoints === g.researchPoints + 12 &&
       chosen.strategy.decision === null,
   );
@@ -3759,7 +3759,7 @@ group('dispatch decisions and travel-aware restoration');
 
 group('district starter networks');
 {
-  const g = { ...newGame(9502), money: 1000000 };
+  const g = { ...newGame(9502), money: 20000000 };
   const district = g.districts.find((d) => !d.unlocked)!;
   const before = JSON.stringify(g);
   const access = expansionQuote(g, district.id, 'access')!;
@@ -3771,7 +3771,7 @@ group('district starter networks');
   check(
     'starter quote includes licence, site and exact fibre cost',
     access.total ===
-      district.entryCost + nodePlacementCost(g, 'access') + Math.round(access.placement!.distance * 1400),
+      district.entryCost + nodePlacementCost(g, 'access') + Math.round(access.placement!.distance * 28000),
   );
   const routes = computeRoutes(g);
   const freeCells = district.cells.filter((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy));
@@ -3829,7 +3829,7 @@ group('district starter networks');
   check(
     'GPON discounts also apply to district starter construction',
     expansionQuote({ ...g, researchDone: [...g.researchDone, 'gpon'] }, district.id, 'access')!.siteCost ===
-      Math.round(6500 * 0.75),
+      Math.round(130000 * 0.75),
   );
   check(
     'launch ledger and assets survive strict save validation',
@@ -4162,7 +4162,7 @@ group('competitive city procurement and verified delivery');
   check(
     'version 19 saves gain a fresh procurement schedule without charges',
     !!upgraded &&
-      upgraded.money === g.money &&
+      upgraded.money === g.money * 20 &&
       upgraded.procurement.tenders.length === 0 &&
       upgraded.version === SAVE_VERSION,
   );
@@ -4369,7 +4369,7 @@ group('district market operations and rival offensives');
     'version 20 networks migrate without buying any operation',
     !!migrated &&
       migrated.competition.operations.length === 0 &&
-      migrated.money === g.money &&
+      migrated.money === g.money * 20 &&
       migrated.competition.nextMoveAt === g.minutes + 2 * MINUTES_PER_DAY,
   );
   const bad = JSON.parse(JSON.stringify(launched));
