@@ -1,3 +1,4 @@
+import { energyPriceIndex, siteDrawKw } from './energy';
 import {
   BASELINE_ARPU,
   DATACENTER_HOSTING_BASE,
@@ -59,9 +60,9 @@ export function monthlyBreakdown(state: GameState, mods: ResearchMods): MonthlyB
   const powerKw = state.nodes.reduce((s, n) => {
     const modePower =
       n.kind === 'datacenter' ? DATA_CENTER_MODE_CONFIG[dataCenterMode(state, n.id)].powerMultiplier : 1;
-    return s + NODE_SPECS[n.kind].powerKw * (1 + (n.tier - 1) * 0.55) * modePower;
+    return s + siteDrawKw(state, n, modePower);
   }, 0);
-  const costPower = powerKw * POWER_COST_PER_KW_MONTH;
+  const costPower = powerKw * POWER_COST_PER_KW_MONTH * energyPriceIndex(state);
 
   const costMaintenance =
     (state.nodes.reduce((s, n) => s + NODE_SPECS[n.kind].maintenance * (1 + (n.tier - 1) * 0.5), 0) +

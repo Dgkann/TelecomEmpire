@@ -4,6 +4,7 @@ import { fixedCoverageTarget } from './reach';
 import { initialStrategy, tickBoard, developDistrict } from './board';
 import {
   CONTRACT_CONTENTION,
+  ENERGY,
   DIFFICULTY,
   GRID,
   HOURLY_DEMAND_CURVE,
@@ -45,6 +46,7 @@ import {
 import { contractProfile } from './contracts';
 import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
 import { computeRoutes, loadServices, servingNodes, type TrafficService } from './network';
+import { initialEnergy, siteDrawKw, tickEnergyMonth } from './energy';
 import { researchModifiers, type ResearchMods } from './research';
 import { CAMPAIGN_STAGES, scenarioStatus } from './scenarios';
 import { staffModifiers, trainEmployee, trainTechnician } from './staff';
@@ -434,6 +436,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     tutorialStep: 0,
     claimedMilestones: [],
     strategy: initialStrategy(8 * 60),
+    energy: initialEnergy(8 * 60),
     procurement: initialProcurement(8 * 60),
     competition: initialCompetition(8 * 60),
     tutorialDone: false,
@@ -969,6 +972,20 @@ export function step(prev: GameState): GameState {
     s.researchPoints += staff.researchPointsPerDay + Math.max(0, Math.round(totalCustomers(s) / 2500));
   }
   if (newMonth) {
+    // Wholesale power resets, and any carbon levy lands with it.
+    const drawKw = s.nodes.reduce(
+      (sum, n) =>
+        sum +
+        siteDrawKw(
+          s,
+          n,
+          n.kind === 'datacenter' ? DATA_CENTER_MODE_CONFIG[dataCenterMode(s, n.id)].powerMultiplier : 1,
+        ),
+      0,
+    );
+    for (const event of tickEnergyMonth(s, rng, drawKw)) pushLog(s, event.text, event.tone);
+    if (s.energy.plan === 'green') s.reputation = clamp(s.reputation + ENERGY.greenReputationPerMonth, 0, 100);
+
     const completedRevenue = s.monthAccumulator.revenue;
     const completedExpense = s.monthAccumulator.expense;
     const completedPenalties = s.finance.penalties;

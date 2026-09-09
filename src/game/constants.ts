@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -107,6 +107,28 @@ export const FIBER_MAINTENANCE_PER_UNIT = 440;
 export const POWER_COST_PER_KW_MONTH = 2600;
 
 // The reference residential price the whole market is measured against.
+// Wholesale power moves with the season and the market; the player picks how much
+// of that risk to carry. Indexes are multiples of POWER_COST_PER_KW_MONTH.
+export const ENERGY = {
+  spotFloor: 0.72,
+  spotCeiling: 1.85,
+  meanReversion: 0.28,
+  monthlyVolatility: 0.14,
+  seasonalAmplitude: 0.06,
+  fixedPremium: 1.12,
+  fixedTermMonths: 12,
+  fixedExitMonths: 2,
+  greenPremium: 1.22,
+  greenReputationPerMonth: 0.35,
+  // Charged per kW of draw on operators that are not on a renewable tariff.
+  // About 14% of a quarter's power bill: a nudge toward renewables, not a hammer.
+  levyPerKw: 1100,
+  levyIntervalDays: 90,
+  // Priced for roughly a twenty-month payback at the reference tariff.
+  solarCostPerKw: 24000,
+  solarDrawCut: 0.45,
+} as const;
+
 export const BASELINE_ARPU = 680;
 
 export const TRANSIT_TIERS = [

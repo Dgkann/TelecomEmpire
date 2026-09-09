@@ -1,4 +1,5 @@
 import { initialCompetition, OPERATION_MINUTES } from './competition';
+import { initialEnergy } from './energy';
 import { initialProcurement, bidBond, ACCEPTANCE_MINUTES } from './procurement';
 import { initialStrategy } from './board';
 import { NODE_SPECS, SAVE_VERSION, SPECTRUM_BANDS, TRANSIT_TIERS } from './constants';
@@ -352,6 +353,8 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   // Prices moved from dollars to lira. Every stored amount is the same value in the
   // new unit, so balances, debts and contracts keep their meaning.
   21: (s) => scaleStoredMoney(s, MONEY_RESCALE),
+  // Energy became a decision: existing networks start on the spot tariff.
+  22: (s) => ({ ...s, energy: initialEnergy(Number(s.minutes) || 0) }),
 };
 
 const DEFAULTS = {
@@ -1087,6 +1090,25 @@ function normalizeIncidentReferences(state: LegacyState): LegacyState {
   return { ...state, version: SAVE_VERSION, finance, incidents: normalizedIncidents, maintenanceOrders, technicians };
 }
 
+function isEnergy(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const ids = value.solarNodeIds;
+  return (
+    isEnum(value.plan, new Set(['spot', 'fixed', 'green'])) &&
+    isNumber(value.spotIndex, 0.1, 5) &&
+    Array.isArray(value.history) &&
+    value.history.length <= 24 &&
+    value.history.every((entry) => isNumber(entry, 0.1, 5)) &&
+    (value.fixedUntil === null || isNumber(value.fixedUntil, 0)) &&
+    isNumber(value.fixedIndex, 0.1, 5) &&
+    Array.isArray(ids) &&
+    ids.every((id) => isId(id)) &&
+    new Set(ids as string[]).size === ids.length &&
+    isNumber(value.nextLevyAt, 0) &&
+    isNumber(value.leviesPaid, 0)
+  );
+}
+
 function isCompetition(value: unknown): boolean {
   const operation = (v: unknown): boolean =>
     isRecord(v) &&
@@ -1365,6 +1387,7 @@ function validateState(value: unknown): GameState | null {
     isStrategy(value.strategy) &&
     isProcurement(value.procurement) &&
     isCompetition(value.competition) &&
+    isEnergy(value.energy) &&
     isStats(value.stats) &&
     isFinance(value.finance) &&
     isDataCenterModeRecord(value.dataCenterModes) &&

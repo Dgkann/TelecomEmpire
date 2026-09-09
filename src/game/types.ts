@@ -524,9 +524,28 @@ export interface GameState {
   strategy: StrategyState;
   procurement: ProcurementState;
   competition: CompetitionState;
+  energy: EnergyState;
   tutorialDone: boolean;
   autosaveAt: number;
   rngSeed: number;
+}
+
+export type EnergyPlan = 'spot' | 'fixed' | 'green';
+
+export interface EnergyState {
+  plan: EnergyPlan;
+  // Wholesale price as a multiple of the reference tariff.
+  spotIndex: number;
+  // Monthly samples, oldest first, kept for two years.
+  history: number[];
+  // Game minute the fixed contract runs out; null when not on one.
+  fixedUntil: number | null;
+  // The index locked in when that contract was signed.
+  fixedIndex: number;
+  // Sites running their own generation.
+  solarNodeIds: string[];
+  nextLevyAt: number;
+  leviesPaid: number;
 }
 
 export interface StrategyState {
