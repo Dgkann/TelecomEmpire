@@ -18,7 +18,7 @@ export interface OperationsInsight {
 }
 
 // Shown as a price relative to the market reference, which reads better than an index.
-const fmtIndex = (i: number) => `$${Math.round(i * BASELINE_ARPU)}`;
+const fmtIndex = (i: number) => `${Math.round(i * BASELINE_ARPU).toLocaleString('tr-TR')} ₺`;
 
 export function contractRisk(state: GameState, contract: EnterpriseContract) {
   const allowance = Math.max(1, 43200 * (1 - contract.slaPercent / 100));

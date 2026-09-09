@@ -150,13 +150,12 @@ export function priceIndex(state: GameState) {
 export const fmtMoney = (n: number) => {
   const abs = Math.abs(n);
   const sign = n < 0 ? '-' : '';
-  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`;
-  if (abs >= 10000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs).toLocaleString('en-US')}`;
+  if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(2)}B ₺`;
+  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(2)}M ₺`;
+  if (abs >= 10000) return `${sign}${Math.round(abs / 1000)}k ₺`;
+  return `${sign}${Math.round(abs).toLocaleString('tr-TR')} ₺`;
 };
-
-export const fmtMoneyExact = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n)).toLocaleString('en-US')}`;
+export const fmtMoneyExact = (n: number) => `${n < 0 ? '-' : ''}${Math.abs(Math.round(n)).toLocaleString('tr-TR')} ₺`;
 
 export const fmtNum = (n: number) => {
   if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`;

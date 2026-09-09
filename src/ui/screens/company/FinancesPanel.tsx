@@ -117,8 +117,8 @@ export default function FinancesPanel({ vm }: { vm: CompanyModel }) {
                 height={86}
                 formatValue={fmtMoney}
                 series={[
-                  { label: 'Revenue $', values: vm.game.history.slice(-14).map((h) => h.revenue), color: '#75df9a' },
-                  { label: 'Expense $', values: vm.game.history.slice(-14).map((h) => h.expense), color: '#ff6577' },
+                  { label: 'Revenue ₺', values: vm.game.history.slice(-14).map((h) => h.revenue), color: '#75df9a' },
+                  { label: 'Expense ₺', values: vm.game.history.slice(-14).map((h) => h.expense), color: '#ff6577' },
                 ]}
               />
             </div>

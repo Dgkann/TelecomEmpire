@@ -72,7 +72,7 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
 
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary text-xs" onClick={vm.hireTechnician}>
-          {t(vm.locale, 'hireFieldCrew')} · $4k
+          {t(vm.locale, 'hireFieldCrew')} · 4k ₺
         </button>
         {HIRE_ROLES.map((role) => (
           <button
@@ -81,7 +81,7 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
             title={STAFF_ROLE_INFO[role].effect}
             onClick={() => vm.hireEmployee(role)}
           >
-            Hire {STAFF_ROLE_INFO[role].label.toLowerCase()} · $6k
+            Hire {STAFF_ROLE_INFO[role].label.toLowerCase()} · 6k ₺
           </button>
         ))}
       </div>
