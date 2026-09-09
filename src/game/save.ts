@@ -9,6 +9,106 @@ import type { GameState, Package } from './types';
 
 type LegacyState = Record<string, unknown>;
 
+// Version 21 -> 22 multiplied every money constant by this factor.
+const MONEY_RESCALE = 20;
+
+const scaleNumber = (value: unknown, k: number) =>
+  typeof value === 'number' && Number.isFinite(value) ? value * k : value;
+
+function scaleFields(row: unknown, k: number, fields: string[]) {
+  if (!row || typeof row !== 'object') return row;
+  const next = { ...(row as Record<string, unknown>) };
+  for (const f of fields) if (f in next) next[f] = scaleNumber(next[f], k);
+  return next;
+}
+
+const scaleList = (list: unknown, k: number, fields: string[]) =>
+  Array.isArray(list) ? list.map((row) => scaleFields(row, k, fields)) : list;
+
+// Only money is touched; capacities, health, counts and timestamps are left alone.
+function scaleStoredMoney(s: LegacyState, k: number): LegacyState {
+  const next: LegacyState = { ...s };
+  for (const f of ['money', 'marketingBudget', 'retentionBudget']) next[f] = scaleNumber(next[f], k);
+
+  next.packages = scaleList(next.packages, k, ['price']);
+  next.contracts = scaleList(next.contracts, k, ['monthlyRevenue', 'penaltyPaid']);
+  next.offers = scaleList(next.offers, k, ['monthlyRevenue', 'signingBonus']);
+  next.employees = scaleList(next.employees, k, ['salary']);
+  next.technicians = scaleList(next.technicians, k, ['salary']);
+  next.loans = scaleList(next.loans, k, ['principal', 'remaining', 'monthlyPayment']);
+  next.ledger = scaleList(next.ledger, k, ['amount']);
+  next.history = scaleList(next.history, k, ['revenue', 'expense']);
+  next.districts = scaleList(next.districts, k, ['entryCost']);
+  next.maintenanceOrders = scaleList(next.maintenanceOrders, k, ['cost']);
+  next.campaigns = scaleList(next.campaigns, k, ['cost']);
+  next.campaignHistory = scaleList(next.campaignHistory, k, ['cost']);
+  next.competitors = scaleList(next.competitors, k, ['cash']);
+  next.regulations = scaleList(next.regulations, k, ['fine']);
+  next.spectrum = scaleList(next.spectrum, k, ['paid']);
+
+  next.finance = scaleFields(next.finance, k, [
+    'revenueResidential',
+    'revenueMobile',
+    'revenueBusiness',
+    'revenueEnterprise',
+    'revenueHosting',
+    'revenueWholesale',
+    'costSalaries',
+    'costPower',
+    'costMaintenance',
+    'costTransit',
+    'costMarketing',
+    'costRetention',
+    'costLoanPayments',
+    'penalties',
+  ]);
+  next.monthAccumulator = scaleFields(next.monthAccumulator, k, ['revenue', 'expense']);
+
+  const auction = next.auction as Record<string, unknown> | null | undefined;
+  if (auction && typeof auction === 'object') {
+    const a = scaleFields(auction, k, ['reserve', 'playerBid']) as Record<string, unknown>;
+    const result = a.result as Record<string, unknown> | null | undefined;
+    if (result && typeof result === 'object') {
+      a.result = {
+        ...(scaleFields(result, k, ['price']) as Record<string, unknown>),
+        bids: scaleList(result.bids, k, ['amount']),
+      };
+    }
+    next.auction = a;
+  }
+
+  const procurement = next.procurement as Record<string, unknown> | undefined;
+  if (procurement && typeof procurement === 'object') {
+    next.procurement = {
+      ...procurement,
+      tenders: Array.isArray(procurement.tenders)
+        ? procurement.tenders.map((t) => {
+            const tender = scaleFields(t, k, ['budget', 'bond']) as Record<string, unknown>;
+            const bid = tender.playerBid as Record<string, unknown> | null | undefined;
+            if (bid && typeof bid === 'object') tender.playerBid = scaleFields(bid, k, ['price']);
+            tender.rivals = scaleList(tender.rivals, k, ['price']);
+            return tender;
+          })
+        : procurement.tenders,
+    };
+  }
+
+  const competition = next.competition as Record<string, unknown> | undefined;
+  if (competition && typeof competition === 'object') {
+    next.competition = {
+      ...competition,
+      operations: scaleList(competition.operations, k, ['cost']),
+      history: scaleList(competition.history, k, ['cost']),
+    };
+  }
+
+  const strategy = next.strategy as Record<string, unknown> | undefined;
+  if (strategy && typeof strategy === 'object') {
+    next.strategy = { ...strategy, acquisitions: scaleList(strategy.acquisitions, k, ['cost']) };
+  }
+  return next;
+}
+
 // One entry per version bump, keyed by the version it upgrades from.
 const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   // 1 -> 2: the mobile layer added spectrum, auctions and per-district radio coverage, plus three mobile packages.
@@ -249,6 +349,9 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   18: (s) => ({ ...s, strategy: initialStrategy(Number(s.minutes) || 0) }),
   19: (s) => ({ ...s, procurement: initialProcurement(Number(s.minutes) || 0) }),
   20: (s) => ({ ...s, competition: initialCompetition(Number(s.minutes) || 0) }),
+  // Prices moved from dollars to lira. Every stored amount is the same value in the
+  // new unit, so balances, debts and contracts keep their meaning.
+  21: (s) => scaleStoredMoney(s, MONEY_RESCALE),
 };
 
 const DEFAULTS = {
