@@ -40,6 +40,7 @@ import { residentialPeakEstimate } from '../src/game/planCapacity';
 // Invariant checks, run headless.
 import {
   MINUTES_PER_DAY,
+  ENERGY,
   MINUTES_PER_MONTH,
   MOBILE_MARKET_SHARE,
   NODE_SPECS,
@@ -110,6 +111,15 @@ import { generateCity } from '../src/game/cityGen';
 import { CAMPAIGN_STAGES, scenarioStatus } from '../src/game/scenarios';
 import { claimMilestone, milestoneProgress } from '../src/game/milestones';
 import { investmentEstimate, suggestedBackhaul } from '../src/game/investment';
+import {
+  buildSolar,
+  energyPriceIndex,
+  fixedExitFee,
+  hasSolar,
+  setEnergyPlan,
+  siteDrawKw,
+  tickEnergyMonth,
+} from '../src/game/energy';
 import type { ContractOffer, GameState, Incident, NetLink, NetNode } from '../src/game/types';
 
 // ---------------------------------------------------------------------------
@@ -4388,6 +4398,93 @@ group('district market operations and rival offensives');
       smartPauseEvents(promise, working, pref).some((e) => e.kind === 'market'),
   );
 }
+group('energy tariffs, carbon levy and on-site generation');
+{
+  const g = newGame(7311);
+  check('a new operator starts on the spot tariff', g.energy.plan === 'spot' && g.energy.spotIndex === 1);
+  check('nothing generates its own power yet', g.energy.solarNodeIds.length === 0 && g.energy.leviesPaid === 0);
+
+  // The wholesale index wanders but is bounded, so power can never price to zero or run away.
+  let walk = { ...g };
+  let low = Infinity;
+  let high = -Infinity;
+  for (let month = 0; month < 240; month++) {
+    walk = { ...walk, minutes: walk.minutes + MINUTES_PER_MONTH };
+    tickEnergyMonth(walk, makeRng(month + 1), 100);
+    low = Math.min(low, walk.energy.spotIndex);
+    high = Math.max(high, walk.energy.spotIndex);
+  }
+  check(
+    'the wholesale index stays inside its band',
+    low >= ENERGY.spotFloor && high <= ENERGY.spotCeiling,
+    `${low.toFixed(2)}..${high.toFixed(2)}`,
+  );
+  check('the index history is capped at two years', walk.energy.history.length === 24);
+
+  const fixed = setEnergyPlan({ ...g, energy: { ...g.energy, spotIndex: 0.9 } }, 'fixed')!;
+  check(
+    'a fixed contract locks the signing index',
+    fixed.energy.fixedIndex === 0.9 && fixed.energy.fixedUntil !== null,
+  );
+  const spiked = { ...fixed, energy: { ...fixed.energy, spotIndex: 1.8 } };
+  check(
+    'a locked contract ignores a later spike',
+    Math.abs(energyPriceIndex(spiked) - 0.9 * ENERGY.fixedPremium) < 1e-9,
+    `${energyPriceIndex(spiked)}`,
+  );
+  check('leaving a locked contract early is charged', fixedExitFee(spiked) > 0);
+  const escaped = setEnergyPlan(spiked, 'spot')!;
+  check('the exit fee leaves the treasury', escaped.money < spiked.money && escaped.energy.fixedUntil === null);
+
+  const green = setEnergyPlan(g, 'green')!;
+  check('green supply costs more per kW', energyPriceIndex(green) > energyPriceIndex(g));
+  const greenLevy = { ...green, minutes: green.energy.nextLevyAt };
+  const greenCash = greenLevy.money;
+  tickEnergyMonth(greenLevy, makeRng(4), 500);
+  check(
+    'a green operator is never charged the levy',
+    greenLevy.money === greenCash && greenLevy.energy.leviesPaid === 0,
+  );
+
+  const dirty = { ...g, minutes: g.energy.nextLevyAt };
+  const dirtyCash = dirty.money;
+  tickEnergyMonth(dirty, makeRng(4), 500);
+  check('everyone else pays the carbon levy', dirty.money < dirtyCash && dirty.energy.leviesPaid > 0);
+  check('the levy is rescheduled, not repeated', dirty.energy.nextLevyAt > g.energy.nextLevyAt);
+
+  const site = g.nodes.find((n) => n.kind === 'core')!;
+  check('generation needs its research first', buildSolar(g, site.id, false) === null);
+  const fitted = buildSolar({ ...g, money: 100000000 }, site.id, true)!;
+  check('generation is paid for and recorded', fitted.money < 100000000 && hasSolar(fitted, site.id));
+  check(
+    'a fitted site draws less from the grid',
+    siteDrawKw(fitted, site) < siteDrawKw(g, site),
+    `${siteDrawKw(fitted, site)} < ${siteDrawKw(g, site)}`,
+  );
+  check('the same site cannot be fitted twice', buildSolar(fitted, site.id, true) === null);
+  check(
+    'a cheaper bill follows the lower draw',
+    monthlyBreakdown(fitted, researchModifiers(fitted.researchDone)).costPower <
+      monthlyBreakdown(g, researchModifiers(g.researchDone)).costPower,
+  );
+
+  const legacy = JSON.parse(JSON.stringify(g)) as Record<string, unknown>;
+  delete legacy.energy;
+  legacy.version = 22;
+  const migrated = migrate(legacy, 22);
+  check(
+    'version 22 networks migrate onto the spot tariff without a charge',
+    !!migrated &&
+      migrated.energy.plan === 'spot' &&
+      migrated.money === g.money &&
+      migrated.energy.solarNodeIds.length === 0,
+  );
+  check('energy state survives a save round trip', !!migrate(JSON.parse(JSON.stringify(fitted)), SAVE_VERSION));
+  const broken = JSON.parse(JSON.stringify(g));
+  broken.energy.plan = 'nuclear';
+  check('an unknown tariff is rejected on load', migrate(broken, SAVE_VERSION) === null);
+}
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);
