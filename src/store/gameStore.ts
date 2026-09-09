@@ -12,6 +12,7 @@ import {
   type SmartPauseNotice,
 } from '../game/smartPause';
 import { updateCompanyIdentity } from '../game/identity';
+import { buildSolar, setEnergyPlan as applyEnergyPlan } from '../game/energy';
 import { launchDistrict as buildDistrictLaunch, type ExpansionKind } from '../game/expansion';
 import type { FailureTarget } from '../game/failureDrill';
 import { buildBackupRoute } from '../game/redundancyBuild';
@@ -64,6 +65,7 @@ import {
 } from '../game/strategy';
 import type {
   CampaignKind,
+  EnergyPlan,
   DataCenterMode,
   GameState,
   InterconnectPlan,
@@ -198,6 +200,8 @@ interface Store extends UiState {
   repayLoan: (id: string) => void;
   setTransitTier: (tier: number) => void;
   toggleBackupTransit: () => void;
+  setEnergyPlan: (plan: EnergyPlan) => boolean;
+  installSolar: (nodeId: string) => boolean;
   toggleAutoDispatch: () => void;
   advanceTutorial: (stepIndex: number) => void;
   skipTutorial: () => void;
@@ -1417,6 +1421,26 @@ export const useGame = create<Store>((set, get) => ({
       pushLog(draft, `Upstream transit changed.`, 'info');
     });
     s.toast('Transit updated', 'good');
+  },
+
+  setEnergyPlan: (plan) => {
+    const s = get();
+    if (!s.game || s.planning) return false;
+    const next = applyEnergyPlan(s.game, plan);
+    if (!next) return false;
+    set({ game: next });
+    s.toast('Energy tariff updated', 'good');
+    return true;
+  },
+
+  installSolar: (nodeId) => {
+    const s = get();
+    if (!s.game || s.planning) return false;
+    const next = buildSolar(s.game, nodeId, researchModifiers(s.game.researchDone).hasOnsiteSolar);
+    if (!next) return false;
+    set({ game: next });
+    s.toast('On-site generation commissioned', 'good');
+    return true;
   },
 
   toggleBackupTransit: () => withGame(set, (draft) => void (draft.backupTransit = !draft.backupTransit)),

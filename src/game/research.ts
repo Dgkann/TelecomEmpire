@@ -135,6 +135,18 @@ export const RESEARCH: ResearchNode[] = [
     tier: 4,
   },
   {
+    id: 'onsite_solar',
+    name: 'On-site Generation',
+    description: 'Panels and batteries at your own sites. Cuts what each installed site draws from the grid.',
+    cost: 1300000,
+    points: 16,
+    days: 14,
+    requires: ['edge_compute'],
+    unlocks: ['Install generation per site', '45% lower draw where fitted'],
+    branch: 'ops',
+    tier: 3,
+  },
+  {
     id: 'mobile_4g',
     name: '4G LTE',
     description: 'Take the network mobile. Towers cover whole neighbourhoods at once.',
@@ -217,6 +229,7 @@ export function researchModifiers(done: string[]) {
     hasMobile: done.includes('mobile_4g'),
     hasPrivate5g: done.includes('private_5g'),
     hasAutoBalance: done.includes('ai_ops'),
+    hasOnsiteSolar: done.includes('onsite_solar'),
   };
 }
 
