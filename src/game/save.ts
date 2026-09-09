@@ -11,7 +11,6 @@ type LegacyState = Record<string, unknown>;
 
 // One entry per version bump, keyed by the version it upgrades from.
 const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
-  20: (s) => ({ ...s, competition: initialCompetition(Number(s.minutes) || 0) }),
   // 1 -> 2: the mobile layer added spectrum, auctions and per-district radio coverage, plus three mobile packages.
   1: (s) => {
     const packages = Array.isArray(s.packages) ? (s.packages as Package[]) : [];
@@ -249,6 +248,7 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   17: (s) => ({ ...s, claimedMilestones: [] }),
   18: (s) => ({ ...s, strategy: initialStrategy(Number(s.minutes) || 0) }),
   19: (s) => ({ ...s, procurement: initialProcurement(Number(s.minutes) || 0) }),
+  20: (s) => ({ ...s, competition: initialCompetition(Number(s.minutes) || 0) }),
 };
 
 const DEFAULTS = {
