@@ -22,11 +22,20 @@ const NETWORK_VIEWS: Array<{ id: NetworkView; label: string; note: string }> = [
   { id: 'policy', label: 'Policy', note: 'QoS & peering' },
   { id: 'capacity', label: 'Capacity', note: 'Sites & forecast' },
   { id: 'operations', label: 'Operations', note: 'Maintenance' },
-  { id: 'interconnect', label: 'Edge & transit', note: 'External network' },
+  { id: 'interconnect', label: 'Edge & transit', note: 'Energy & external network' },
 ];
+const NETWORK_VIEWS_TR: Record<NetworkView, [string, string]> = {
+  live: ['Canlı', 'Kalite ve hizmet'],
+  lab: ['Ağ laboratuvarı', 'Yük testi ve yükseltme'],
+  policy: ['Politikalar', 'QoS ve eşleşme'],
+  capacity: ['Kapasite', 'Sahalar ve tahmin'],
+  operations: ['Operasyonlar', 'Bakım'],
+  interconnect: ['Enerji ve bağlantı', 'Tarifeler ve dış ağ'],
+};
 
 export default function NetworkScreen() {
   const m = useNetworkModel();
+  const tr = m.locale === 'tr';
 
   return (
     <div className="screen-shell">
@@ -47,12 +56,20 @@ export default function NetworkScreen() {
               className={`num text-sm font-semibold ${m.daysLeft !== null && m.daysLeft < 30 ? 'text-neon-red' : 'text-neon-lime'}`}
             >
               {!m.forecast.confident
-                ? 'Collecting baseline'
+                ? tr
+                  ? 'Veri toplanıyor'
+                  : 'Collecting baseline'
                 : m.daysLeft === null
-                  ? 'Demand stable'
+                  ? tr
+                    ? 'Talep dengeli'
+                    : 'Demand stable'
                   : m.daysLeft > 365
-                    ? 'More than 1 year'
-                    : `${Math.round(m.daysLeft)} days headroom`}
+                    ? tr
+                      ? '1 yıldan fazla'
+                      : 'More than 1 year'
+                    : tr
+                      ? `${Math.round(m.daysLeft)} günlük kapasite`
+                      : `${Math.round(m.daysLeft)} days headroom`}
             </div>
           </div>
         </div>
@@ -60,7 +77,7 @@ export default function NetworkScreen() {
         <div
           className="sticky top-0 z-20 -mx-1 flex gap-1 overflow-x-auto rounded-md border border-white/[0.08] bg-[#0d151c]/95 p-1 shadow-lg backdrop-blur lg:col-span-2"
           role="tablist"
-          aria-label="Network operations views"
+          aria-label={tr ? 'Ağ yönetimi görünümleri' : 'Network operations views'}
         >
           {NETWORK_VIEWS.map((view) => (
             <button
@@ -77,8 +94,8 @@ export default function NetworkScreen() {
                   : 'border-transparent text-white/50 hover:bg-white/[0.05] hover:text-white/80'
               }`}
             >
-              <span className="block text-[11px] font-semibold">{view.label}</span>
-              <span className="block text-[9px] text-white/40">{view.note}</span>
+              <span className="block text-[11px] font-semibold">{tr ? NETWORK_VIEWS_TR[view.id][0] : view.label}</span>
+              <span className="block text-[9px] text-white/40">{tr ? NETWORK_VIEWS_TR[view.id][1] : view.note}</span>
             </button>
           ))}
         </div>
