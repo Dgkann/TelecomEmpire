@@ -1429,7 +1429,7 @@ export const useGame = create<Store>((set, get) => ({
     const next = applyEnergyPlan(s.game, plan);
     if (!next) return false;
     set({ game: next });
-    s.toast('Energy tariff updated', 'good');
+    s.toast(s.locale === 'tr' ? 'Enerji tarifesi güncellendi' : 'Energy tariff updated', 'good');
     return true;
   },
 
@@ -1439,7 +1439,7 @@ export const useGame = create<Store>((set, get) => ({
     const next = buildSolar(s.game, nodeId, researchModifiers(s.game.researchDone).hasOnsiteSolar);
     if (!next) return false;
     set({ game: next });
-    s.toast('On-site generation commissioned', 'good');
+    s.toast(s.locale === 'tr' ? 'Saha üretimi devreye alındı' : 'On-site generation commissioned', 'good');
     return true;
   },
 

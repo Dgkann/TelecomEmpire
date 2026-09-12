@@ -158,6 +158,9 @@ export interface EnergyEvent {
   tone: 'good' | 'bad' | 'info';
 }
 
+export const carbonLevy = (totalKw: number, plan: EnergyPlan) =>
+  plan === 'green' ? 0 : Math.round((totalKw * ENERGY.levyPerKw) / 1000) * 1000;
+
 // Rolls the wholesale price and settles any carbon levy. Called once per game month.
 export function tickEnergyMonth(s: GameState, rng: Rng, totalKw: number): EnergyEvent[] {
   const events: EnergyEvent[] = [];
@@ -187,7 +190,7 @@ export function tickEnergyMonth(s: GameState, rng: Rng, totalKw: number): Energy
   if (s.minutes >= s.energy.nextLevyAt) {
     s.energy = { ...s.energy, nextLevyAt: s.minutes + ENERGY.levyIntervalDays * MINUTES_PER_DAY };
     if (s.energy.plan !== 'green' && totalKw > 0) {
-      const levy = Math.round((totalKw * ENERGY.levyPerKw) / 1000) * 1000;
+      const levy = carbonLevy(totalKw, s.energy.plan);
       s.money -= levy;
       s.energy = { ...s.energy, leviesPaid: s.energy.leviesPaid + levy };
       recordLedger(s, 'regulatory_fine', 'Carbon levy on network power', -levy);

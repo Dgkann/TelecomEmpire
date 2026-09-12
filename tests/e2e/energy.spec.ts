@@ -28,10 +28,16 @@ test('energy desk reaches every site and previews a tariff without spending cash
   await page.getByRole('tab', { name: /Edge & transit/ }).click();
   const desk = page.getByRole('region', { name: 'Energy desk', exact: true });
   await expect(desk.getByText(/One-time exit fee/)).toHaveCount(2);
+  await expect(desk.getByRole('group', { name: 'Carbon levy outlook' })).toContainText('at month close');
+  await expect(desk.getByRole('group', { name: 'Fixed contract', exact: true })).toContainText('Monthly extra cost');
   expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(initial);
   await desk.getByRole('button', { name: /Show all sites/ }).click();
   await expect(desk.getByRole('button', { name: 'Install generation: Extra site 6', exact: true })).toBeVisible();
   await desk.getByRole('searchbox', { name: 'Search sites' }).fill('Extra site 6');
+  const site = desk.getByRole('group', { name: 'Extra site 6', exact: true });
+  await expect(site).toContainText('Monthly electricity saving');
+  await expect(site).toContainText('Estimated payback');
+  await expect(site).toContainText('Cash after installation');
   await desk.getByRole('button', { name: 'Install generation: Extra site 6', exact: true }).click();
   expect(await page.evaluate(() => (window as any).__game.getState().game.energy.solarNodeIds)).toContain('extra-6');
   await desk.getByRole('searchbox').fill('missing-site');
@@ -42,8 +48,12 @@ test('energy desk reaches every site and previews a tariff without spending cash
   const turkishDesk = page.getByRole('region', { name: 'Enerji masası', exact: true });
   await turkishDesk.getByRole('searchbox', { name: 'Saha ara' }).fill('');
   await expect(turkishDesk).toBeVisible();
+  await turkishDesk.getByRole('group', { name: 'Yeşil enerji', exact: true }).getByRole('button').click();
+  await expect(turkishDesk.getByRole('group', { name: 'Karbon vergisi takvimi' })).toContainText('vergiden muafsınız');
+  await expect(page.getByText('Enerji tarifesi güncellendi', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(
     true,
   );
+  await turkishDesk.getByRole('group', { name: 'Karbon vergisi takvimi' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('energy-desk.png') });
 });

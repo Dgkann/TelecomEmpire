@@ -1,3 +1,4 @@
+import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src/game/energyPlanning';
 import {
   initialCompetition,
   startMarketOperation,
@@ -4483,6 +4484,71 @@ group('energy tariffs, carbon levy and on-site generation');
   const broken = JSON.parse(JSON.stringify(g));
   broken.energy.plan = 'nuclear';
   check('an unknown tariff is rejected on load', migrate(broken, SAVE_VERSION) === null);
+}
+
+group('energy investment previews match commissioned costs');
+{
+  const base = newGame(7312);
+  const dc = { ...base.nodes[0], id: 'quote-dc', kind: 'datacenter' as const, tier: 2 };
+  const g: GameState = { ...base, money: 100000000, nodes: [...base.nodes, dc], dataCenterModes: { [dc.id]: 'cloud' } };
+  const snapshot = JSON.stringify(g);
+  const bill = monthlyBreakdown(g, researchModifiers(g.researchDone)).costPower;
+  check('preview includes the active data centre workload', Math.abs(operatingPowerBill(g) - bill) < 1e-6);
+  const quote = solarQuote(g, dc.id)!;
+  const built = buildSolar(g, dc.id, true)!;
+  const actualSaving = bill - monthlyBreakdown(built, researchModifiers(built.researchDone)).costPower;
+  check('solar saving matches the actual bill reduction', Math.abs(quote.monthlySaving - actualSaving) < 1e-6);
+  check('solar cash preview matches the purchase', quote.cashAfter === built.money);
+  check(
+    'solar payback recovers the capital through electricity alone',
+    Math.abs(quote.paybackMonths! * actualSaving - quote.cost) < 1e-6,
+  );
+  check(
+    'fitted sites report savings without another capital deduction',
+    solarQuote(built, dc.id)!.cashAfter === built.money &&
+      Math.abs(solarQuote(built, dc.id)!.monthlySaving - actualSaving) < 1e-6,
+  );
+  check('missing sites cannot be quoted', solarQuote(g, 'missing') === null);
+  const fixed = setEnergyPlan(g, 'fixed')!;
+  const spiked = { ...fixed, energy: { ...fixed.energy, spotIndex: 1.8 } };
+  const keep = tariffQuote(spiked, 'fixed');
+  check(
+    'current fixed quote keeps its signed rate without an exit fee',
+    keep.monthly === operatingPowerBill(spiked) && keep.exitFee === 0 && keep.cashAfter === spiked.money,
+  );
+  const greenQuote = tariffQuote(spiked, 'green');
+  const green = setEnergyPlan(spiked, 'green')!;
+  check(
+    'tariff quote matches the actual exit debit and monthly bill',
+    greenQuote.cashAfter === green.money &&
+      Math.abs(greenQuote.monthly - monthlyBreakdown(green, researchModifiers(green.researchDone)).costPower) < 1e-6,
+  );
+  check(
+    'renewable quote and levy outlook agree on exemption',
+    greenQuote.levy === 0 && levyOutlook(green).amount === 0,
+  );
+  const levy = levyOutlook(g);
+  check(
+    'levy is scheduled at the first month close on or after its due date',
+    levy.at % MINUTES_PER_MONTH === 0 &&
+      levy.at >= g.energy.nextLevyAt &&
+      levy.at - MINUTES_PER_MONTH < g.energy.nextLevyAt,
+  );
+  const settled = { ...g, minutes: levy.at };
+  const kw = g.nodes.reduce(
+    (sum, node) =>
+      sum + siteDrawKw(g, node, node.kind === 'datacenter' ? DATA_CENTER_MODE_CONFIG.cloud.powerMultiplier : 1),
+    0,
+  );
+  tickEnergyMonth(settled, makeRng(5), kw);
+  check('estimated carbon levy equals the actual settlement', g.money - settled.money === levy.amount);
+  check('generation reduces the next levy estimate', levyOutlook(built).amount < levy.amount);
+  const poor = { ...spiked, money: 0 };
+  check(
+    'unaffordable quotes remain available without authorizing a purchase',
+    tariffQuote(poor, 'green').cashAfter < 0 && setEnergyPlan(poor, 'green') === null,
+  );
+  check('investment previews leave the original game untouched', JSON.stringify(g) === snapshot);
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

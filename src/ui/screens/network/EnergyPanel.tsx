@@ -1,18 +1,10 @@
 import { useState } from 'react';
-import { ENERGY, MINUTES_PER_DAY, MINUTES_PER_MONTH } from '../../../game/constants';
+import { ENERGY, MINUTES_PER_DAY } from '../../../game/constants';
 import { fmtMoney } from '../../../game/economy';
-import {
-  ENERGY_PLANS,
-  energyPriceIndex,
-  fixedExitFee,
-  hasSolar,
-  monthlyPowerBill,
-  planIssue,
-  solarCost,
-  solarIssue,
-} from '../../../game/energy';
-import type { EnergyPlan, NetNode } from '../../../game/types';
-import { DATA_CENTER_MODE_CONFIG, dataCenterMode } from '../../../game/strategy';
+import { ENERGY_PLANS, energyPriceIndex, hasSolar, planIssue, solarCost, solarIssue } from '../../../game/energy';
+import type { EnergyPlan } from '../../../game/types';
+import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../../../game/energyPlanning';
+import { dateFromMinutes } from '../../../game/simulation';
 import { useGame } from '../../../store/gameStore';
 import { t } from '../../i18n';
 import type { NetworkModel } from './model';
@@ -27,10 +19,8 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
   const [showAll, setShowAll] = useState(false);
   const energy = m.game.energy;
   const index = energyPriceIndex(m.game);
-  const modePower = (node: NetNode) =>
-    node.kind === 'datacenter' ? DATA_CENTER_MODE_CONFIG[dataCenterMode(m.game, node.id)].powerMultiplier : 1;
-  const bill = monthlyPowerBill(m.game, modePower);
-  const exitFee = fixedExitFee(m.game);
+  const bill = operatingPowerBill(m.game);
+  const levy = levyOutlook(m.game);
   const canSolar = m.mods.hasOnsiteSolar;
   const history = energy.history.slice(-12);
   const peak = Math.max(ENERGY.spotCeiling, ...history);
@@ -56,6 +46,34 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
             {t(m.locale, 'tariffIndex')} ×{index.toFixed(2)}
           </div>
         </div>
+      </div>
+
+      <div
+        className="mt-4 rounded-md border border-neon-amber/25 bg-neon-amber/[0.04] p-3"
+        role="group"
+        aria-label={tr ? 'Karbon vergisi takvimi' : 'Carbon levy outlook'}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold">{tr ? 'Yaklaşan karbon vergisi' : 'Upcoming carbon levy'}</h3>
+          <span className="num text-sm text-neon-amber">{fmtMoney(levy.amount)}</span>
+        </div>
+        <p className="mt-1 text-xs text-white/65">
+          {energy.plan === 'green'
+            ? tr
+              ? 'Yeşil enerji tarifesinde kaldığınız sürece vergiden muafsınız.'
+              : 'Exempt while you remain on the renewable tariff.'
+            : `${dateFromMinutes(levy.at).toLocaleDateString(tr ? 'tr-TR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · ${levy.days} ${tr ? 'oyun günü sonra, ay kapanışında' : 'game days away, at month close'}`}
+        </p>
+        <p className="mt-1 text-xs text-white/55">
+          {tr
+            ? 'Mevcut tüketimle tahmin edilir. Yeni sahalar, çalışma modları ve saha üretimi tutarı değiştirir.'
+            : 'Estimated at current consumption. New sites, operating modes and on-site generation change the amount.'}
+        </p>
+        {levy.amount > m.game.money && (
+          <p className="mt-2 text-xs text-neon-amber">
+            {tr ? 'Mevcut nakit bu vergi tahminini karşılamıyor.' : 'Current cash does not cover this estimated levy.'}
+          </p>
+        )}
       </div>
 
       {/* Twelve months of wholesale price, so a spike is visible before it is signed away. */}
@@ -95,36 +113,55 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
           const plan = ENERGY_PLANS[id];
           const active = energy.plan === id;
           const issue = planIssue(m.game, id, m.locale);
-          const estimate = active
-            ? bill
-            : monthlyPowerBill(
-                {
-                  ...m.game,
-                  energy: {
-                    ...energy,
-                    plan: id,
-                    fixedIndex: energy.spotIndex,
-                    fixedUntil: id === 'fixed' ? m.game.minutes + ENERGY.fixedTermMonths * MINUTES_PER_MONTH : null,
-                  },
-                },
-                modePower,
-              );
+          const quote = tariffQuote(m.game, id);
+          const exitFee = quote.exitFee;
           return (
             <div
               key={id}
+              role="group"
+              aria-label={tr ? plan.titleTr : plan.title}
               className={`rounded-md border p-3 ${active ? 'border-neon-amber/50 bg-neon-amber/[0.07]' : 'border-white/10 bg-black/15'}`}
             >
               <div className="text-xs font-semibold text-white/85">{tr ? plan.titleTr : plan.title}</div>
               <div className="num mt-2 text-lg font-semibold text-white/90">
-                {fmtMoney(estimate)}
+                {fmtMoney(quote.monthly)}
                 <span className="ml-1 text-xs font-normal text-white/60">/ {tr ? 'ay' : 'month'}</span>
               </div>
               <p className="mt-1 text-[10px] leading-snug text-white/45">{tr ? plan.detailTr : plan.detail}</p>
               <p className="mt-1.5 text-[10px] leading-snug text-white/35">{tr ? plan.tradeoffTr : plan.tradeoff}</p>
               {!active && (
-                <p className="mt-2 text-xs text-white/60">
-                  {tr ? 'Tek seferlik çıkış bedeli' : 'One-time exit fee'}: {fmtMoney(exitFee)}
-                </p>
+                <dl className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs text-white/65">
+                  <div>
+                    <dt>
+                      {quote.monthlySaving > 0
+                        ? tr
+                          ? 'Aylık tasarruf'
+                          : 'Monthly saving'
+                        : quote.monthlySaving < 0
+                          ? tr
+                            ? 'Aylık ek maliyet'
+                            : 'Monthly extra cost'
+                          : tr
+                            ? 'Aylık fark'
+                            : 'Monthly difference'}
+                    </dt>
+                    <dd className={quote.monthlySaving > 0 ? 'num text-neon-lime' : 'num text-neon-amber'}>
+                      {fmtMoney(Math.abs(quote.monthlySaving))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr ? 'Tek seferlik çıkış bedeli' : 'One-time exit fee'}</dt>
+                    <dd className="num">{fmtMoney(exitFee)}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr ? 'Değişim sonrası nakit' : 'Cash after switching'}</dt>
+                    <dd className={`num ${quote.cashAfter < 0 ? 'text-neon-red' : ''}`}>{fmtMoney(quote.cashAfter)}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr ? 'Bu tarifeyle sonraki vergi' : 'Next levy on this tariff'}</dt>
+                    <dd className="num">{fmtMoney(quote.levy)}</dd>
+                  </div>
+                </dl>
               )}
               {active ? (
                 <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-neon-amber">
@@ -158,6 +195,11 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
         <p className="mt-1 text-[10px] leading-snug text-white/40">
           {canSolar ? t(m.locale, 'onsiteGenerationBlurb') : t(m.locale, 'onsiteGenerationLocked')}
         </p>
+        <p className="mt-2 text-xs text-white/60">
+          {tr
+            ? 'Geri ödeme, bugünkü elektrik tasarrufuyla hesaplanır; vergi avantajını içermez. Gelecekteki fiyatlar ve çalışma modları süreyi değiştirebilir.'
+            : 'Payback uses today’s electricity savings and excludes levy savings. Future prices and operating modes can change the duration.'}
+        </p>
         <label className="mt-3 block text-xs text-white/60">
           {tr ? 'Saha ara' : 'Search sites'}
           <input
@@ -171,9 +213,12 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
           {visibleSites.map((node) => {
             const fitted = hasSolar(m.game, node.id);
             const issue = solarIssue(m.game, node.id, canSolar, m.locale);
+            const quote = solarQuote(m.game, node.id)!;
             return (
               <div
                 key={node.id}
+                role="group"
+                aria-label={node.name}
                 className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/[0.07] bg-black/15 px-2.5 py-2"
               >
                 <span className="min-w-0 flex-1 break-words text-xs text-white/70">{node.name}</span>
@@ -189,9 +234,33 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
                     aria-label={`${tr ? 'Üretim kur' : 'Install generation'}: ${node.name}`}
                     onClick={() => installSolar(node.id)}
                   >
-                    {fmtMoney(solarCost(m.game, node.id))}
+                    {tr ? 'Kur' : 'Install'} · {fmtMoney(quote.cost)}
                   </button>
                 )}
+                <dl className="grid w-full grid-cols-2 gap-2 border-t border-white/[0.07] pt-2 text-xs text-white/60">
+                  <div>
+                    <dt>{tr ? 'Aylık elektrik tasarrufu' : 'Monthly electricity saving'}</dt>
+                    <dd className="num mt-1 text-neon-lime">{fmtMoney(quote.monthlySaving)}</dd>
+                  </div>
+                  {!fitted && (
+                    <div>
+                      <dt>{tr ? 'Tahmini geri ödeme' : 'Estimated payback'}</dt>
+                      <dd className="num mt-1 text-white/85">
+                        {quote.paybackMonths === null
+                          ? '—'
+                          : `${quote.paybackMonths.toLocaleString(tr ? 'tr-TR' : 'en-GB', { maximumFractionDigits: 1 })} ${tr ? 'ay' : 'months'}`}
+                      </dd>
+                    </div>
+                  )}
+                  {!fitted && (
+                    <div className="col-span-2">
+                      <dt>{tr ? 'Kurulum sonrası nakit' : 'Cash after installation'}</dt>
+                      <dd className={`num mt-1 ${quote.cashAfter < 0 ? 'text-neon-red' : 'text-white/85'}`}>
+                        {fmtMoney(quote.cashAfter)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
                 {!fitted && issue && <p className="w-full text-xs text-white/60">{issue}</p>}
               </div>
             );
