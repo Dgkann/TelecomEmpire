@@ -12,6 +12,7 @@ import { fmtMoneyExact } from '../../game/economy';
 import type { CityTender, GameState } from '../../game/types';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
+import { SignalTrainingCard } from '../SignalTraining';
 
 const timeLeft = (until: number, now: number) => {
   const hours = Math.max(0, Math.ceil((until - now) / 60));
@@ -405,6 +406,7 @@ export default function ProjectsScreen() {
   return (
     <div className="screen-shell">
       <div className="mx-auto max-w-[1280px] space-y-5">
+        <SignalTrainingCard />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs text-neon-amber">{t(locale, 'municipalProcurementOffice')}</p>

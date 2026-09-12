@@ -525,12 +525,29 @@ export interface GameState {
   procurement: ProcurementState;
   competition: CompetitionState;
   energy: EnergyState;
+  signalTraining: SignalTraining;
   tutorialDone: boolean;
   autosaveAt: number;
   rngSeed: number;
 }
 
 export type EnergyPlan = 'spot' | 'fixed' | 'green';
+
+export interface SignalPuzzle {
+  seed: number;
+  size: 4 | 5;
+  rotations: number[];
+  moves: number;
+  completed: boolean;
+  reward: number;
+}
+
+export interface SignalTraining {
+  sequence: number;
+  completed: number;
+  nextRewardAt: number;
+  active: SignalPuzzle | null;
+}
 
 export interface EnergyState {
   plan: EnergyPlan;

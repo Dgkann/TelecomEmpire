@@ -47,6 +47,7 @@ import { contractProfile } from './contracts';
 import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
 import { computeRoutes, loadServices, servingNodes, type TrafficService } from './network';
 import { initialEnergy, siteDrawKw, tickEnergyMonth } from './energy';
+import { initialSignalTraining } from './signalTraining';
 import { researchModifiers, type ResearchMods } from './research';
 import { CAMPAIGN_STAGES, scenarioStatus } from './scenarios';
 import { staffModifiers, trainEmployee, trainTechnician } from './staff';
@@ -437,6 +438,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     claimedMilestones: [],
     strategy: initialStrategy(8 * 60),
     energy: initialEnergy(8 * 60),
+    signalTraining: initialSignalTraining(),
     procurement: initialProcurement(8 * 60),
     competition: initialCompetition(8 * 60),
     tutorialDone: false,
@@ -645,7 +647,7 @@ export function offeredTraffic(
 }
 
 export function step(prev: GameState): GameState {
-  if (prev.gameOver) return prev;
+  if (prev.gameOver || prev.signalTraining.active) return prev;
   const s: GameState = { ...prev };
   ensureActiveTariffs(s);
   const rng = makeRng((s.minutes * 2654435761 + s.rngSeed) >>> 0);

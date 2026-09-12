@@ -18,6 +18,7 @@ import TopBar from './ui/TopBar';
 import Tutorial from './ui/Tutorial';
 import { playSound, prepareAudio } from './ui/sound';
 import SaveManager from './ui/SaveManager';
+import SignalTrainingDialog from './ui/SignalTraining';
 
 // Only the map is on screen at startup. The rest load when first opened.
 const NetworkScreen = lazy(() => import('./ui/screens/NetworkScreen'));
@@ -221,6 +222,7 @@ function GameShell() {
           <GameOverOverlay />
           <VictoryOverlay />
           <SaveManager />
+          <SignalTrainingDialog />
           <CornerToasts />
           <CriticalEventFlash />
         </div>

@@ -1,5 +1,16 @@
 import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src/game/energyPlanning';
 import {
+  beginSignalTraining,
+  turnSignalTile,
+  finishSignalTraining,
+  signalConnection,
+  signalBoard,
+  validSignalTraining,
+  TRAINING_REWARD,
+  TRAINING_RESEARCH,
+  TRAINING_COOLDOWN,
+} from '../src/game/signalTraining';
+import {
   initialCompetition,
   startMarketOperation,
   cancelMarketOperation,
@@ -4549,6 +4560,115 @@ group('energy investment previews match commissioned costs');
     tariffQuote(poor, 'green').cashAfter < 0 && setEnergyPlan(poor, 'green') === null,
   );
   check('investment previews leave the original game untouched', JSON.stringify(g) === snapshot);
+}
+
+group('optional signal routing exercises');
+{
+  const g = newGame(811);
+  let allSolvable = true;
+  let allScrambled = true;
+  for (const size of [4, 5] as const) {
+    for (let seed = 0; seed < 100; seed++) {
+      const started = beginSignalTraining({ ...g, rngSeed: seed }, size)!;
+      const puzzle = started.signalTraining.active!;
+      allScrambled &&= !signalConnection(puzzle).connected;
+      allSolvable &&= signalConnection({ ...puzzle, rotations: puzzle.rotations.map(() => 0) }).connected;
+      allSolvable &&= signalBoard(puzzle.seed, size).every((mask) => [3, 5, 6, 9, 10, 12].includes(mask));
+    }
+  }
+  check('200 seeded boards contain a valid two-port route', allSolvable);
+  check('new exercises always require a player action', allScrambled);
+  const started = beginSignalTraining(g, 4)!;
+  check(
+    'starting is free and pauses company time',
+    started.money === g.money && started.speed === 0 && step(started) === started,
+  );
+  check('an unfinished route cannot claim a reward', finishSignalTraining(started) === null);
+  check('an active route cannot be replaced by another start', beginSignalTraining(started, 5) === null);
+  check(
+    'invalid rotation targets cannot change progress',
+    turnSignalTile(started, -1) === null &&
+      turnSignalTile(started, 16) === null &&
+      turnSignalTile(started, 0.5) === null,
+  );
+  let solved = started;
+  const original = JSON.stringify(started);
+  for (let cell = 0; cell < 16; cell++) {
+    while (solved.signalTraining.active!.rotations[cell] !== 0) solved = turnSignalTile(solved, cell)!;
+  }
+  check(
+    'rotating real pieces completes the route without changing the original',
+    signalConnection(solved.signalTraining.active!).connected && JSON.stringify(started) === original,
+  );
+  const rewarded = finishSignalTraining(solved)!;
+  check(
+    'completion credits the advertised grant once',
+    rewarded.money === g.money + TRAINING_REWARD &&
+      rewarded.researchPoints === g.researchPoints + TRAINING_RESEARCH &&
+      finishSignalTraining(rewarded) === null,
+  );
+  check(
+    'grants are separate from operating income',
+    rewarded.ledger[0]?.category === 'milestone_reward' &&
+      rewarded.monthAccumulator.revenue === g.monthAccumulator.revenue,
+  );
+  check('completed tiles cannot be rotated', turnSignalTile(rewarded, 0) === null);
+  const close = { ...rewarded, signalTraining: { ...rewarded.signalTraining, active: null } };
+  const practice = beginSignalTraining(close, 5)!;
+  const practiceSolved = {
+    ...practice,
+    signalTraining: {
+      ...practice.signalTraining,
+      active: { ...practice.signalTraining.active!, rotations: Array(25).fill(0) },
+    },
+  };
+  const practiced = finishSignalTraining(practiceSolved)!;
+  check(
+    'replaying on another difficulty cannot farm grants or research',
+    practiced.money === rewarded.money &&
+      practiced.researchPoints === rewarded.researchPoints &&
+      practiced.signalTraining.active!.reward === 0 &&
+      practiced.signalTraining.completed === 2,
+  );
+  const nextWeek = { ...practiceSolved, minutes: rewarded.minutes + TRAINING_COOLDOWN };
+  check(
+    'another grant becomes available after seven game days',
+    finishSignalTraining(nextWeek)!.money === rewarded.money + TRAINING_REWARD,
+  );
+  const resumed = migrate(JSON.parse(JSON.stringify(solved)), SAVE_VERSION);
+  check(
+    'saved partial progress preserves every rotation and move',
+    !!resumed && JSON.stringify(resumed.signalTraining) === JSON.stringify(solved.signalTraining),
+  );
+  const claimedSave = migrate(JSON.parse(JSON.stringify(rewarded)), SAVE_VERSION)!;
+  check('loading a completed exercise cannot claim twice', !!claimedSave && finishSignalTraining(claimedSave) === null);
+  const legacy = JSON.parse(JSON.stringify(g));
+  delete legacy.signalTraining;
+  legacy.version = 23;
+  const migrated = migrate(legacy, 23);
+  check(
+    'version 23 saves gain optional training without changing their money',
+    !!migrated &&
+      migrated.money === g.money &&
+      migrated.signalTraining.completed === 0 &&
+      migrated.signalTraining.active === null,
+  );
+  const broken = JSON.parse(JSON.stringify(started));
+  broken.signalTraining.active.rotations[0] = 4;
+  check('malformed cable orientations are rejected on import', migrate(broken, SAVE_VERSION) === null);
+  check(
+    'malformed dimensions and false completions are rejected',
+    !validSignalTraining({ ...started.signalTraining, active: { ...started.signalTraining.active!, size: 10000 } }) &&
+      !validSignalTraining({
+        ...started.signalTraining,
+        completed: 1,
+        active: { ...started.signalTraining.active!, completed: true },
+      }),
+  );
+  check(
+    'closed companies cannot start an exercise',
+    beginSignalTraining({ ...g, gameOver: { at: g.minutes, reason: 'closed' } }, 4) === null,
+  );
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

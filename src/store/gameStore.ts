@@ -39,6 +39,7 @@ import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/saveStor
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
 import { CAMPAIGN_STAGES } from '../game/scenarios';
 import { claimMilestone as grantMilestone, MILESTONES } from '../game/milestones';
+import { beginSignalTraining, turnSignalTile, finishSignalTraining } from '../game/signalTraining';
 import { projectBlueprint, type BuildStep } from '../game/blueprint';
 import {
   createNewGame,
@@ -149,6 +150,10 @@ interface Store extends UiState {
   advanceCampaign: () => boolean;
 
   tick: () => void;
+  startSignalTraining: (size: 4 | 5) => void;
+  rotateSignalTile: (index: number) => void;
+  submitSignalTraining: () => boolean;
+  closeSignalTraining: () => void;
   setSpeed: (speed: Speed) => void;
 
   setScreen: (screen: Screen) => void;
@@ -407,7 +412,7 @@ export const useGame = create<Store>((set, get) => ({
 
   tick: () => {
     const s = get();
-    if (s.planning || s.drillTarget) return;
+    if (s.planning || s.drillTarget || s.game?.signalTraining.active) return;
     if (!s.game || s.game.speed === 0) return;
     let g = s.game;
     let notice = s.smartPauseNotice;
@@ -447,7 +452,7 @@ export const useGame = create<Store>((set, get) => ({
   },
   endFailureDrill: () => set({ drillTarget: null }),
   setSpeed: (speed) => {
-    if (!get().planning && !get().drillTarget) {
+    if (!get().planning && !get().drillTarget && !get().game?.signalTraining.active) {
       withGame(set, (g) => void (g.speed = speed));
       if (speed > 0) set({ smartPauseNotice: null });
     }
@@ -520,6 +525,30 @@ export const useGame = create<Store>((set, get) => ({
       `${goal.title[s.locale === 'tr' ? 1 : 0]} · +$${goal.reward.toLocaleString()} · +${goal.research} ${s.locale === 'tr' ? 'araştırma puanı' : 'research points'}`,
       'good',
     );
+  },
+
+  startSignalTraining: (size) => {
+    const s = get();
+    if (!s.game || s.planning || s.drillTarget || s.openIncidentId || s.showSaveManager || s.showHelp || s.game.auction)
+      return;
+    const next = beginSignalTraining(s.game, size);
+    if (next) set({ game: next });
+  },
+  rotateSignalTile: (index) => {
+    const s = get();
+    const next = s.game && turnSignalTile(s.game, index);
+    if (next) set({ game: next });
+  },
+  submitSignalTraining: () => {
+    const s = get();
+    const next = s.game && finishSignalTraining(s.game);
+    if (!next) return false;
+    set({ game: next });
+    return true;
+  },
+  closeSignalTraining: () => {
+    const s = get();
+    if (s.game) set({ game: { ...s.game, speed: 0, signalTraining: { ...s.game.signalTraining, active: null } } });
   },
 
   setScreen: (screen) => {

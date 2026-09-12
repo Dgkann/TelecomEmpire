@@ -1,5 +1,6 @@
 import { initialCompetition, OPERATION_MINUTES } from './competition';
 import { initialEnergy } from './energy';
+import { initialSignalTraining, validSignalTraining } from './signalTraining';
 import { initialProcurement, bidBond, ACCEPTANCE_MINUTES } from './procurement';
 import { initialStrategy } from './board';
 import { NODE_SPECS, SAVE_VERSION, SPECTRUM_BANDS, TRANSIT_TIERS } from './constants';
@@ -355,6 +356,7 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   21: (s) => scaleStoredMoney(s, MONEY_RESCALE),
   // Energy became a decision: existing networks start on the spot tariff.
   22: (s) => ({ ...s, energy: initialEnergy(Number(s.minutes) || 0) }),
+  23: (s) => ({ ...s, signalTraining: initialSignalTraining() }),
 };
 
 const DEFAULTS = {
@@ -1388,6 +1390,7 @@ function validateState(value: unknown): GameState | null {
     isProcurement(value.procurement) &&
     isCompetition(value.competition) &&
     isEnergy(value.energy) &&
+    validSignalTraining(value.signalTraining) &&
     isStats(value.stats) &&
     isFinance(value.finance) &&
     isDataCenterModeRecord(value.dataCenterModes) &&
