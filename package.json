@@ -17,6 +17,7 @@
     "performance:network": "esbuild tools/network-benchmark.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/network-benchmark.mjs --log-level=error && node node_modules/.cache/network-benchmark.mjs",
     "check": "esbuild tools/checks.ts --bundle --platform=node --format=esm --define:import.meta.env.VITE_E2E=false --outfile=node_modules/.cache/checks.mjs --log-level=error && node node_modules/.cache/checks.mjs",
     "balance": "esbuild tools/balance.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs",
+    "release:audit": "esbuild tools/release-audit.ts --bundle --platform=node --format=esm --define:import.meta.env.VITE_E2E=false --outfile=node_modules/.cache/release-audit.mjs --log-level=error && node node_modules/.cache/release-audit.mjs",
     "mobile-check": "esbuild tools/mobile-check.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/mobile.mjs --log-level=error && node node_modules/.cache/mobile.mjs",
     "audit": "npm audit --audit-level=moderate",
     "verify-commits": "bash tools/verify-commits.sh",
