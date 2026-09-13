@@ -46,7 +46,7 @@ const STEPS: TutorialStep[] = [
     titleTr: 'Akşam yoğunluğunu izle',
     bodyTr:
       'Trafik 18:00 ile 23:00 arasında yaklaşık iki katına çıkar. Bir POP noktasını T1 seviyesinden T2 seviyesine yükselt.',
-    done: (g) => g.nodes.some((n) => n.tier >= 2),
+    done: (g) => g.nodes.some((n) => n.kind === 'pop' && n.tier >= 2),
   },
   {
     title: 'Protect a customer site',
@@ -76,6 +76,10 @@ export default function Tutorial() {
   const selection = useGame((s) => s.selection);
   const locale = useGame((s) => s.locale);
   const planning = useGame((s) => s.planning);
+  const setTool = useGame((s) => s.setTool);
+  const setSpeed = useGame((s) => s.setSpeed);
+  const select = useGame((s) => s.select);
+  const focus = useGame((s) => s.focus);
   const [expanded, setExpanded] = useState(false);
   const stepIndex = game.tutorialStep;
   const step = STEPS[stepIndex];
@@ -100,7 +104,7 @@ export default function Tutorial() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className={`panel absolute right-2 top-12 z-20 w-[calc(100%-16px)] border-neon-cyan/25 px-3 py-2.5 sm:right-4 sm:top-4 sm:w-[400px] sm:px-4 sm:py-3 xl:w-[520px] ${selection ? 'hidden' : ''}`}
+        className={`panel pointer-events-none absolute right-2 top-12 z-20 w-[calc(100%-16px)] border-neon-cyan/25 px-3 py-2.5 sm:right-4 sm:top-4 sm:w-[400px] sm:px-4 sm:py-3 xl:w-[520px] ${selection ? 'hidden' : ''}`}
       >
         <div className="flex items-start gap-3">
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-neon-cyan/35 bg-neon-cyan/10 font-mono text-xs font-semibold text-neon-cyan">
@@ -116,13 +120,13 @@ export default function Tutorial() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
-                  className="text-[11px] text-neon-cyan sm:hidden"
+                  className="pointer-events-auto text-[11px] text-neon-cyan sm:hidden"
                   aria-expanded={expanded}
                   onClick={() => setExpanded((value) => !value)}
                 >
                   {expanded ? (locale === 'tr' ? 'Azalt' : 'Less') : locale === 'tr' ? 'Ayrıntı' : 'Details'}
                 </button>
-                <button className="text-[11px] text-white/45 hover:text-white" onClick={skip}>
+                <button className="pointer-events-auto text-[11px] text-white/45 hover:text-white" onClick={skip}>
                   {locale === 'tr' ? 'Rehberi geç' : 'Skip guide'}
                 </button>
               </div>
@@ -130,6 +134,47 @@ export default function Tutorial() {
             <p className={`${expanded ? 'block' : 'hidden'} mt-1 text-[12px] leading-snug text-white/60 sm:block`}>
               {locale === 'tr' ? step.bodyTr : step.body}
             </p>
+            <button
+              className="btn pointer-events-auto mt-2 min-h-9 text-xs"
+              onClick={() => {
+                if (stepIndex === 0) setTool('pop');
+                else if (stepIndex === 1 || stepIndex === 4) setTool('fiber');
+                else if (stepIndex === 2) setSpeed(4);
+                else if (stepIndex === 3) {
+                  const pop = game.nodes.find((n) => n.kind === 'pop');
+                  if (pop) {
+                    select({ type: 'node', id: pop.id });
+                    focus(pop.gx, pop.gy);
+                  }
+                } else {
+                  const district = game.districts.find((d) => !d.unlocked);
+                  if (district) {
+                    select({ type: 'district', id: district.id });
+                    focus(district.center.gx, district.center.gy);
+                  }
+                }
+              }}
+            >
+              {
+                (locale === 'tr'
+                  ? [
+                      'POP seç',
+                      'Fiber seç',
+                      'Zamanı 4× ilerlet',
+                      'POP noktasını incele',
+                      'Yedek fiber seç',
+                      'Yeni ilçeyi incele',
+                    ]
+                  : [
+                      'Select POP',
+                      'Select fibre',
+                      'Advance time at 4×',
+                      'Inspect a POP',
+                      'Select backup fibre',
+                      'Inspect a new district',
+                    ])[stepIndex]
+              }
+            </button>
             <div className="mt-2 hidden gap-1 sm:flex">
               {STEPS.map((_, i) => (
                 <div
