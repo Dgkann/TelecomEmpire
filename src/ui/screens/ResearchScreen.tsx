@@ -5,6 +5,7 @@ import { totalCustomers } from '../../game/simulation';
 import { staffModifiers } from '../../game/staff';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
+import { researchCopy } from '../researchCopy';
 
 const BRANCH = {
   fixed: { label: 'Fixed network', code: 'FX', color: '#2dd4bf', description: 'Fibre, access and backbone capacity.' },
@@ -19,10 +20,12 @@ const BRANCH = {
 
 export default function ResearchScreen() {
   const locale = useGame((s) => s.locale);
+  const tr = locale === 'tr';
+  const research = RESEARCH.map((node) => researchCopy(node, locale));
   const game = useGame((s) => s.game)!;
   const startResearch = useGame((s) => s.startResearch);
   const active = game.researchActive;
-  const activeNode = active ? RESEARCH.find((r) => r.id === active.id) : null;
+  const activeNode = active ? research.find((r) => r.id === active.id) : null;
   const completed = game.researchDone.length;
   const staff = staffModifiers(game);
   const researchPerDay = staff.researchPointsPerDay + Math.max(0, Math.round(totalCustomers(game) / 2500));
@@ -37,11 +40,12 @@ export default function ResearchScreen() {
               {t(locale, 'networkEvolutionMap')}
             </h1>
             <p className="mt-1 max-w-xl text-[13px] text-white/45">
-              Follow each branch from field infrastructure to city-scale capability. Cross-branch requirements are named
-              on locked nodes.
+              {tr
+                ? 'Şebekeni büyüten araştırmaları seç. Kilitli araştırmalarda önce tamamlanması gereken çalışmalar yazılıdır.'
+                : 'Follow each branch from field infrastructure to city-scale capability. Cross-branch requirements are named on locked nodes.'}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
             <div className="kpi min-w-[110px]">
               <div className="stat-label">{t(locale, 'researchPoints')}</div>
               <div className="num text-lg text-neon-cyan">{game.researchPoints}</div>
@@ -54,12 +58,14 @@ export default function ResearchScreen() {
             </div>
             <div className="kpi min-w-[110px]">
               <div className="stat-label">{t(locale, 'researchOutput')}</div>
-              <div className="num text-lg text-neon-cyan">+{researchPerDay}/day</div>
+              <div className="num text-lg text-neon-cyan">
+                +{researchPerDay}/{tr ? 'gün' : 'day'}
+              </div>
             </div>
             <div className="kpi min-w-[120px]">
               <div className="stat-label">{t(locale, 'labStatus')}</div>
               <div className={`text-sm font-semibold ${activeNode ? 'text-neon-cyan' : 'text-white/55'}`}>
-                {activeNode ? 'Researching' : 'Available'}
+                {activeNode ? (tr ? 'Çalışıyor' : 'Researching') : tr ? 'Boş' : 'Available'}
               </div>
             </div>
           </div>
@@ -79,8 +85,10 @@ export default function ResearchScreen() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="num text-sm text-white/75">{Math.ceil(active!.daysLeft)} days</div>
-                <div className="text-[11px] text-white/35">remaining</div>
+                <div className="num text-sm text-white/75">
+                  {Math.ceil(active!.daysLeft)} {tr ? 'gün' : 'days'}
+                </div>
+                <div className="text-[11px] text-white/35">{tr ? 'kaldı' : 'remaining'}</div>
               </div>
             </div>
             <div className="h-1 bg-white/5">
@@ -95,7 +103,12 @@ export default function ResearchScreen() {
         <div className="grid gap-4 lg:grid-cols-3">
           {(Object.keys(BRANCH) as Array<keyof typeof BRANCH>).map((branch) => {
             const meta = BRANCH[branch];
-            const nodes = RESEARCH.filter((r) => r.branch === branch).sort((a, b) => a.tier - b.tier);
+            const branchTr = {
+              fixed: ['Sabit şebeke', 'Fiber, erişim ve omurga kapasitesi.'],
+              mobile: ['Mobil', 'Spektrum, radyo erişimi ve mobilite.'],
+              ops: ['Operasyonlar', 'Otomasyon, dayanıklılık ve kurumsal hizmet.'],
+            }[branch];
+            const nodes = research.filter((r) => r.branch === branch).sort((a, b) => a.tier - b.tier);
             const branchDone = nodes.filter((r) => game.researchDone.includes(r.id)).length;
             const branchReady = nodes.filter(
               (r) => isAvailable(r, game.researchDone) && !game.researchDone.includes(r.id),
@@ -115,19 +128,19 @@ export default function ResearchScreen() {
                         className="font-display text-lg font-semibold uppercase tracking-[0.1em]"
                         style={{ color: meta.color }}
                       >
-                        {meta.label}
+                        {tr ? branchTr[0] : meta.label}
                       </h2>
                       <span className="font-mono text-[9px] text-white/35">
-                        {branchDone}/{nodes.length} ONLINE
+                        {branchDone}/{nodes.length} {tr ? 'TAMAM' : 'ONLINE'}
                       </span>
                     </div>
-                    <p className="text-[11px] leading-snug text-white/40">{meta.description}</p>
+                    <p className="text-[11px] leading-snug text-white/40">{tr ? branchTr[1] : meta.description}</p>
                     {branchReady > 0 && (
                       <div
                         className="mt-1 text-[9px] font-semibold uppercase tracking-wider"
                         style={{ color: meta.color }}
                       >
-                        {branchReady} programme ready
+                        {branchReady} {tr ? 'araştırma açık' : 'programme ready'}
                       </div>
                     )}
                   </div>
@@ -143,10 +156,24 @@ export default function ResearchScreen() {
                     const affordable = affordableMoney && affordablePoints;
                     const activeHere = active?.id === r.id;
                     const requirements = r.requires
-                      .map((q) => RESEARCH.find((x) => x.id === q)?.name)
+                      .map((q) => research.find((x) => x.id === q)?.name)
                       .filter(Boolean)
                       .join(', ');
-                    const status = done ? 'ONLINE' : activeHere ? 'RUNNING' : available ? 'READY' : 'LOCKED';
+                    const status = done
+                      ? tr
+                        ? 'TAMAM'
+                        : 'ONLINE'
+                      : activeHere
+                        ? tr
+                          ? 'SÜRÜYOR'
+                          : 'RUNNING'
+                        : available
+                          ? tr
+                            ? 'AÇIK'
+                            : 'READY'
+                          : tr
+                            ? 'KİLİTLİ'
+                            : 'LOCKED';
                     const statusClass = done
                       ? 'text-neon-lime'
                       : activeHere
@@ -220,7 +247,7 @@ export default function ResearchScreen() {
                                 </span>
                               </div>
                               <div className="num mt-0.5 text-[10px] text-white/35">
-                                {fmtMoneyExact(r.cost)} · {r.points} RP · {r.days} days
+                                {fmtMoneyExact(r.cost)} · {r.points} {tr ? 'AP' : 'RP'} · {r.days} {tr ? 'gün' : 'days'}
                               </div>
                             </div>
                           </div>
@@ -248,19 +275,27 @@ export default function ResearchScreen() {
                                 onClick={() => startResearch(r.id)}
                               >
                                 {busy
-                                  ? 'Research slot occupied'
+                                  ? tr
+                                    ? 'Önce süren araştırmayı tamamla'
+                                    : 'Research slot occupied'
                                   : !affordableMoney
-                                    ? `Need ${fmtMoneyExact(r.cost)}`
+                                    ? tr
+                                      ? `${fmtMoneyExact(r.cost - game.money)} daha gerekiyor`
+                                      : `Need ${fmtMoneyExact(r.cost - game.money)} more`
                                     : !affordablePoints
-                                      ? `Need ${r.points} research points`
-                                      : 'Start programme'}
+                                      ? tr
+                                        ? `${r.points - game.researchPoints} araştırma puanı daha gerekiyor`
+                                        : `Need ${r.points - game.researchPoints} more research points`
+                                      : tr
+                                        ? 'Araştırmayı başlat'
+                                        : 'Start programme'}
                               </button>
                             ) : (
                               <div className="mt-3 rounded-md border border-white/[0.055] bg-black/20 px-2.5 py-2 text-[10px] leading-snug text-white/[0.34]">
                                 <span className="mr-1 font-semibold uppercase tracking-wider text-white/25">
                                   {t(locale, 'locked')}
                                 </span>{' '}
-                                Requires {requirements}
+                                {tr ? 'Önce tamamla:' : 'Requires'} {requirements}
                               </div>
                             ))}
                           {activeHere && (
