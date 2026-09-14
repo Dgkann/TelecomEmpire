@@ -11,6 +11,10 @@ import { fixedCoverageTarget } from '../src/game/reach';
 import { milestoneProgress } from '../src/game/milestones';
 import { RANKS, nextRank } from '../src/game/progression';
 import { migrate } from '../src/game/save';
+import { creditLimit, createLoan, monthlyDebtService, totalDebt } from '../src/game/finance';
+import { negotiatedTerms } from '../src/game/contracts';
+import { makeRng } from '../src/game/rng';
+import { scenarioById, scenarioStatus } from '../src/game/scenarios';
 import type { NodeKind } from '../src/game/types';
 
 const memory = new Map<string, string>();
@@ -38,9 +42,32 @@ const priority = [
 const seeds = (process.env.AUDIT_SEEDS ?? '12345,4242,7311').split(',').map(Number);
 const days = Number(process.env.AUDIT_DAYS ?? 365);
 const campaign = process.env.AUDIT_MODE === 'campaign';
+// Reproduce the previous balance with the same policy and transition fixes.
+const referenceBalance = process.env.AUDIT_REFERENCE_BALANCE === '2026-09-13';
+if (referenceBalance) {
+  RESEARCH.find((r) => r.id === 'mobile_4g')!.cost = 6000000;
+  scenarioById('service_standard').deadlineDays = 365;
+}
+const strategy = process.env.AUDIT_STRATEGY ?? 'baseline';
+if (!['baseline', 'research', 'careful', 'credit'].includes(strategy)) throw new Error('Unknown audit strategy');
+const saving = strategy !== 'baseline';
+const careful = strategy === 'careful' || strategy === 'credit';
+const output =
+  process.env.AUDIT_OUTPUT ?? (campaign ? 'reports/release-campaign.json' : 'reports/release-balance.json');
 const results: unknown[] = [];
 
+function nextResearch() {
+  const g = live();
+  const order = saving ? ['ftth', 'fiber10g', 'mobile_4g', ...priority] : priority;
+  return RESEARCH.filter(
+    (r) => !g.researchDone.includes(r.id) && r.requires.every((id) => g.researchDone.includes(id)),
+  ).sort(
+    (a, b) => (order.includes(a.id) ? order.indexOf(a.id) : 99) - (order.includes(b.id) ? order.indexOf(b.id) : 99),
+  );
+}
+
 function build(kind: NodeKind, districtId: string, reserve: number) {
+  actions().setAutoConnect(true);
   const g = live();
   const district = g.districts.find((d) => d.id === districtId)!;
   const occupied = new Set(g.nodes.map((n) => `${n.gx},${n.gy}`));
@@ -65,7 +92,19 @@ function policy(day: number) {
     if (!goal.claimed && goal.progress >= 1) actions().claimMilestone(goal.id);
   for (const incident of live().incidents)
     if (!incident.resolved && !incident.assignedTechId) actions().dispatchTech(incident.id, 'normal');
-  for (const offer of live().offers) actions().acceptOffer(offer.id, 'flexible');
+  for (const offer of live().offers) {
+    const district = live().districts.find((d) => d.id === offer.districtId);
+    // A deliberately conservative policy: leave strict SLAs and thin/unhealthy districts alone.
+    if (
+      !careful ||
+      (negotiatedTerms(offer, 'flexible').slaPercent <= 99 &&
+        district &&
+        district.coverage >= 0.7 &&
+        live().stats.health >= 90 &&
+        live().stats.packetLoss < 0.01)
+    )
+      actions().acceptOffer(offer.id, 'flexible');
+  }
   const finance = monthlyBreakdown(live(), researchModifiers(live().researchDone));
   const reserve = Math.max(150000, finance.totalCost * 0.75);
   for (const node of live().nodes) {
@@ -85,27 +124,54 @@ function policy(day: number) {
   )
     actions().setTransitTier(g.transitTier + 1);
   if (!live().researchActive) {
-    const eligible = RESEARCH.filter(
-      (r) => !live().researchDone.includes(r.id) && r.requires.every((id) => live().researchDone.includes(id)),
-    );
-    eligible.sort(
-      (a, b) =>
-        (priority.includes(a.id) ? priority.indexOf(a.id) : 99) -
-        (priority.includes(b.id) ? priority.indexOf(b.id) : 99),
-    );
+    const eligible = nextResearch();
+    const target = eligible[0];
+    if (
+      strategy === 'credit' &&
+      target &&
+      live().researchPoints >= target.points &&
+      live().districts.filter((d) => d.unlocked).length >= 2
+    ) {
+      const gap = Math.ceil(Math.max(0, target.cost + reserve - live().money) / 10000) * 10000;
+      const recentPenalties = live()
+        .ledger.filter(
+          (e) =>
+            ['sla_penalty', 'regulatory_fine'].includes(e.category) && e.at >= live().minutes - 30 * MINUTES_PER_DAY,
+        )
+        .reduce((sum, e) => sum - Math.min(0, e.amount), 0);
+      if (
+        gap > 0 &&
+        gap <= creditLimit(live()) &&
+        createLoan(live(), gap, 24).monthlyPayment + monthlyDebtService(live()) <
+          (finance.profit - recentPenalties) * 0.3
+      )
+        actions().takeLoan(gap, 24);
+    }
     const next = eligible.find((r) => live().money >= r.cost + reserve && live().researchPoints >= r.points);
-    if (next) actions().startResearch(next.id);
+    if (next && (!saving || next.id === target?.id)) actions().startResearch(next.id);
   }
+  // Preserve the second-district launch; reserve research cash only after a viable initial footprint.
+  const mobileStep = ['ftth', 'fiber10g', 'mobile_4g']
+    .map((id) => RESEARCH.find((r) => r.id === id)!)
+    .find((r) => !live().researchDone.includes(r.id));
+  const investmentReserve =
+    reserve +
+    (saving &&
+    mobileStep &&
+    mobileStep.id !== live().researchActive?.id &&
+    live().districts.filter((d) => d.unlocked).length >= 2
+      ? mobileStep.cost
+      : 0);
   if (day % 3 === 0) {
     const thin = live().districts.find((d) => d.unlocked && fixedCoverageTarget(live(), d.id) < 0.7);
-    if (thin) build('pop', thin.id, reserve);
+    if (thin) build('pop', thin.id, investmentReserve);
     else {
       const quote = live()
         .districts.filter((d) => !d.unlocked)
         .map((d) => expansionQuote(live(), d.id, 'pop'))
         .filter((q) => q && !q.issue)
         .sort((a, b) => a!.total - b!.total)[0];
-      if (quote && live().money > quote.total + reserve) actions().launchDistrict(quote.district.id, 'pop');
+      if (quote && live().money > quote.total + investmentReserve) actions().launchDistrict(quote.district.id, 'pop');
     }
   }
   if (live().researchDone.includes('edge_compute') && !live().nodes.some((n) => n.kind === 'datacenter'))
@@ -123,6 +189,7 @@ function policy(day: number) {
 }
 
 for (const seed of seeds) {
+  Math.random = makeRng(seed);
   useGame.setState({
     game: createNewGame({
       companyName: 'Release audit',
@@ -144,14 +211,21 @@ for (const seed of seeds) {
     negativeCashDays = 0,
     reloads = 0;
   let previous = '';
+  let elapsedDays = 0;
   for (let day = 0; day < days && !live().gameOver; day++) {
     policy(day);
     let g = live();
     for (let tick = 0; tick < MINUTES_PER_DAY / 5 && !g.gameOver; tick++) g = step(g);
     useGame.setState({ game: g });
+    elapsedDays = day + 1;
     if (campaign && g.victoryAt !== null) {
       const from = g.cityName;
-      if (actions().advanceCampaign()) {
+      // Hold each city's layout constant across policies, using the normal transition action.
+      const random = Math.random;
+      Math.random = makeRng(seed + (g.campaignStage + 1) * 100000);
+      const advanced = actions().advanceCampaign();
+      Math.random = random;
+      if (advanced) {
         const next = live();
         transitions.push({ day: day + 1, from, to: next.cityName, cash: next.money, seed: next.rngSeed });
         console.log(JSON.stringify({ transition: transitions.at(-1) }));
@@ -191,6 +265,9 @@ for (const seed of seeds) {
         rank: RANKS[g.rank].name,
         districts: g.districts.filter((d) => d.unlocked).length,
         research: g.researchDone.length,
+        researchDone: g.researchDone,
+        debt: Math.round(totalDebt(g)),
+        debtService: monthlyDebtService(g),
         health: Math.round(g.stats.health),
         recentSpend: Object.fromEntries(
           [...new Set(g.ledger.map((entry) => entry.category))].map((category) => [
@@ -213,20 +290,24 @@ for (const seed of seeds) {
   const g = live();
   const result = {
     seed,
+    strategy,
+    balance: {
+      mobile4gCost: RESEARCH.find((r) => r.id === 'mobile_4g')!.cost,
+      serviceDeadlineDays: scenarioById('service_standard').deadlineDays,
+    },
+    elapsedDays,
     days: Math.floor(g.minutes / MINUTES_PER_DAY),
     milestones,
     transitions,
-    longestProgressGapDays: Math.max(longestGap, Math.floor(g.minutes / MINUTES_PER_DAY) - lastProgressDay),
+    longestProgressGapDays: Math.max(longestGap, elapsedDays - lastProgressDay),
     negativeCashDays,
     reloads,
     gameOver: g.gameOver,
+    scenario: scenarioStatus(g),
     nextRank: nextRank(g)?.requirements.map((r) => ({ label: r.label, detail: r.detail(g), progress: r.progress(g) })),
     months,
   };
   results.push(result);
   mkdirSync('reports', { recursive: true });
-  writeFileSync(
-    campaign ? 'reports/release-campaign.json' : 'reports/release-balance.json',
-    JSON.stringify(results, null, 2),
-  );
+  writeFileSync(output, JSON.stringify(results, null, 2));
 }
