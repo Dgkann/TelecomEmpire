@@ -61,3 +61,58 @@ test('campaign victory explains retained research and initializes mobile service
   });
 });
 
+test('reputation points to the actual obligation and completed edge research points to construction', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const store = (window as any).__game;
+    store
+      .getState()
+      .newGame({ companyName: 'Actionable progress', logo: 'x', difficulty: 'standard', cityName: 'Ege', seed: 7311 });
+    const game = store.getState().game;
+    store.setState({
+      game: {
+        ...game,
+        speed: 0,
+        tutorialDone: true,
+        reputation: 58,
+        researchDone: ['ftth', 'fiber10g', 'mobile_4g', 'backbone100g', 'edge_compute'],
+        regulations: [
+          {
+            id: 'price-review',
+            kind: 'price_cap',
+            title: 'Price review',
+            detail: 'Review pricing',
+            districtId: null,
+            target: 0.8,
+            dueAt: game.minutes + 1440 * 5,
+            fine: 600000,
+            status: 'pending',
+          },
+        ],
+      },
+    });
+    store.getState().setLocale('tr');
+    store.getState().setScreen('company');
+  });
+  const reputation = page.getByRole('region', { name: 'İtibarın nedenleri' });
+  await expect(reputation).toContainText('5 gün kaldı');
+  await expect(reputation).toContainText('600.000 ₺');
+  await expect(reputation).toContainText('−8 itibar riski');
+  expect(await reputation.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await reputation.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('reputation-tr.png') });
+  await reputation.getByRole('button', { name: 'Paket fiyatlarını aç' }).click();
+  await expect(page.locator('#pricing')).toBeInViewport();
+  await page.evaluate(() => (window as any).__game.getState().setScreen('research'));
+  const construction = page.getByRole('region', { name: 'Veri merkezi kurulumu' });
+  await expect(construction).toContainText('4.400.000 ₺');
+  await construction.getByRole('button', { name: 'Veri merkezi yerini seç' }).click();
+  expect(
+    await page.evaluate(() => {
+      const s = (window as any).__game.getState();
+      return { tool: s.tool, screen: s.screen, autoConnect: s.autoConnect };
+    }),
+  ).toEqual({ tool: 'datacenter', screen: 'map', autoConnect: true });
+});
