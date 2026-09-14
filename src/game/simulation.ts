@@ -25,7 +25,7 @@ import {
   towerRadius,
 } from './constants';
 import { effectiveNodeCapacity } from './capacity';
-import { createAuction, settleAuction } from './spectrum';
+import { createAuction, grantStarterSpectrum, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
 import { recordLedger, recordOperatingMonth } from './financeLedger';
@@ -915,8 +915,7 @@ export function step(prev: GameState): GameState {
 
       if (doneId === 'mobile_4g') {
         // The regulator hands every new entrant a starter block.
-        s.spectrum = [{ band: '1800', blocks: 1, wonAt: s.minutes, paid: 0 }];
-        s.nextAuctionAt = s.minutes + MINUTES_PER_DAY * 12;
+        grantStarterSpectrum(s);
         pushLog(s, 'Regulator granted a starter block at 1800 MHz. Towers can go live.', 'good');
       }
     } else {

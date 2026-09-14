@@ -1,8 +1,14 @@
-import { SPECTRUM_BANDS, blocksOf } from './constants';
+import { MINUTES_PER_DAY, SPECTRUM_BANDS, blocksOf } from './constants';
 import { rand, randInt, uid, type Rng } from './rng';
 import type { Auction, AuctionBid, BandId, GameState } from './types';
 
 // Sealed-bid auctions: one number each, highest wins, results when the lot closes.
+
+export function grantStarterSpectrum(state: GameState) {
+  if (state.spectrum.length) return;
+  state.spectrum = [{ band: '1800', blocks: 1, wonAt: state.minutes, paid: 0 }];
+  state.nextAuctionAt = state.minutes + MINUTES_PER_DAY * 12;
+}
 
 export function bandsAvailable(done: string[]): BandId[] {
   return (Object.keys(SPECTRUM_BANDS) as BandId[]).filter((b) => {
