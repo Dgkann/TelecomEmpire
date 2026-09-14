@@ -151,7 +151,7 @@ interface Store extends UiState {
   advanceCampaign: () => boolean;
 
   tick: () => void;
-  startSignalTraining: (size: 4 | 5) => void;
+  startSignalTraining: (size: 4 | 5, mode?: 'routing' | 'fault') => void;
   rotateSignalTile: (index: number) => void;
   submitSignalTraining: () => boolean;
   closeSignalTraining: () => void;
@@ -547,11 +547,11 @@ export const useGame = create<Store>((set, get) => ({
     );
   },
 
-  startSignalTraining: (size) => {
+  startSignalTraining: (size, mode) => {
     const s = get();
     if (!s.game || s.planning || s.drillTarget || s.openIncidentId || s.showSaveManager || s.showHelp || s.game.auction)
       return;
-    const next = beginSignalTraining(s.game, size);
+    const next = beginSignalTraining(s.game, size, mode);
     if (next) set({ game: next });
   },
   rotateSignalTile: (index) => {

@@ -13,16 +13,17 @@ export function SignalTrainingCard() {
   const days = Math.max(0, Math.ceil((training.nextRewardAt - game.minutes) / MINUTES_PER_DAY));
   return (
     <section
+      id="network-exercises"
       className="panel border-neon-cyan/30 p-4 sm:p-5"
       aria-label={tr ? 'Sinyal rotası mini oyunu' : 'Signal routing mini-game'}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
-          <h2 className="text-lg font-semibold">{tr ? 'Sinyal rotası' : 'Signal routing'}</h2>
+          <h2 className="text-lg font-semibold">{tr ? 'Kısa ağ görevleri' : 'Quick network exercises'}</h2>
           <p className="mt-1 text-sm leading-relaxed text-white/65">
             {tr
-              ? 'Kabloları döndür, vericiyi alıcıya bağla. Şirket zamanı durur; süre sınırı, giriş ücreti ve başarısızlık cezası yok.'
-              : 'Rotate the cables to connect transmitter and receiver. Company time pauses; there is no timer, entry fee or failure penalty.'}
+              ? 'Sıfırdan sinyal rotası kur veya çalışan hattaki tek yanlış kabloyu bul. Arıza bulma, kısa bir mola için uygundur. Şirket zamanı durur; süre sınırı, giriş ücreti ve başarısızlık cezası yok.'
+              : 'Build a signal route or find the one incorrect cable in a working line. Fault finding is suited to a short break. Company time pauses; there is no timer, entry fee or failure penalty.'}
           </p>
           <p className="mt-2 text-xs text-neon-amber">
             {days === 0
@@ -33,12 +34,22 @@ export function SignalTrainingCard() {
           </p>
           <p className="mt-1 text-xs text-white/50">
             {tr
-              ? 'Her 7 oyun gününde en fazla bir ödül. İki boyut da aynı ödülü verir.'
-              : 'At most one reward every 7 game days. Both sizes award the same amount.'}{' '}
-            · {training.completed} {tr ? 'rota tamamlandı' : 'routes completed'}
+              ? 'Her 7 oyun gününde en fazla bir ödül. Tüm görevler aynı ödül hakkını paylaşır.'
+              : 'At most one reward every 7 game days. All exercises share the same reward allowance.'}{' '}
+            · {training.completed} {tr ? 'görev tamamlandı' : 'exercises completed'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            className="btn-primary"
+            disabled={!!game.gameOver || !!game.auction}
+            onClick={(event) => {
+              event.currentTarget.focus();
+              start(4, 'fault');
+            }}
+          >
+            {tr ? 'Arıza bul · Kısa görev' : 'Find the fault · Quick exercise'}
+          </button>
           <button
             className="btn-primary"
             disabled={!!game.gameOver || !!game.auction}
@@ -85,6 +96,7 @@ export default function SignalTrainingDialog() {
   });
   if (!puzzle) return null;
   const route = signalConnection(puzzle);
+  const fault = puzzle.mode === 'fault';
   const directions = tr ? ['kuzey', 'doğu', 'güney', 'batı'] : ['north', 'east', 'south', 'west'];
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/80 p-3 backdrop-blur-sm">
@@ -100,7 +112,7 @@ export default function SignalTrainingDialog() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="signal-title" className="text-xl font-semibold">
-              {tr ? 'Sinyal rotası' : 'Signal routing'}
+              {fault ? (tr ? 'Arıza bulma' : 'Fault finding') : tr ? 'Sinyal rotası' : 'Signal routing'}
             </h2>
             <p className="mt-1 text-xs text-neon-amber">
               {tr ? 'Şirket saati duraklatıldı' : 'Company clock paused'} · {puzzle.moves} {tr ? 'hamle' : 'moves'}
@@ -118,6 +130,10 @@ export default function SignalTrainingDialog() {
           </button>
         </div>
         <p id="signal-instructions" className="mt-3 text-sm leading-relaxed text-white/65">
+          {fault &&
+            (tr
+              ? 'Bu hat çalışıyordu; yalnızca bir kablo yanlış yönde. Sinyalin kesildiği yeri bul ve kabloyu düzelt. '
+              : 'This line was working; just one cable is misaligned. Find where the signal stops and repair the cable. ')}
           {tr
             ? 'Her tıklama kabloyu saat yönünde döndürür. Sol üstteki girişten sağ alttaki çıkışa kesintisiz bir yol kur. Tüm parçaları kullanman gerekmez. Klavyede Tab ile seç, Enter veya Boşluk ile döndür.'
             : 'Each click rotates a cable clockwise. Build an unbroken path from the top-left inlet to the bottom-right outlet. You do not need every tile. Use Tab to select and Enter or Space to rotate.'}

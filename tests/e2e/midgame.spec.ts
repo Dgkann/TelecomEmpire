@@ -1,0 +1,65 @@
+import { expect, test } from '@playwright/test';
+
+test('fault finding saves the repair, pauses time and shares rewards with routing', async ({ page }, testInfo) => {
+  await page.goto('/');
+  const before = await page.evaluate(() => {
+    const store = (window as any).__game;
+    store
+      .getState()
+      .newGame({ companyName: 'Fault finder', logo: 'x', difficulty: 'standard', cityName: 'Ege', seed: 7311 });
+    const game = store.getState().game;
+    store.setState({ game: { ...game, speed: 0, tutorialDone: true } });
+    store.getState().setLocale('tr');
+    store.getState().setScreen('projects');
+    return { money: game.money, points: game.researchPoints, minutes: game.minutes };
+  });
+  await page.getByRole('button', { name: 'Arıza bul · Kısa görev' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Arıza bulma', exact: true });
+  await expect(dialog).toContainText('yalnızca bir kablo yanlış yönde');
+  await expect(dialog.getByRole('button', { name: 'Rotayı doğrula' })).toBeDisabled();
+  const fault = await page.evaluate(() =>
+    (window as any).__game.getState().game.signalTraining.active.rotations.findIndex((r: number) => r !== 0),
+  );
+  await dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button').nth(fault).press('Space');
+  await dialog.getByRole('button', { name: 'İlerlemeyi kaydet' }).click();
+  await expect(dialog.getByText('Oyun ve rota kaydedildi.')).toBeVisible();
+  await page.reload();
+  await page.evaluate(() => (window as any).__game.getState().continueGame());
+  dialog = page.getByRole('dialog', { name: 'Arıza bulma', exact: true });
+  await expect(dialog).toBeVisible();
+  for (let turn = 0; turn < 2; turn++)
+    await dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button').nth(fault).click();
+  await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
+  await expect(dialog).toContainText('Bağlantı tamamlandı! Ödül alındı');
+  expect(
+    await page.evaluate(() => {
+      const store = (window as any).__game;
+      store.getState().setSpeed(4);
+      store.getState().tick();
+      const g = store.getState().game;
+      return {
+        money: g.money,
+        points: g.researchPoints,
+        minutes: g.minutes,
+        duplicate: store.getState().submitSignalTraining(),
+      };
+    }),
+  ).toEqual({ money: before.money + 30000, points: before.points + 3, minutes: before.minutes, duplicate: false });
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('fault-finding.png') });
+  await dialog.getByRole('button', { name: 'Şirkete dön' }).click();
+  await page.evaluate(() => (window as any).__game.getState().setScreen('projects'));
+  await expect(page.getByText('Ödül 7 oyun günü sonra yenilenir.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Oyna · 4×4', exact: true }).click();
+  const rotations: number[] = await page.evaluate(
+    () => (window as any).__game.getState().game.signalTraining.active.rotations,
+  );
+  dialog = page.getByRole('dialog', { name: 'Sinyal rotası', exact: true });
+  for (let tile = 0; tile < rotations.length; tile++) {
+    for (let turn = 0; turn < (4 - rotations[tile]) % 4; turn++)
+      await dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button').nth(tile).click();
+  }
+  await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
+  await expect(dialog).toContainText('Bu tur ödülsüzdü.');
+  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(before.money + 30000);
+});
