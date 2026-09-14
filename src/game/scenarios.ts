@@ -87,7 +87,7 @@ export const SCENARIOS: ScenarioDefinition[] = [
     id: 'service_standard',
     name: 'Service standard',
     description: 'Grow across the city while keeping the operator trusted.',
-    deadlineDays: 365,
+    deadlineDays: 450,
     objectives: [customers(5000), districts(4), reputation(75), mobile],
   },
   {

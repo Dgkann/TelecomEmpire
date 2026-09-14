@@ -150,7 +150,7 @@ export const RESEARCH: ResearchNode[] = [
     id: 'mobile_4g',
     name: '4G LTE',
     description: 'Take the network mobile. Towers cover whole neighbourhoods at once.',
-    cost: 6000000,
+    cost: 4800000,
     points: 55,
     days: 30,
     requires: ['fiber10g'],

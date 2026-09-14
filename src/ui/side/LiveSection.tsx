@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { fmtClock } from '../../game/simulation';
 import { t } from '../i18n';
 import DevelopmentGoals from '../DevelopmentGoals';
+import ResearchGuidance from '../ResearchGuidance';
 import { scrollToAnchor } from './shared';
 import type { SideModel } from './model';
 
@@ -23,6 +24,7 @@ export default function LiveSection({ sp }: { sp: SideModel }) {
             {game.strategy.decision ? (tr ? ' · Karar bekliyor' : ' · Decision waiting') : ' ↗'}
           </button>
           <DevelopmentGoals onNavigate={() => setMobileOpen(false)} />
+          <ResearchGuidance compact onNavigate={() => setMobileOpen(false)} />
           <button
             className="btn my-2 w-full text-xs"
             onClick={() => {

@@ -6,6 +6,7 @@ import { staffModifiers } from '../../game/staff';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
 import { researchCopy } from '../researchCopy';
+import ResearchGuidance from '../ResearchGuidance';
 
 const BRANCH = {
   fixed: { label: 'Fixed network', code: 'FX', color: '#2dd4bf', description: 'Fibre, access and backbone capacity.' },
@@ -71,6 +72,7 @@ export default function ResearchScreen() {
           </div>
         </div>
 
+        <ResearchGuidance />
         {activeNode && (
           <div className="panel mb-5 overflow-hidden border-neon-cyan/30">
             <div className="flex items-center justify-between gap-4 px-4 py-3">

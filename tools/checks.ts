@@ -1,4 +1,5 @@
 import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src/game/energyPlanning';
+import { researchPlan } from '../src/game/researchPlanning';
 import {
   beginSignalTraining,
   turnSignalTile,
@@ -80,7 +81,7 @@ import {
   servingCapacity,
 } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
-import { researchModifiers } from '../src/game/research';
+import { RESEARCH, researchModifiers } from '../src/game/research';
 import { makeRegulation, networkResilience, pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
 import { cacheRatio, mobileServingTowers, tickMaintenance } from '../src/game/simulation';
@@ -4668,6 +4669,52 @@ group('optional signal routing exercises');
   check(
     'closed companies cannot start an exercise',
     beginSignalTraining({ ...g, gameOver: { at: g.minutes, reason: 'closed' } }, 4) === null,
+  );
+}
+
+group('Research roadmap');
+{
+  const g = newGame(12345);
+  const plan = researchPlan(g)!;
+  check(
+    'mobile roadmap includes its unpaid prerequisites in order',
+    plan.steps.map((r) => r.id).join(',') === 'ftth,fiber10g,mobile_4g',
+  );
+  const active = researchPlan({ ...g, researchActive: { id: 'ftth', daysLeft: 5 } })!;
+  check(
+    'paid active research is excluded from the remaining bill',
+    active.remainingCost === plan.remainingCost - 800000 && active.next?.id === 'fiber10g' && !active.ready,
+  );
+  const negative = researchPlan({ ...g, money: -100000, researchPoints: 0 })!;
+  check(
+    'negative balances and missing points are both accounted for',
+    negative.cashMissing === 900000 && negative.pointsMissing === 12 && !negative.ready,
+  );
+  const mobile = researchPlan({ ...g, researchDone: ['ftth', 'fiber10g', 'mobile_4g'] })!;
+  check(
+    'after mobile, guidance follows the data centre prerequisite',
+    mobile.target.id === 'edge_compute' && mobile.next?.id === 'backbone100g',
+  );
+  check(
+    'a finished technology tree has no stale suggestion',
+    researchPlan({ ...g, researchDone: RESEARCH.map((r) => r.id) }) === null,
+  );
+}
+
+group('Service standard launch window');
+{
+  const g = { ...newGame(4242), scenarioId: 'service_standard' as const, minutes: MINUTES_PER_DAY * 400 };
+  check(
+    'Karadeniz gives a growing operator time beyond its old deadline',
+    !scenarioStatus(g).expired && scenarioStatus(g).daysLeft === 50,
+  );
+  check(
+    'the extension still requires all four service objectives',
+    !scenarioStatus(g).complete && scenarioStatus(g).objectives.length === 4,
+  );
+  check(
+    'an unfinished operator still loses after the extended window',
+    scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
   );
 }
 
