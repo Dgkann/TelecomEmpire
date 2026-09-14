@@ -36,7 +36,7 @@ export default function VictoryOverlay() {
             aria-modal="true"
             aria-label={locale === 'tr' ? 'Zafer' : 'Victory'}
             tabIndex={-1}
-            className="panel w-[460px] overflow-hidden border-neon-lime/40"
+            className="panel max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[460px] overflow-y-auto border-neon-lime/40"
             initial={{ scale: 0.94, y: 14 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
@@ -81,8 +81,12 @@ export default function VictoryOverlay() {
 
               <p className="text-[11px] leading-snug text-white/40">
                 {nextStage
-                  ? `The next campaign stage opens in ${nextStage.cityName}. Cash reserves provide a launch bonus.`
-                  : 'Nothing stops here. The rivals are still building, the kit still ages, and the city still grows.'}
+                  ? locale === 'tr'
+                    ? `${nextStage.cityName} şehrinde yeni bir ağ kuracaksın. Tamamlanan araştırmalar, süren çalışma ve araştırma puanların korunur. Kasanın %20’si, en fazla 5 milyon ₺, yeni şehrin başlangıç bütçesine eklenir.`
+                    : `Build a new network in ${nextStage.cityName}. Completed research, work in progress and research points carry over. 20% of cash, up to 5 million ₺, is added to the new city's starting budget.`
+                  : locale === 'tr'
+                    ? 'Şirketini yönetmeye devam edebilirsin. Rakipler büyümeye, ekipmanlar yaşlanmaya devam edecek.'
+                    : 'Keep running your company. Rivals continue building and equipment continues to age.'}
               </p>
 
               {nextStage ? (
