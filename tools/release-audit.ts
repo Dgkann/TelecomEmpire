@@ -60,6 +60,7 @@ const goalFunding = process.env.AUDIT_GOAL_FUNDING === '1';
 const manageService = process.env.AUDIT_MANAGE_SERVICE === '1';
 const reviewPricing = process.env.AUDIT_REVIEW_PRICING === '1';
 const resetResearch = process.env.AUDIT_RESET_RESEARCH === '1';
+const exercises = process.env.AUDIT_EXERCISES === '1';
 const output =
   process.env.AUDIT_OUTPUT ?? (campaign ? 'reports/release-campaign.json' : 'reports/release-balance.json');
 const results: unknown[] = [];
@@ -276,8 +277,23 @@ for (const seed of seeds) {
   let previous = '';
   let elapsedDays = 0;
   let campaignComplete = false;
+  let exercisesCompleted = 0;
+  let exerciseResearchDaysSaved = 0;
   for (let day = 0; day < days && !live().gameOver && !campaignComplete; day++) {
     policy(day);
+    if (exercises && live().minutes >= live().signalTraining.nextRewardAt) {
+      actions().startSignalTraining(4, 'fault');
+      const puzzle = live().signalTraining.active;
+      if (puzzle) {
+        // Solve through player actions. No state edits or synthetic rewards.
+        const fault = puzzle.rotations.findIndex((rotation) => rotation !== 0);
+        for (let turn = 0; turn < 3; turn++) actions().rotateSignalTile(fault);
+        if (!actions().submitSignalTraining()) throw new Error('Fault exercise failed');
+        exercisesCompleted++;
+        exerciseResearchDaysSaved += live().signalTraining.active?.researchDaysSaved ?? 0;
+        actions().closeSignalTraining();
+      }
+    }
     let g = live();
     for (let tick = 0; tick < MINUTES_PER_DAY / 5 && !g.gameOver; tick++) g = step(g);
     useGame.setState({ game: g });
@@ -387,6 +403,9 @@ for (const seed of seeds) {
     manageService,
     reviewPricing,
     resetResearch,
+    exercises,
+    exercisesCompleted,
+    exerciseResearchDaysSaved,
     campaignComplete,
     events,
     balance: {
