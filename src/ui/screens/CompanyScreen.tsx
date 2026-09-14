@@ -13,6 +13,7 @@ import ContractsPanel from './company/ContractsPanel';
 import BorrowingPanel from './company/BorrowingPanel';
 import ChurnPanel from './company/ChurnPanel';
 import StaffPanel from './company/StaffPanel';
+import ReputationGuidance from '../ReputationGuidance';
 
 export default function CompanyScreen() {
   const vm = useCompanyModel();
@@ -50,6 +51,7 @@ export default function CompanyScreen() {
         <StrategyDesk />
 
         <StandingPanel vm={vm} />
+        <ReputationGuidance />
         <WholesalePanel vm={vm} />
         <MomentumPanel vm={vm} />
         <PackagesPanel vm={vm} />

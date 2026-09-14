@@ -26,6 +26,16 @@ export default function LiveSection({ sp }: { sp: SideModel }) {
           <DevelopmentGoals onNavigate={() => setMobileOpen(false)} />
           <ResearchGuidance compact onNavigate={() => setMobileOpen(false)} />
           <button
+            className="btn mb-2 w-full text-xs"
+            onClick={() => {
+              setScreen('company');
+              setMobileOpen(false);
+              scrollToAnchor('reputation');
+            }}
+          >
+            {tr ? 'İtibarın nedenleri' : 'Reputation explained'} · {Math.round(game.reputation)} / 100
+          </button>
+          <button
             className="btn my-2 w-full text-xs"
             onClick={() => {
               setScreen('projects');
