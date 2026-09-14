@@ -8,7 +8,7 @@ test('fault finding saves the repair, pauses time and shares rewards with routin
       .getState()
       .newGame({ companyName: 'Fault finder', logo: 'x', difficulty: 'standard', cityName: 'Ege', seed: 7311 });
     const game = store.getState().game;
-    store.setState({ game: { ...game, speed: 0, tutorialDone: true } });
+    store.setState({ game: { ...game, speed: 0, tutorialDone: true, researchActive: { id: 'ftth', daysLeft: 5 } } });
     store.getState().setLocale('tr');
     store.getState().setScreen('projects');
     return { money: game.money, points: game.researchPoints, minutes: game.minutes };
@@ -31,6 +31,8 @@ test('fault finding saves the repair, pauses time and shares rewards with routin
     await dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button').nth(fault).click();
   await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
   await expect(dialog).toContainText('Bağlantı tamamlandı! Ödül alındı');
+  await expect(dialog).toContainText('Araştırmadan 1 günlük çalışma düşüldü.');
+  expect(await page.evaluate(() => (window as any).__game.getState().game.researchActive.daysLeft)).toBe(4);
   expect(
     await page.evaluate(() => {
       const store = (window as any).__game;
@@ -61,5 +63,7 @@ test('fault finding saves the repair, pauses time and shares rewards with routin
   }
   await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
   await expect(dialog).toContainText('Bu tur ödülsüzdü.');
+  expect(await page.evaluate(() => (window as any).__game.getState().game.researchActive.daysLeft)).toBe(4);
   expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(before.money + 30000);
 });
+

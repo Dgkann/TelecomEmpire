@@ -5,6 +5,7 @@ import type { GameState, SignalPuzzle, SignalTraining } from './types';
 
 export const TRAINING_REWARD = 30000;
 export const TRAINING_RESEARCH = 3;
+export const TRAINING_LAB_DAYS = 1;
 export const TRAINING_COOLDOWN = 7 * MINUTES_PER_DAY;
 export const initialSignalTraining = (): SignalTraining => ({
   sequence: 0,
@@ -115,15 +116,21 @@ export function finishSignalTraining(s: GameState): GameState | null {
   const active = s.signalTraining.active;
   if (s.gameOver || !active || active.completed || !signalConnection(active).connected) return null;
   const reward = s.minutes >= s.signalTraining.nextRewardAt ? TRAINING_REWARD : 0;
+  const researchDaysSaved = reward && s.researchActive ? Math.min(TRAINING_LAB_DAYS, s.researchActive.daysLeft) : 0;
   const next: GameState = {
     ...s,
     money: s.money + reward,
     researchPoints: s.researchPoints + (reward ? TRAINING_RESEARCH : 0),
+    // Completion still goes through the simulation so unlocks and spectrum grants
+    // run exactly once when the player resumes company time.
+    researchActive: s.researchActive
+      ? { ...s.researchActive, daysLeft: s.researchActive.daysLeft - researchDaysSaved }
+      : null,
     signalTraining: {
       ...s.signalTraining,
       completed: s.signalTraining.completed + 1,
       nextRewardAt: reward ? s.minutes + TRAINING_COOLDOWN : s.signalTraining.nextRewardAt,
-      active: { ...active, completed: true, reward },
+      active: { ...active, completed: true, reward, researchDaysSaved },
     },
   };
   if (reward) recordLedger(next, 'milestone_reward', 'Signal routing exercise', reward);
@@ -155,6 +162,14 @@ export function validSignalTraining(value: unknown): value is SignalTraining {
     typeof active.completed !== 'boolean' ||
     (active.mode !== undefined && !['routing', 'fault'].includes(active.mode)) ||
     ![0, TRAINING_REWARD].includes(active.reward)
+  )
+    return false;
+  if (
+    active.researchDaysSaved !== undefined &&
+    (!Number.isFinite(active.researchDaysSaved) ||
+      active.researchDaysSaved < 0 ||
+      active.researchDaysSaved > TRAINING_LAB_DAYS ||
+      (active.researchDaysSaved > 0 && (!active.completed || active.reward !== TRAINING_REWARD)))
   )
     return false;
   if (

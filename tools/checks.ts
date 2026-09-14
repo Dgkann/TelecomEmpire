@@ -4753,6 +4753,49 @@ group('Service standard launch window');
   );
 }
 
+group('Weekly research exercise bonus');
+{
+  const g = { ...newGame(811), researchActive: { id: 'ftth', daysLeft: 0.5 } };
+  const exercise = beginSignalTraining(g, 4, 'fault')!;
+  exercise.signalTraining.active!.rotations.fill(0);
+  const rewarded = finishSignalTraining(exercise)!;
+  check(
+    'bonus is capped at remaining research and never makes time negative',
+    rewarded.researchActive?.daysLeft === 0 && rewarded.signalTraining.active?.researchDaysSaved === 0.5,
+  );
+  const saved = migrate(JSON.parse(JSON.stringify(rewarded)), SAVE_VERSION)!;
+  check(
+    'a saved bonus cannot be claimed twice',
+    !!saved && finishSignalTraining(saved) === null && saved.researchActive?.daysLeft === 0,
+  );
+  const resumed = step({ ...saved, signalTraining: { ...saved.signalTraining, active: null } });
+  check(
+    'normal simulation completes an accelerated research unlock',
+    resumed.researchDone.includes('ftth') && resumed.researchActive === null,
+  );
+  const newResearch = { ...resumed, researchActive: { id: 'fiber10g', daysLeft: 18 } };
+  const practice = beginSignalTraining(newResearch, 5)!;
+  practice.signalTraining.active!.rotations.fill(0);
+  const practiced = finishSignalTraining(practice)!;
+  check(
+    'switching exercises during cooldown cannot accelerate a second research',
+    practiced.researchActive?.daysLeft === 18 && practiced.signalTraining.active?.researchDaysSaved === 0,
+  );
+  const longExercise = beginSignalTraining({ ...g, researchActive: { id: 'ftth', daysLeft: 12 } }, 4)!;
+  longExercise.signalTraining.active!.rotations.fill(0);
+  check(
+    'a weekly bonus saves at most one day of research work',
+    finishSignalTraining(longExercise)!.researchActive?.daysLeft === 11,
+  );
+  check(
+    'import rejects an exaggerated research bonus',
+    !validSignalTraining({
+      ...rewarded.signalTraining,
+      active: { ...rewarded.signalTraining.active!, researchDaysSaved: 2 },
+    }),
+  );
+}
+
 group('Goal timing estimates');
 {
   const g = newGame(7311);

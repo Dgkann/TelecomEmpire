@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MINUTES_PER_DAY } from '../game/constants';
 import { fmtMoney } from '../game/economy';
-import { signalConnection, TRAINING_REWARD, TRAINING_RESEARCH } from '../game/signalTraining';
+import { signalConnection, TRAINING_REWARD, TRAINING_RESEARCH, TRAINING_LAB_DAYS } from '../game/signalTraining';
 import { useGame } from '../store/gameStore';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
@@ -31,6 +31,11 @@ export function SignalTrainingCard() {
               : tr
                 ? `Ödül ${days} oyun günü sonra yenilenir. Şimdi ödülsüz alıştırma yapabilirsin.`
                 : `Reward renews in ${days} game days. You can practise without rewards now.`}
+          </p>
+          <p className="mt-1 text-xs text-white/50">
+            {tr
+              ? `Ödüllü görev, süren araştırmadan en fazla ${TRAINING_LAB_DAYS} günlük çalışma da düşürür. Araştırma yoksa bu bonus birikmez.`
+              : `A rewarded exercise also removes up to ${TRAINING_LAB_DAYS} day of work from active research. This bonus does not bank when the lab is idle.`}
           </p>
           <p className="mt-1 text-xs text-white/50">
             {tr
@@ -195,6 +200,13 @@ export default function SignalTrainingDialog() {
                 : 'The signal has not reached the receiver. Follow the illuminated cables.'}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
+          {!!puzzle.researchDaysSaved && (
+            <p className="w-full text-xs text-neon-lime">
+              {tr
+                ? `Araştırmadan ${puzzle.researchDaysSaved.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} günlük çalışma düşüldü. Sonuç, şirket saatini devam ettirince işlenir.`
+                : `${puzzle.researchDaysSaved.toLocaleString('en-US', { maximumFractionDigits: 2 })} day of research work saved. The result is processed when you resume company time.`}
+            </p>
+          )}
           {!puzzle.completed && (
             <button className="btn-primary" disabled={!route.connected} onClick={() => submit()}>
               {tr ? 'Rotayı doğrula' : 'Verify route'}

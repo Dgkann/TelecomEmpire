@@ -542,6 +542,7 @@ export interface SignalPuzzle {
   moves: number;
   completed: boolean;
   reward: number;
+  researchDaysSaved?: number;
 }
 
 export interface SignalTraining {
