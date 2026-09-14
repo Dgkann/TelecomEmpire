@@ -14,7 +14,11 @@ import { migrate } from '../src/game/save';
 import { creditLimit, createLoan, monthlyDebtService, totalDebt } from '../src/game/finance';
 import { negotiatedTerms } from '../src/game/contracts';
 import { makeRng } from '../src/game/rng';
-import { scenarioById, scenarioStatus } from '../src/game/scenarios';
+import { CAMPAIGN_STAGES, scenarioById, scenarioStatus } from '../src/game/scenarios';
+import { backupRouteEstimate } from '../src/game/redundancyBuild';
+import { networkResilience, regulationProgress } from '../src/game/regulator';
+import { priceIndex } from '../src/game/economy';
+import { reputationOutlook } from '../src/game/reputation';
 import type { NodeKind } from '../src/game/types';
 
 const memory = new Map<string, string>();
@@ -52,6 +56,10 @@ const strategy = process.env.AUDIT_STRATEGY ?? 'baseline';
 if (!['baseline', 'research', 'careful', 'credit'].includes(strategy)) throw new Error('Unknown audit strategy');
 const saving = strategy !== 'baseline';
 const careful = strategy === 'careful' || strategy === 'credit';
+const goalFunding = process.env.AUDIT_GOAL_FUNDING === '1';
+const manageService = process.env.AUDIT_MANAGE_SERVICE === '1';
+const reviewPricing = process.env.AUDIT_REVIEW_PRICING === '1';
+const resetResearch = process.env.AUDIT_RESET_RESEARCH === '1';
 const output =
   process.env.AUDIT_OUTPUT ?? (campaign ? 'reports/release-campaign.json' : 'reports/release-balance.json');
 const results: unknown[] = [];
@@ -107,6 +115,41 @@ function policy(day: number) {
   }
   const finance = monthlyBreakdown(live(), researchModifiers(live().researchDone));
   const reserve = Math.max(150000, finance.totalCost * 0.75);
+  if (manageService) {
+    // Follow the same price/satisfaction advice the company screen now exposes.
+    if (
+      reviewPricing &&
+      reputationOutlook(live()).satisfaction < 85 &&
+      live().stats.packetLoss < 0.01 &&
+      priceIndex(live()) > 1
+    ) {
+      const ratio = 1 / priceIndex(live());
+      for (const p of live().packages.filter((p) => p.active && p.segment === 'residential'))
+        actions().updatePackage(p.id, { price: Math.floor(p.price * ratio) });
+    }
+    for (const regulation of live().regulations.filter(
+      (r) => r.status === 'pending' && regulationProgress(live(), r) < 1,
+    )) {
+      if (regulation.kind === 'price_cap') {
+        const ratio = regulation.target / priceIndex(live());
+        for (const p of live().packages.filter((p) => p.active && p.segment === 'residential'))
+          actions().updatePackage(p.id, { price: Math.floor(p.price * ratio) });
+      } else if (
+        regulation.kind === 'coverage' &&
+        regulation.districtId &&
+        fixedCoverageTarget(live(), regulation.districtId) < regulation.target
+      ) {
+        build('pop', regulation.districtId, reserve);
+      } else if (regulation.kind === 'resilience' && networkResilience(live()) < regulation.target) {
+        const candidate = live()
+          .nodes.map((node) => ({ node, quote: backupRouteEstimate(live(), node.id) }))
+          .filter((entry) => entry.quote)
+          .sort((a, b) => a.quote!.cost - b.quote!.cost)[0];
+        if (candidate?.quote && live().money >= candidate.quote.cost + reserve)
+          actions().addBackupRoute(candidate.node.id);
+      }
+    }
+  }
   for (const node of live().nodes) {
     if (node.trafficGbps / node.capacityGbps > 0.75 && live().money > reserve + NODE_SPECS[node.kind].baseCost * 2)
       actions().upgradeNode(node.id);
@@ -123,7 +166,14 @@ function policy(day: number) {
     finance.profit > 0
   )
     actions().setTransitTier(g.transitTier + 1);
-  if (!live().researchActive) {
+  if (
+    !live().researchActive &&
+    !(
+      goalFunding &&
+      live().researchDone.includes('edge_compute') &&
+      !live().nodes.some((node) => node.kind === 'datacenter')
+    )
+  ) {
     const eligible = nextResearch();
     const target = eligible[0];
     if (
@@ -162,16 +212,28 @@ function policy(day: number) {
     live().districts.filter((d) => d.unlocked).length >= 2
       ? mobileStep.cost
       : 0);
+  const dataCentreReserve =
+    goalFunding &&
+    live().researchDone.includes('mobile_4g') &&
+    live().districts.filter((d) => d.unlocked).length >= 4 &&
+    !live().nodes.some((n) => n.kind === 'datacenter')
+      ? live().researchDone.includes('edge_compute')
+        ? NODE_SPECS.datacenter.baseCost + 300000
+        : live().researchActive
+          ? 0
+          : (nextResearch()[0]?.cost ?? 0)
+      : 0;
   if (day % 3 === 0) {
     const thin = live().districts.find((d) => d.unlocked && fixedCoverageTarget(live(), d.id) < 0.7);
-    if (thin) build('pop', thin.id, investmentReserve);
+    if (thin) build('pop', thin.id, Math.max(investmentReserve, reserve + dataCentreReserve));
     else {
       const quote = live()
         .districts.filter((d) => !d.unlocked)
         .map((d) => expansionQuote(live(), d.id, 'pop'))
         .filter((q) => q && !q.issue)
         .sort((a, b) => a!.total - b!.total)[0];
-      if (quote && live().money > quote.total + investmentReserve) actions().launchDistrict(quote.district.id, 'pop');
+      if (quote && live().money > quote.total + Math.max(investmentReserve, reserve + dataCentreReserve))
+        actions().launchDistrict(quote.district.id, 'pop');
     }
   }
   if (live().researchDone.includes('edge_compute') && !live().nodes.some((n) => n.kind === 'datacenter'))
@@ -206,13 +268,15 @@ for (const seed of seeds) {
   const milestones: Record<string, number> = {};
   const months: unknown[] = [];
   const transitions: unknown[] = [];
+  const events: unknown[] = [];
   let lastProgressDay = 0,
     longestGap = 0,
     negativeCashDays = 0,
     reloads = 0;
   let previous = '';
   let elapsedDays = 0;
-  for (let day = 0; day < days && !live().gameOver; day++) {
+  let campaignComplete = false;
+  for (let day = 0; day < days && !live().gameOver && !campaignComplete; day++) {
     policy(day);
     let g = live();
     for (let tick = 0; tick < MINUTES_PER_DAY / 5 && !g.gameOver; tick++) g = step(g);
@@ -226,14 +290,38 @@ for (const seed of seeds) {
       const advanced = actions().advanceCampaign();
       Math.random = random;
       if (advanced) {
+        if (resetResearch) {
+          useGame.setState({
+            game: {
+              ...live(),
+              researchDone: [],
+              researchPoints: 0,
+              researchActive: null,
+              spectrum: [],
+              nextAuctionAt: Infinity,
+            },
+          });
+          actions().save();
+        }
         const next = live();
         transitions.push({ day: day + 1, from, to: next.cityName, cash: next.money, seed: next.rngSeed });
         console.log(JSON.stringify({ transition: transitions.at(-1) }));
         g = next;
-      }
+      } else if (g.campaignStage === CAMPAIGN_STAGES.length - 1) campaignComplete = true;
+      else throw new Error(`Campaign transition failed: ${g.cityName}, seed ${seed}`);
     }
     const progression = `${g.rank}:${g.nodes.length}:${g.researchDone.length}:${g.districts.filter((d) => d.unlocked).length}`;
     if (progression !== previous) {
+      events.push({
+        day: day + 1,
+        city: g.cityName,
+        cityDay: Math.floor(g.minutes / MINUTES_PER_DAY),
+        research: g.researchDone,
+        activeResearch: g.researchActive?.id ?? null,
+        nodes: g.nodes.length,
+        districts: g.districts.filter((d) => d.unlocked).length,
+        rank: g.rank,
+      });
       longestGap = Math.max(longestGap, day - lastProgressDay);
       lastProgressDay = day;
       previous = progression;
@@ -250,7 +338,7 @@ for (const seed of seeds) {
     };
     for (const [name, reached] of Object.entries(markers))
       if (reached && milestones[name] === undefined) milestones[name] = day + 1;
-    if ((day + 1) % 30 === 0 || g.gameOver) {
+    if ((day + 1) % 30 === 0 || g.gameOver || campaignComplete) {
       const restored = migrate(JSON.parse(JSON.stringify(g)), g.version);
       if (!restored) throw new Error(`Save rejected: seed ${seed}, day ${day + 1}`);
       useGame.setState({ game: restored });
@@ -269,6 +357,10 @@ for (const seed of seeds) {
         debt: Math.round(totalDebt(g)),
         debtService: monthlyDebtService(g),
         health: Math.round(g.stats.health),
+        reputation: Math.round(g.reputation),
+        packetLoss: g.stats.packetLoss,
+        satisfaction: g.districts.filter((d) => d.unlocked).map((d) => Math.round(d.satisfaction)),
+        datacenters: g.nodes.filter((n) => n.kind === 'datacenter').length,
         recentSpend: Object.fromEntries(
           [...new Set(g.ledger.map((entry) => entry.category))].map((category) => [
             category,
@@ -291,6 +383,12 @@ for (const seed of seeds) {
   const result = {
     seed,
     strategy,
+    goalFunding,
+    manageService,
+    reviewPricing,
+    resetResearch,
+    campaignComplete,
+    events,
     balance: {
       mobile4gCost: RESEARCH.find((r) => r.id === 'mobile_4g')!.cost,
       serviceDeadlineDays: scenarioById('service_standard').deadlineDays,
