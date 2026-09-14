@@ -1,6 +1,7 @@
 import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src/game/energyPlanning';
 import { researchPlan } from '../src/game/researchPlanning';
 import { reputationOutlook } from '../src/game/reputation';
+import { goalTiming } from '../src/game/goalTiming';
 import {
   beginSignalTraining,
   turnSignalTile,
@@ -4749,6 +4750,55 @@ group('Service standard launch window');
   check(
     'an unfinished operator still loses after the extended window',
     scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
+  );
+}
+
+group('Goal timing estimates');
+{
+  const g = newGame(7311);
+  g.packages = g.packages.map((p) => ({ ...p, subscribers: 1000 }));
+  g.researchPoints = 0;
+  g.employees = [
+    { id: 'timing-engineer', name: 'Engineer', role: 'network_engineer', salary: 10000, skill: 2, experience: 0 },
+  ];
+  const base = goalTiming(g, g.money + 100000, 6);
+  check('missing cash has a finite estimate for a profitable company', base.monthlyCash > 0 && base.cashDays! > 0);
+  check('research point timing uses actual staff production', base.pointsPerDay === 2 && base.pointsDays === 3);
+  const blocked = goalTiming({ ...g, packages: [], employees: [] }, g.money + 1, 1);
+  check(
+    'losses and absent point production do not promise a completion date',
+    blocked.cashDays === null && blocked.pointsDays === null && blocked.readyInDays === null,
+  );
+  const funded = goalTiming({ ...g, packages: [], employees: [], researchPoints: 6 }, g.money, 6);
+  check('already funded goals need no waiting even with a monthly loss', funded.readyInDays === 0);
+  const debt = goalTiming(
+    {
+      ...g,
+      loans: [
+        {
+          id: 'timing-loan',
+          principal: 1000000,
+          remaining: 1000000,
+          rateAnnual: 0.09,
+          monthlyPayment: 100000,
+          termMonths: 12,
+          takenAt: g.minutes,
+        },
+      ],
+    },
+    g.money + 100000,
+    6,
+  );
+  check(
+    'scheduled debt repayments reduce the saving rate',
+    Math.abs(base.monthlyCash - debt.monthlyCash - 100000) < 0.001,
+  );
+  const loss = goalTiming({ ...g, stats: { ...g.stats, packetLoss: 0.5 } }, g.money + 100000);
+  check('packet loss reduces the forecast revenue', loss.monthlyCash < base.monthlyCash);
+  const busy = { ...g, researchActive: { id: 'ftth', daysLeft: 12 }, researchPoints: 20 };
+  check(
+    'research must wait for its lab but construction need not',
+    goalTiming(busy, g.money, 0).readyInDays === 12 && goalTiming(busy, g.money, 0, false).readyInDays === 0,
   );
 }
 
