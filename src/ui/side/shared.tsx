@@ -7,7 +7,7 @@ export function Stars({ n }: { n: number }) {
   );
 }
 
-export function scrollToAnchor(id: string, tries = 40) {
+export function scrollToAnchor(id: string) {
   const networkView =
     id === 'traffic-policy' || id === 'interconnect'
       ? 'policy'
@@ -16,12 +16,24 @@ export function scrollToAnchor(id: string, tries = 40) {
         : id === 'transit'
           ? 'interconnect'
           : null;
-  if (networkView) window.dispatchEvent(new CustomEvent('network:view', { detail: networkView }));
-  const el = document.getElementById(id);
-  const shell = el?.closest('.screen-shell') as HTMLElement | null;
-  if (el && shell && el.offsetTop > 0) {
-    shell.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
-    return;
-  }
-  if (tries > 0) requestAnimationFrame(() => scrollToAnchor(id, tries - 1));
+  // Screens are lazy loaded. A fixed frame count can expire before a mobile
+  // browser downloads the target screen, even though navigation succeeds.
+  const deadline = performance.now() + 5000;
+  const attempt = () => {
+    if (networkView) window.dispatchEvent(new CustomEvent('network:view', { detail: networkView }));
+    const el = document.getElementById(id);
+    const shell = el?.closest('.screen-shell') as HTMLElement | null;
+    if (el && shell && shell.clientHeight > 0) {
+      requestAnimationFrame(() => {
+        if (!el.isConnected) return;
+        shell.scrollTo({
+          top: shell.scrollTop + el.getBoundingClientRect().top - shell.getBoundingClientRect().top - 16,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        });
+      });
+      return;
+    }
+    if (performance.now() < deadline) requestAnimationFrame(attempt);
+  };
+  attempt();
 }

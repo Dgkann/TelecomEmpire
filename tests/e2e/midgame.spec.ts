@@ -68,6 +68,12 @@ test('fault finding saves the repair, pauses time and shares rewards with routin
 });
 
 test('research waiting guidance explains blockers and opens useful work', async ({ page }, testInfo) => {
+  // Exercise navigation while the destination's lazy chunk takes longer than
+  // the old 40-frame polling window to arrive.
+  await page.route('**/CompanyScreen-*.js', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.continue();
+  });
   await page.goto('/');
   await page.evaluate(() => {
     const store = (window as any).__game;
