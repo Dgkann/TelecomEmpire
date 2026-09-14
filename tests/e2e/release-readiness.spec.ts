@@ -68,6 +68,14 @@ test('all campaign transitions preserve company identity and survive reload', as
     });
     const rejectedEarly = !store.getState().advanceCampaign();
     store.getState().setAutoConnect(true);
+    store.setState({
+      game: {
+        ...store.getState().game,
+        researchDone: ['ftth'],
+        researchPoints: 17,
+        researchActive: { id: 'fiber10g', daysLeft: 9 },
+      },
+    });
     const stages = [];
     for (let stage = 0; stage < 2; stage++) {
       const g = store.getState().game;
@@ -84,6 +92,8 @@ test('all campaign transitions preserve company identity and survive reload', as
         money: next.money,
         reputation: next.reputation,
         research: next.researchDone.length,
+        points: next.researchPoints,
+        active: next.researchActive,
         training: next.signalTraining.completed,
       });
     }
@@ -100,9 +110,21 @@ test('all campaign transitions preserve company identity and survive reload', as
       company: 'Campaign Review',
       money: 4000000,
       reputation: 72,
-      research: 0,
+      research: 1,
+      points: 17,
+      active: { id: 'fiber10g', daysLeft: 9 },
       training: 0,
     },
-    { city: 'Ege', stage: 2, company: 'Campaign Review', money: 4000000, reputation: 72, research: 0, training: 0 },
+    {
+      city: 'Ege',
+      stage: 2,
+      company: 'Campaign Review',
+      money: 4000000,
+      reputation: 72,
+      research: 1,
+      points: 17,
+      active: { id: 'fiber10g', daysLeft: 9 },
+      training: 0,
+    },
   ]);
 });

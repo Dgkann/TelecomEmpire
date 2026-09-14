@@ -16,6 +16,7 @@ import { buildSolar, setEnergyPlan as applyEnergyPlan } from '../game/energy';
 import { launchDistrict as buildDistrictLaunch, type ExpansionKind } from '../game/expansion';
 import type { FailureTarget } from '../game/failureDrill';
 import { buildBackupRoute } from '../game/redundancyBuild';
+import { grantStarterSpectrum } from '../game/spectrum';
 import { buildConnectedSite } from '../game/connectedBuild';
 import { resolveDecision, claimChallenge } from '../game/board';
 import { acquireCompany } from '../game/acquisitions';
@@ -354,6 +355,11 @@ export const useGame = create<Store>((set, get) => ({
     });
     next.money += Math.max(0, Math.min(5000000, Math.round(current.money * 0.2)));
     next.reputation = Math.max(50, Math.round(current.reputation * 0.8));
+    // Technology belongs to the company, not the city being left behind.
+    next.researchDone = [...current.researchDone];
+    next.researchPoints = current.researchPoints;
+    next.researchActive = current.researchActive ? { ...current.researchActive } : null;
+    if (next.researchDone.includes('mobile_4g')) grantStarterSpectrum(next);
     if (!saveGame(next, s.activeSaveSlot)) {
       set({ persistenceError: 'The next campaign city could not be saved.' });
       return false;
