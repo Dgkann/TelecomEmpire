@@ -135,13 +135,13 @@ export default function SignalTrainingDialog() {
           </button>
         </div>
         <p id="signal-instructions" className="mt-3 text-sm leading-relaxed text-white/65">
-          {fault &&
-            (tr
-              ? 'Bu hat çalışıyordu; yalnızca bir kablo yanlış yönde. Sinyalin kesildiği yeri bul ve kabloyu düzelt. '
-              : 'This line was working; just one cable is misaligned. Find where the signal stops and repair the cable. ')}
-          {tr
-            ? 'Her tıklama kabloyu saat yönünde döndürür. Sol üstteki girişten sağ alttaki çıkışa kesintisiz bir yol kur. Tüm parçaları kullanman gerekmez. Klavyede Tab ile seç, Enter veya Boşluk ile döndür.'
-            : 'Each click rotates a cable clockwise. Build an unbroken path from the top-left inlet to the bottom-right outlet. You do not need every tile. Use Tab to select and Enter or Space to rotate.'}
+          {fault
+            ? tr
+              ? 'Bu hatta yalnızca bir kablo yanlış yönde. Işıklı parçaları takip edip kesintiyi onar. Tıklama veya Enter/Boşluk kabloyu döndürür; Tab ile seçebilirsin.'
+              : 'Just one cable is misaligned. Follow the lit tiles and repair the break. Click or press Enter/Space to rotate; use Tab to select a tile.'
+            : tr
+              ? 'Her tıklama kabloyu saat yönünde döndürür. Sol üstteki girişten sağ alttaki çıkışa kesintisiz bir yol kur. Tüm parçaları kullanman gerekmez. Klavyede Tab ile seç, Enter veya Boşluk ile döndür.'
+              : 'Each click rotates a cable clockwise. Build an unbroken path from the top-left inlet to the bottom-right outlet. You do not need every tile. Use Tab to select and Enter or Space to rotate.'}
         </p>
         <div className="mx-auto mt-4 w-full" style={{ maxWidth: 'clamp(240px, calc(100dvh - 420px), 420px)' }}>
           <div className="mb-2 text-xs font-semibold text-neon-cyan">{tr ? 'Giriş →' : 'Inlet →'}</div>
