@@ -6,7 +6,7 @@ import type { CompanyModel } from './model';
 
 export default function StaffPanel({ vm }: { vm: CompanyModel }) {
   return (
-    <div className="panel panel-tone-blue p-5">
+    <div id="staff" className="panel panel-tone-blue p-5">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">{t(vm.locale, 'staff')}</h2>
 
       <div className="mb-3 grid grid-cols-2 gap-2 text-[10px]">

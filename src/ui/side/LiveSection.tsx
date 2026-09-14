@@ -3,6 +3,7 @@ import { fmtClock } from '../../game/simulation';
 import { t } from '../i18n';
 import DevelopmentGoals from '../DevelopmentGoals';
 import ResearchGuidance from '../ResearchGuidance';
+import ExerciseShortcut from '../ExerciseShortcut';
 import { scrollToAnchor } from './shared';
 import type { SideModel } from './model';
 
@@ -35,15 +36,7 @@ export default function LiveSection({ sp }: { sp: SideModel }) {
           >
             {tr ? 'İtibarın nedenleri' : 'Reputation explained'} · {Math.round(game.reputation)} / 100
           </button>
-          <button
-            className="btn my-2 w-full text-xs"
-            onClick={() => {
-              setScreen('projects');
-              setMobileOpen(false);
-            }}
-          >
-            {tr ? 'Sinyal rotası · Mini oyun' : 'Signal routing · Mini-game'}
-          </button>
+          <ExerciseShortcut onNavigate={() => setMobileOpen(false)} />
           <AnimatePresence>
             {game.activeEvent && (
               <motion.div

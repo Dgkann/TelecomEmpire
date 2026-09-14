@@ -3,6 +3,7 @@ import { researchPlan } from '../game/researchPlanning';
 import { useGame } from '../store/gameStore';
 import { researchCopy } from './researchCopy';
 import { NODE_SPECS } from '../game/constants';
+import GoalWait from './GoalWait';
 
 export default function ResearchGuidance({
   compact = false,
@@ -41,6 +42,7 @@ export default function ResearchGuidance({
             {tr ? 'en az eksik nakit' : 'minimum cash shortfall'}
           </p>
         )}
+        <GoalWait cost={NODE_SPECS.datacenter.baseCost} needsLab={false} compact={compact} />
         <button
           className="btn-primary mt-3 text-xs"
           onClick={() => {
@@ -88,6 +90,7 @@ export default function ResearchGuidance({
           {tr ? 'Sonraki araştırma' : 'Next research'} · {name(plan.next ?? plan.target)}
         </span>
         <span className="mt-1 block text-[11px] text-white/60">{status} →</span>
+        <GoalWait cost={plan.next?.cost ?? 0} points={plan.next?.points} activeOnly={!plan.next} compact />
       </button>
     );
   return (
@@ -103,6 +106,7 @@ export default function ResearchGuidance({
       </h2>
       <p className="mt-1 text-xs leading-relaxed text-white/60">{plan.steps.map(name).join(' → ')}</p>
       <p className="mt-2 text-sm text-neon-amber">{status}</p>
+      <GoalWait cost={plan.next?.cost ?? 0} points={plan.next?.points} activeOnly={!plan.next} />
       {plan.cashMissing > 0 && plan.pointsMissing > 0 && (
         <p className="mt-1 text-xs text-white/60">
           {plan.pointsMissing} {tr ? 'araştırma puanı da gerekiyor' : 'research points also needed'}
