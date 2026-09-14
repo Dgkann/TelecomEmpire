@@ -58,23 +58,23 @@ test('all campaign transitions preserve company identity and survive reload', as
   await page.goto('/');
   const result = await page.evaluate(() => {
     const store = (window as any).__game;
-    store
-      .getState()
-      .newGame({
-        companyName: 'Campaign Review',
-        logo: 'x',
-        difficulty: 'standard',
-        cityName: 'Marmara',
-        mode: 'campaign',
-        seed: 12345,
-      });
+    store.getState().newGame({
+      companyName: 'Campaign Review',
+      logo: 'x',
+      difficulty: 'standard',
+      cityName: 'Marmara',
+      mode: 'campaign',
+      seed: 12345,
+    });
     const rejectedEarly = !store.getState().advanceCampaign();
+    store.getState().setAutoConnect(true);
     const stages = [];
     for (let stage = 0; stage < 2; stage++) {
       const g = store.getState().game;
       // Isolate transition plumbing from the separate economic playthrough.
       store.setState({ game: { ...g, speed: 0, victoryAt: g.minutes, money: 10000000, reputation: 90 } });
       if (!store.getState().advanceCampaign()) throw new Error('Transition rejected');
+      if (!store.getState().autoConnect) throw new Error('Connected construction preference lost at city transition');
       store.getState().continueGame();
       const next = store.getState().game;
       stages.push({

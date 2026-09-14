@@ -282,7 +282,14 @@ export const useGame = create<Store>((set, get) => ({
     if (!isSaveSlot(slot)) return false;
     const game = loadGame(slot);
     if (!game) return false;
-    set({ ...initialUi, locale: get().locale, activeSaveSlot: slot, game: { ...game, speed: 0 }, started: true });
+    set({
+      ...initialUi,
+      locale: get().locale,
+      autoConnect: get().autoConnect,
+      activeSaveSlot: slot,
+      game: { ...game, speed: 0 },
+      started: true,
+    });
     return true;
   },
 
@@ -351,7 +358,14 @@ export const useGame = create<Store>((set, get) => ({
       set({ persistenceError: 'The next campaign city could not be saved.' });
       return false;
     }
-    set({ ...initialUi, locale: s.locale, activeSaveSlot: s.activeSaveSlot, game: next, started: true });
+    set({
+      ...initialUi,
+      locale: s.locale,
+      autoConnect: s.autoConnect,
+      activeSaveSlot: s.activeSaveSlot,
+      game: next,
+      started: true,
+    });
     return true;
   },
 
