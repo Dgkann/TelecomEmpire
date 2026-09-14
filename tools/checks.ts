@@ -1,5 +1,6 @@
 import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src/game/energyPlanning';
 import { researchPlan } from '../src/game/researchPlanning';
+import { reputationOutlook } from '../src/game/reputation';
 import {
   beginSignalTraining,
   turnSignalTile,
@@ -4716,6 +4717,21 @@ group('Service standard launch window');
     'an unfinished operator still loses after the extended window',
     scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
   );
+}
+
+group('Reputation explanations');
+{
+  const g = newGame(7311);
+  g.stats.health = 100;
+  g.stats.outages = {};
+  g.districts = g.districts.map((d) => ({ ...d, satisfaction: 100 }));
+  check('excellent service explains the actual reputation target', reputationOutlook(g).target === 85);
+  g.stats.outages = { [g.districts[0].id]: true };
+  check('each district outage reduces the explained target by eight', reputationOutlook(g).target === 77);
+  g.stats.health = 70;
+  check('maintenance has a measurable effect on the recovery target', reputationOutlook(g).target === 56);
+  g.districts = g.districts.map((d) => ({ ...d, unlocked: false }));
+  check('an empty service footprint still has a finite outlook', Number.isFinite(reputationOutlook(g).target));
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

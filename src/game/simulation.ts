@@ -1,4 +1,5 @@
 import { initialCompetition, tickCompetition, marketEffects } from './competition';
+import { averageSatisfaction, reputationOutlook } from './reputation';
 import { initialProcurement, tickProcurement } from './procurement';
 import { fixedCoverageTarget } from './reach';
 import { initialStrategy, tickBoard, developDistrict } from './board';
@@ -895,8 +896,7 @@ export function step(prev: GameState): GameState {
   }
 
   // 6. Reputation
-  const outageCount = Object.values(outages).filter(Boolean).length;
-  const repTarget = clamp(50 + (health - 70) * 0.7 + (averageSatisfaction(s) - 60) * 0.35 - outageCount * 8, 0, 100);
+  const { target: repTarget, outages: outageCount } = reputationOutlook(s);
   s.reputation = approach(s.reputation, repTarget, 1.2 * dayFrac);
 
   // 7. Incidents, technicians, contracts
@@ -1305,19 +1305,6 @@ function recordChurn(s: GameState, d: District, count: number, rng: Rng, toMarke
     },
     ...s.churn,
   ].slice(0, 30);
-}
-
-function averageSatisfaction(s: GameState) {
-  const active = s.districts.filter((d) => d.unlocked);
-  if (!active.length) return 70;
-  let weighted = 0;
-  let total = 0;
-  for (const d of active) {
-    const subs = Math.max(1, residentialSubs(s, d.id));
-    weighted += d.satisfaction * subs;
-    total += subs;
-  }
-  return weighted / total;
 }
 
 export const INCIDENT_LOAD_FLOOR = 0.45;
