@@ -4673,6 +4673,39 @@ group('optional signal routing exercises');
   );
 }
 
+group('Short fault finding exercises');
+{
+  const g = newGame(811);
+  let valid = true;
+  for (const size of [4, 5] as const) {
+    for (let seed = 0; seed < 100; seed++) {
+      const started = beginSignalTraining({ ...g, rngSeed: seed }, size, 'fault')!;
+      const puzzle = started.signalTraining.active!;
+      const fault = puzzle.rotations.findIndex((r) => r !== 0);
+      valid &&= puzzle.rotations.filter(Boolean).length === 1 && fault > 0 && fault < size * size - 1;
+      valid &&= !signalConnection(puzzle).connected && signalConnection(puzzle).lit.has(0);
+      let solved = started;
+      for (let turn = 0; turn < 3; turn++) solved = turnSignalTile(solved, fault)!;
+      valid &&= signalConnection(solved.signalTraining.active!).connected;
+      const rewarded = finishSignalTraining(solved)!;
+      const resumed = migrate(JSON.parse(JSON.stringify(rewarded)), SAVE_VERSION);
+      valid &&= resumed?.signalTraining.active?.mode === 'fault' && finishSignalTraining(resumed) === null;
+      const practice = beginSignalTraining(
+        { ...rewarded, signalTraining: { ...rewarded.signalTraining, active: null } },
+        4,
+      )!;
+      practice.signalTraining.active!.rotations.fill(0);
+      valid &&= finishSignalTraining(practice)!.money === rewarded.money;
+    }
+  }
+  check('200 fault exercises retain a lit source, have one repair and share the routing reward cooldown', valid);
+  const training = beginSignalTraining(g, 4, 'fault')!.signalTraining;
+  check(
+    'unknown exercise modes cannot be imported',
+    !validSignalTraining({ ...training, active: { ...training.active, mode: 'unknown' } }),
+  );
+}
+
 group('Research roadmap');
 {
   const g = newGame(12345);

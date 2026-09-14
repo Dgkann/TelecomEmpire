@@ -534,6 +534,8 @@ export interface GameState {
 export type EnergyPlan = 'spot' | 'fixed' | 'green';
 
 export interface SignalPuzzle {
+  // Missing on existing saves: the original routing exercise.
+  mode?: 'routing' | 'fault';
   seed: number;
   size: 4 | 5;
   rotations: number[];

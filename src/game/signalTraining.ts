@@ -55,11 +55,17 @@ export function signalConnection(puzzle: SignalPuzzle) {
   return { ports, lit, connected: lit.has(last) && !!(ports[last] & 2) };
 }
 
-export function beginSignalTraining(s: GameState, size: 4 | 5): GameState | null {
-  if (s.gameOver || s.signalTraining.active || (size !== 4 && size !== 5)) return null;
+export function beginSignalTraining(
+  s: GameState,
+  size: 4 | 5,
+  mode: 'routing' | 'fault' = 'routing',
+): GameState | null {
+  if (s.gameOver || s.signalTraining.active || (size !== 4 && size !== 5) || !['routing', 'fault'].includes(mode))
+    return null;
   const seed = (s.rngSeed + Math.imul(s.signalTraining.sequence + 1, 2654435761)) >>> 0;
   const rng = makeRng(seed ^ 1234567);
   const active: SignalPuzzle = {
+    mode,
     seed,
     size,
     rotations: Array.from({ length: size * size }, () => Math.floor(rng() * 4)),
@@ -70,6 +76,14 @@ export function beginSignalTraining(s: GameState, size: 4 | 5): GameState | null
   // A new exercise always needs at least one rotation at the source.
   const masks = signalBoard(seed, size);
   while (rotatePorts(masks[0], active.rotations[0]) & 8) active.rotations[0] = (active.rotations[0] + 1) % 4;
+  if (mode === 'fault') {
+    // Begin with a working route and break one interior cable. The source still
+    // lights up, so following the signal teaches the player where to investigate.
+    active.rotations.fill(0);
+    const path = [...signalConnection(active).lit].filter((cell) => cell !== 0 && cell !== size * size - 1);
+    const broken = path[Math.floor(rng() * path.length)];
+    active.rotations[broken] = 1;
+  }
   return { ...s, speed: 0, signalTraining: { ...s.signalTraining, sequence: s.signalTraining.sequence + 1, active } };
 }
 
@@ -139,6 +153,7 @@ export function validSignalTraining(value: unknown): value is SignalTraining {
     ![4, 5].includes(active.size) ||
     !integer(active.moves) ||
     typeof active.completed !== 'boolean' ||
+    (active.mode !== undefined && !['routing', 'fault'].includes(active.mode)) ||
     ![0, TRAINING_REWARD].includes(active.reward)
   )
     return false;
