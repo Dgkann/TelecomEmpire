@@ -6,6 +6,7 @@ import type { MaintenanceMode } from '../../game/types';
 import { t } from '../i18n';
 import SiteIcon, { TierBadge } from '../SiteIcon';
 import InvestmentPreview from '../InvestmentPreview';
+import DataCenterFinance from '../DataCenterFinance';
 import { Bar } from './Bar';
 import type { NetNode } from '../../game/types';
 import type { ContextModel } from './model';
@@ -124,7 +125,11 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
         </div>
       )}
 
-      {cp.nextNodeCapacity !== null && <InvestmentPreview kind={node.kind} nodeId={node.id} />}
+      {node.kind === 'datacenter' ? (
+        <DataCenterFinance nodeId={node.id} />
+      ) : (
+        cp.nextNodeCapacity !== null && <InvestmentPreview kind={node.kind} nodeId={node.id} />
+      )}
       {nodeMaintenance ? (
         <div className="rounded-lg border border-neon-amber/25 bg-neon-amber/[0.06] p-2.5">
           <div className="flex items-center justify-between">
