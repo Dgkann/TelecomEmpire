@@ -1,4 +1,5 @@
 import { startMarketOperation, cancelMarketOperation } from '../game/competition';
+import { initialNodeTier, nodeCapitalCost } from '../game/constants';
 import { commissionCapacityPlan, type CapacityUpgrade } from '../game/capacityLab';
 import type { MarketTactic } from '../game/types';
 import { submitTenderBid, withdrawTenderBid } from '../game/procurement';
@@ -681,7 +682,7 @@ export const useGame = create<Store>((set, get) => ({
     if (!district) return;
     const cost = nodePlacementCost(g, kind);
 
-    const capacity = effectiveNodeCapacity(kind, 1, g.spectrum, g.researchDone);
+    const capacity = effectiveNodeCapacity(kind, initialNodeTier(kind), g.spectrum, g.researchDone);
     const count = g.nodes.filter((n) => n.kind === kind).length + 1;
     const nodeId = uid('n');
     withGame(set, (draft) => {
@@ -696,7 +697,7 @@ export const useGame = create<Store>((set, get) => ({
           gx,
           gy,
           districtId: district.id,
-          tier: 1,
+          tier: initialNodeTier(kind),
           capacityGbps: capacity,
           trafficGbps: 0,
           health: 100,
@@ -798,6 +799,15 @@ export const useGame = create<Store>((set, get) => ({
       return;
     }
     const cost = nodeUpgradeCost(node.kind, node.tier);
+    if (node.kind === 'datacenter' && node.tier === 0 && !g.researchDone.includes('edge_compute')) {
+      s.toast(
+        s.locale === 'tr'
+          ? 'Tam merkeze genişletmek için Edge araştırması gerekiyor.'
+          : 'Research edge compute to expand to a full data centre.',
+        'bad',
+      );
+      return;
+    }
     if (g.money < cost) {
       s.toast('Not enough money.', 'bad');
       return;
@@ -930,7 +940,7 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       const node = draft.nodes.find((n) => n.id === id);
       if (!node) return;
-      const refund = Math.round(NODE_SPECS[node.kind].baseCost * 0.35 * node.tier);
+      const refund = Math.round(nodeCapitalCost(node.kind, node.tier) * 0.35);
       draft.money += refund;
       recordLedger(draft, 'asset_sale', `Decommissioned: ${node.name}`, refund);
       draft.nodes = draft.nodes.filter((n) => n.id !== id);

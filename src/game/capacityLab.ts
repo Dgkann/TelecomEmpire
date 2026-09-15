@@ -32,18 +32,20 @@ export function capacityOptions(state: GameState) {
       nextCapacity: effectiveNodeCapacity(n.kind, n.tier + 1, state.spectrum, state.researchDone),
       cost: nodeUpgradeCost(n.kind, n.tier),
       issue:
-        n.down || state.incidents.some((i) => !i.resolved && i.targetType === 'node' && i.targetId === n.id)
-          ? 'Resolve the site fault first.'
-          : state.maintenanceOrders.some((o) => o.nodeId === n.id && o.status !== 'completed')
-            ? 'Finish planned maintenance first.'
-            : n.tier >=
-                (n.kind === 'core'
-                  ? mods.maxCoreTier
-                  : n.kind === 'tower'
-                    ? mods.maxTowerTier
-                    : NODE_SPECS[n.kind].maxTier)
-              ? 'Maximum available tier. Research may unlock more.'
-              : null,
+        n.kind === 'datacenter' && n.tier === 0 && !state.researchDone.includes('edge_compute')
+          ? 'Research edge compute to expand this data centre.'
+          : n.down || state.incidents.some((i) => !i.resolved && i.targetType === 'node' && i.targetId === n.id)
+            ? 'Resolve the site fault first.'
+            : state.maintenanceOrders.some((o) => o.nodeId === n.id && o.status !== 'completed')
+              ? 'Finish planned maintenance first.'
+              : n.tier >=
+                  (n.kind === 'core'
+                    ? mods.maxCoreTier
+                    : n.kind === 'tower'
+                      ? mods.maxTowerTier
+                      : NODE_SPECS[n.kind].maxTier)
+                ? 'Maximum available tier. Research may unlock more.'
+                : null,
     })),
     ...state.links.map((l) => ({
       type: 'link' as const,

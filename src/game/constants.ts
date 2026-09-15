@@ -80,7 +80,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     powerKw: 90,
     maintenance: 104000,
     description: 'Hosting, caching and edge compute. Cuts transit costs and unlocks enterprise deals.',
-    requires: 'edge_compute',
+    requires: 'backbone100g',
   },
   tower: {
     kind: 'tower',

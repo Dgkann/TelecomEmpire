@@ -4823,6 +4823,71 @@ group('Staged data centre economics and saves');
   );
 }
 
+group('Staged data centre construction');
+{
+  const g = newGame(811);
+  g.money = 1200000;
+  g.researchDone = ['ftth', 'fiber10g', 'backbone100g'];
+  const d = g.districts.find((d) => d.unlocked)!;
+  const cell = d.cells.find((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy))!;
+  const built = projectBlueprint(g, [{ type: 'node', id: 'staged-build', kind: 'datacenter', ...cell }]);
+  const objective = scenarioStatus({ ...built.state, scenarioId: 'market_leader' }).objectives.find((o) =>
+    o.label.includes('data centre'),
+  )!;
+  check('a small centre advances but does not complete the campaign objective', objective.progress === 0.25);
+  check(
+    'the first stage can be built with 100G research for 1.2 million',
+    !built.error &&
+      built.cost === 1200000 &&
+      built.state.nodes.at(-1)?.tier === 0 &&
+      built.state.nodes.at(-1)?.capacityGbps === 10,
+  );
+  check(
+    'the capacity lab cannot bypass the expansion research gate',
+    !!capacityOptions(built.state).find((n) => n.id === 'staged-build')?.issue,
+  );
+  const prior = useGame.getState();
+  useGame.setState({ game: built.state, toast: () => {} });
+  useGame.getState().upgradeNode('staged-build');
+  check('store upgrades require edge research', useGame.getState().game === built.state);
+  useGame.setState({ game: { ...built.state, money: 3199999, researchDone: [...g.researchDone, 'edge_compute'] } });
+  useGame.getState().upgradeNode('staged-build');
+  check(
+    'an unaffordable expansion leaves money and capacity untouched',
+    useGame.getState().game?.money === 3199999 && useGame.getState().game?.nodes.at(-1)?.tier === 0,
+  );
+  useGame.setState({ game: { ...useGame.getState().game!, money: 3200000 } });
+  useGame.getState().upgradeNode('staged-build');
+  const expanded = useGame.getState().game!;
+  check(
+    'expanding completes the data centre objective',
+    scenarioStatus({ ...expanded, scenarioId: 'market_leader' }).objectives.find((o) => o.label.includes('data centre'))
+      ?.progress === 1,
+  );
+  check(
+    'expansion charges 3.2 million and produces the original full centre',
+    expanded.money === 0 && expanded.nodes.at(-1)?.tier === 1 && expanded.nodes.at(-1)?.capacityGbps === 40,
+  );
+  check(
+    'the expansion survives a JSON save round trip',
+    migrate(JSON.parse(JSON.stringify(expanded)), SAVE_VERSION)?.nodes.at(-1)?.tier === 1,
+  );
+  useGame.setState({ game: g, autoConnect: false, planning: false, drillTarget: null });
+  useGame.getState().placeNode('datacenter', cell.gx, cell.gy);
+  const direct = useGame.getState().game!;
+  const directCentre = direct.nodes.find((n) => n.kind === 'datacenter');
+  check(
+    'manual placement uses the same first stage and price as blueprints',
+    direct.money === 0 && directCentre?.tier === 0 && directCentre?.capacityGbps === 10,
+  );
+  if (directCentre) useGame.getState().sellNode(directCentre.id);
+  check(
+    'selling a small centre refunds only its actual first-stage investment',
+    useGame.getState().game?.money === 420000,
+  );
+  useGame.setState(prior);
+}
+
 group('Weekly research exercise bonus');
 {
   const g = { ...newGame(811), researchActive: { id: 'ftth', daysLeft: 0.5 } };

@@ -1,8 +1,9 @@
-import { FIBER_COST_PER_UNIT, NODE_SPECS } from './constants';
+import { FIBER_COST_PER_UNIT, NODE_SPECS, DATACENTER_PILOT_COST } from './constants';
 import { researchModifiers } from './research';
 import type { GameState, NodeKind } from './types';
 
 export function nodePlacementCost(state: GameState, kind: NodeKind) {
+  if (kind === 'datacenter') return DATACENTER_PILOT_COST;
   const mods = researchModifiers(state.researchDone);
   return Math.round(NODE_SPECS[kind].baseCost * (kind === 'access' ? mods.accessCostMul : 1));
 }

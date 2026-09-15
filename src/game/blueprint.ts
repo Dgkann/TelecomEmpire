@@ -1,4 +1,4 @@
-import { NODE_SPECS, linkCapacity } from './constants';
+import { NODE_SPECS, linkCapacity, initialNodeTier } from './constants';
 import { effectiveNodeCapacity } from './capacity';
 import { nodePlacementCost, nodePlacementIssue, fibreConnectionCost, fibreConnectionIssue } from './placement';
 import { computeRoutes } from './network';
@@ -54,8 +54,13 @@ export function projectBlueprint(original: GameState, steps: BuildStep[], locale
           gx: step.gx,
           gy: step.gy,
           districtId: district.id,
-          tier: 1,
-          capacityGbps: effectiveNodeCapacity(step.kind, 1, state.spectrum, state.researchDone),
+          tier: initialNodeTier(step.kind),
+          capacityGbps: effectiveNodeCapacity(
+            step.kind,
+            initialNodeTier(step.kind),
+            state.spectrum,
+            state.researchDone,
+          ),
           trafficGbps: 0,
           health: 100,
           down: false,

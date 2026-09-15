@@ -62,10 +62,15 @@ const mobile: ScenarioObjective = {
 };
 
 const dataCentre: ScenarioObjective = {
-  label: 'Build a data centre',
-  labelTr: 'Veri merkezi kur',
-  progress: (state) => (state.nodes.some((node) => node.kind === 'datacenter') ? 1 : 0),
-  detail: (state) => `${state.nodes.filter((node) => node.kind === 'datacenter').length} built`,
+  label: 'Build a full data centre',
+  labelTr: 'Tam kapasiteli veri merkezi kur',
+  progress: (state) =>
+    state.nodes.some((node) => node.kind === 'datacenter' && node.tier >= 1)
+      ? 1
+      : state.nodes.some((node) => node.kind === 'datacenter')
+        ? 0.25
+        : 0,
+  detail: (state) => `${state.nodes.filter((node) => node.kind === 'datacenter' && node.tier >= 1).length} / 1`,
 };
 
 export const SCENARIOS: ScenarioDefinition[] = [

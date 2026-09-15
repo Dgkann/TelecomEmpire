@@ -68,12 +68,14 @@ const research = (id: string, label: string): RankRequirement => ({
 
 const dataCentres = (target: number): RankRequirement => ({
   action: (s) =>
-    s.researchDone.includes('edge_compute')
-      ? { screen: 'map', tool: 'datacenter', label: 'Build a data centre' }
-      : { screen: 'research', label: 'Research edge compute' },
-  label: `${target} data centre${target > 1 ? 's' : ''}`,
-  progress: (s) => clamp(s.nodes.filter((n) => n.kind === 'datacenter').length / target, 0, 1),
-  detail: (s) => `${s.nodes.filter((n) => n.kind === 'datacenter').length} / ${target}`,
+    s.nodes.some((n) => n.kind === 'datacenter' && n.tier === 0)
+      ? { screen: 'research', label: 'Expand the small data centre' }
+      : s.researchDone.includes('edge_compute')
+        ? { screen: 'map', tool: 'datacenter', label: 'Build a data centre' }
+        : { screen: 'research', label: 'Research edge compute' },
+  label: `${target} full data centre${target > 1 ? 's' : ''}`,
+  progress: (s) => clamp(s.nodes.filter((n) => n.kind === 'datacenter' && n.tier >= 1).length / target, 0, 1),
+  detail: (s) => `${s.nodes.filter((n) => n.kind === 'datacenter' && n.tier >= 1).length} / ${target}`,
 });
 
 export const RANKS: Rank[] = [
