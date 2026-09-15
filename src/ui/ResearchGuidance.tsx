@@ -4,6 +4,7 @@ import { useGame } from '../store/gameStore';
 import { researchCopy } from './researchCopy';
 import { NODE_SPECS, DATACENTER_PILOT_COST, nodeUpgradeCost } from '../game/constants';
 import GoalWait from './GoalWait';
+import DataCenterFinance from './DataCenterFinance';
 
 export default function ResearchGuidance({
   compact = false,
@@ -59,6 +60,7 @@ export default function ResearchGuidance({
           </p>
         )}
         <GoalWait cost={siteCost} needsLab={false} compact={compact} />
+        {!compact && needsExpansion && pilot && <DataCenterFinance nodeId={pilot.id} expanded />}
         <button
           className="btn-primary mt-3 text-xs"
           onClick={() => {

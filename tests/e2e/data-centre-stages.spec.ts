@@ -60,6 +60,11 @@ test('small data centre connects, saves and expands through the research guidanc
   });
   await expect(guidance).toContainText('Sonraki aşama: tam kapasiteli merkez');
   await expect(guidance).toContainText('3.200.000 ₺');
+  const finances = guidance.getByRole('region', { name: 'Veri merkezi finansmanı' });
+  await expect(finances.getByText('Ek aylık net katkı', { exact: true })).toBeVisible();
+  await expect(finances.getByText('Tahmini geri ödeme', { exact: true })).toBeVisible();
+  expect(await finances.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(3200000);
   await guidance.getByRole('button', { name: 'Genişletmeyi incele' }).click();
   const small = page.getByRole('region', { name: 'Küçük veri merkezi' });
   await expect(small).toBeVisible();
