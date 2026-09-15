@@ -4754,6 +4754,26 @@ group('Service standard launch window');
   );
 }
 
+group('Investment energy estimates');
+{
+  const g = newGame(811);
+  for (const solar of [false, true]) {
+    const s = { ...g, energy: { ...g.energy, spotIndex: 2.4, solarNodeIds: solar ? [g.nodes[0].id] : [] } };
+    const n = s.nodes[0];
+    const next = { ...s, nodes: s.nodes.map((x) => (x.id === n.id ? { ...x, tier: x.tier + 1 } : x)) };
+    const actual =
+      monthlyBreakdown(next, researchModifiers(s.researchDone)).totalCost -
+      monthlyBreakdown(s, researchModifiers(s.researchDone)).totalCost;
+    check(
+      `upgrade energy estimate matches current tariff with solar ${solar}`,
+      Math.abs(investmentEstimate(s, n.kind, n.id).monthlyCost - actual) < 0.001,
+    );
+  }
+  const snapshot = JSON.stringify(g);
+  investmentEstimate(g, 'datacenter');
+  check('investment estimates do not change the game', JSON.stringify(g) === snapshot);
+}
+
 group('Staged data centre economics and saves');
 {
   const g = newGame(811);

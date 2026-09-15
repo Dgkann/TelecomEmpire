@@ -6,7 +6,9 @@ import {
   initialNodeTier,
   nodePowerScale,
   nodeMaintenanceScale,
+  ENERGY,
 } from './constants';
+import { energyPriceIndex, hasSolar } from './energy';
 import { monthlyBreakdown } from './economy';
 import { researchModifiers } from './research';
 import { staffModifiers } from './staff';
@@ -30,7 +32,9 @@ export function investmentEstimate(state: GameState, kind: NodeKind, nodeId?: st
       (node
         ? nodePowerScale(kind, node.tier + 1) - nodePowerScale(kind, node.tier)
         : nodePowerScale(kind, initialNodeTier(kind))) *
-      powerMultiplier +
+      powerMultiplier *
+      energyPriceIndex(state) *
+      (node && hasSolar(state, node.id) ? 1 - ENERGY.solarDrawCut : 1) +
     spec.maintenance *
       (node
         ? nodeMaintenanceScale(kind, node.tier + 1) - nodeMaintenanceScale(kind, node.tier)
