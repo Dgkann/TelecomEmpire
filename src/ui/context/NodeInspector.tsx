@@ -1,4 +1,5 @@
 import { NODE_SPECS, nodeUpgradeCost } from '../../game/constants';
+import { dataCenterExpansionBlocker } from '../../game/dataCenterOutlook';
 import { fmtMoneyExact } from '../../game/economy';
 import { nodeUtil } from '../../game/network';
 import { MAINTENANCE_CONFIG, maintenanceCost } from '../../game/strategy';
@@ -14,6 +15,7 @@ import type { ContextModel } from './model';
 export default function NodeInspector({ cp, node }: { cp: ContextModel; node: NetNode }) {
   // Destructured so TypeScript can narrow it inside the conditional below.
   const { nodeMaintenance } = cp;
+  const expansionBlocked = node.kind === 'datacenter' && dataCenterExpansionBlocker(cp.game, node);
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-3 pr-6">
@@ -188,7 +190,11 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={node.tier >= cp.nodeMaxTier} onClick={() => cp.upgradeNode(node.id)}>
+        <button
+          className="btn-primary"
+          disabled={node.tier >= cp.nodeMaxTier || !!expansionBlocked}
+          onClick={() => cp.upgradeNode(node.id)}
+        >
           {node.tier >= cp.nodeMaxTier
             ? node.kind === 'datacenter' && node.tier === 0
               ? cp.locale === 'tr'

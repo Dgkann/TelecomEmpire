@@ -93,7 +93,6 @@ export default function DataCenterFinance({ nodeId, expanded = false }: { nodeId
               <dd className={expansion.cashAfter < 0 ? 'text-neon-red' : ''}>{fmtMoneyExact(expansion.cashAfter)}</dd>
             </div>
           </dl>
-          {blockedText && <p className="mt-2 text-neon-amber">{blockedText}</p>}
           {expansion.runwayMonths !== null && (
             <p className="mt-2 text-neon-amber">
               {tr
@@ -103,6 +102,7 @@ export default function DataCenterFinance({ nodeId, expanded = false }: { nodeId
           )}
         </details>
       )}
+      {blockedText && <p className="mt-2 text-neon-amber">{blockedText}</p>}
       <p className="mt-3 text-[11px] leading-relaxed text-white/45">
         {tr
           ? 'Mevcut talep, çalışma modu, paket kaybı ve enerji tarifesiyle tahmin edilir. Saha neti elektrik ve bakımı düşer; ortak personel, fiber, kredi ve araştırma giderlerini içermez. Şirketin nakit süresi hesabı personel ve kredi taksitlerini de içerir.'

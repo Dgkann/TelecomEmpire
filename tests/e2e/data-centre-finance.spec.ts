@@ -36,6 +36,29 @@ test('site finances explain payback and stop quoting income when fibre is cut', 
   await expect(panel).toContainText('oyun ayı');
   await expect(panel).not.toContainText('Bu koşullarda geri ödeme beklenmiyor.');
   expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(original.money);
+  const expand = page.getByRole('button', { name: /Tam merkeze genişlet/ });
+  await expect(expand).toBeEnabled();
+  await page.evaluate(() => {
+    const store = (window as any).__game;
+    store.setState({ game: { ...store.getState().game, money: 1000000 } });
+  });
+  await panel.getByText('Genişletme hesabı', { exact: true }).click();
+  await expect(expand).toBeDisabled();
+  await expect(panel.getByText('2.200.000 ₺ ek nakit gerekiyor.')).toBeVisible();
+  await page.evaluate((original) => {
+    const store = (window as any).__game;
+    store.setState({ game: { ...store.getState().game, money: original.money } });
+    store.getState().scheduleMaintenance(original.id, 'overnight');
+  }, original);
+  await expect(expand).toBeDisabled();
+  await expect(panel.getByText('Önce planlı bakımın bitmesini bekle veya iptal et.')).toBeVisible();
+  await page.evaluate((id) => {
+    const store = (window as any).__game;
+    const order = store.getState().game.maintenanceOrders.find((o: any) => o.nodeId === id && o.status !== 'completed');
+    store.getState().cancelMaintenance(order.id);
+  }, original.id);
+  await expect(expand).toBeEnabled();
+  await panel.getByText('Genişletme hesabı', { exact: true }).click();
   await page.evaluate((id) => {
     const store = (window as any).__game;
     const g = store.getState().game;

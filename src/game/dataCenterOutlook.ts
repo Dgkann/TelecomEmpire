@@ -7,6 +7,16 @@ import { staffModifiers } from './staff';
 import { DATA_CENTER_MODE_CONFIG, dataCenterMode, operationalDataCenters } from './strategy';
 import type { GameState, NetNode } from './types';
 
+export function dataCenterExpansionBlocker(state: GameState, node: NetNode) {
+  if (state.gameOver) return 'closed';
+  if (node.tier === 0 && !state.researchDone.includes('edge_compute')) return 'research';
+  if (node.down || state.incidents.some((i) => !i.resolved && i.targetType === 'node' && i.targetId === node.id))
+    return 'fault';
+  if (state.maintenanceOrders.some((o) => o.nodeId === node.id && o.status !== 'completed')) return 'maintenance';
+  if (state.money < nodeUpgradeCost('datacenter', node.tier)) return 'funds';
+  return null;
+}
+
 // Quotes use current demand, workload, connectivity and energy prices. They do
 // not assume that expanding a site repairs its connection or removes packet loss.
 export function dataCenterOutlook(state: GameState, nodeId: string) {
@@ -36,17 +46,7 @@ export function dataCenterOutlook(state: GameState, nodeId: string) {
   const monthlyCompanyCashAfter =
     money.totalRevenue * revenueFactor - money.totalCost - monthlyDebtService(state) + addedNet;
   const cashAfter = state.money - cost;
-  const blockedBy = state.gameOver
-    ? 'closed'
-    : node.tier === 0 && !state.researchDone.includes('edge_compute')
-      ? 'research'
-      : node.down || state.incidents.some((i) => !i.resolved && i.targetType === 'node' && i.targetId === nodeId)
-        ? 'fault'
-        : state.maintenanceOrders.some((o) => o.nodeId === nodeId && o.status !== 'completed')
-          ? 'maintenance'
-          : cashAfter < 0
-            ? 'funds'
-            : null;
+  const blockedBy = dataCenterExpansionBlocker(state, node);
   return {
     connected,
     current,
