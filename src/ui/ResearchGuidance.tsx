@@ -1,5 +1,6 @@
 import { fmtMoneyExact } from '../game/economy';
 import { researchPlan } from '../game/researchPlanning';
+import { researchById } from '../game/research';
 import { useGame } from '../store/gameStore';
 import { researchCopy } from './researchCopy';
 import { NODE_SPECS, DATACENTER_PILOT_COST, nodeUpgradeCost } from '../game/constants';
@@ -27,6 +28,7 @@ export default function ResearchGuidance({
   const siteCost = needsExpansion ? nodeUpgradeCost('datacenter', 0) : DATACENTER_PILOT_COST;
   const needsDataCenter =
     game.researchDone.includes('backbone100g') && !game.nodes.some((n) => n.kind === 'datacenter');
+  const edge = researchById('edge_compute')!;
   if (needsDataCenter || needsExpansion)
     return (
       <section
@@ -84,6 +86,48 @@ export default function ResearchGuidance({
               ? 'Veri merkezi yerini seç'
               : 'Choose a data centre site'}
         </button>
+        {!compact && needsDataCenter && !game.researchDone.includes(edge.id) && (
+          <section
+            className="mt-4 border-t border-white/10 pt-3"
+            aria-label={tr ? 'Önce araştırma seçeneği' : 'Research first option'}
+          >
+            <h3 className="text-xs font-semibold">
+              {tr ? 'İstersen önce araştırmaya yatırım yap' : 'You can invest in research first'}
+            </h3>
+            <p className="mt-2 text-xs leading-relaxed text-white/60">
+              {tr
+                ? 'Küçük merkez erken barındırma geliri sağlar. Önce Edge araştırmasını seçersen nakdini araştırmaya ayırır, merkezin kurulumunu sonraya bırakırsın.'
+                : 'A small centre earns hosting income early. Choosing edge research first reserves your cash for research and leaves construction for later.'}
+            </p>
+            <p className="mt-2 text-xs text-white/60">
+              {fmtMoneyExact(edge.cost)} · {edge.points} {tr ? 'araştırma puanı' : 'research points'} · {edge.days}{' '}
+              {tr ? 'oyun günü' : 'game days'}
+            </p>
+            <GoalWait cost={edge.cost} points={edge.points} activeOnly={game.researchActive?.id === edge.id} compact />
+            {game.researchActive && game.researchActive.id !== edge.id && (
+              <p className="mt-2 text-xs text-neon-amber">
+                {tr
+                  ? 'Önce süren araştırmanın tamamlanmasını bekle.'
+                  : 'Wait for the current research to finish first.'}
+              </p>
+            )}
+            <button
+              className="btn mt-3 whitespace-normal text-xs"
+              disabled={
+                !!game.researchActive || !!game.gameOver || game.money < edge.cost || game.researchPoints < edge.points
+              }
+              onClick={() => startResearch(edge.id)}
+            >
+              {game.researchActive?.id === edge.id
+                ? tr
+                  ? 'Edge araştırması sürüyor'
+                  : 'Edge research in progress'
+                : tr
+                  ? 'Önce Edge araştırmasını başlat'
+                  : 'Start edge research first'}
+            </button>
+          </section>
+        )}
       </section>
     );
   if (!plan) return null;
