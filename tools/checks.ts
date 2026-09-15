@@ -2,6 +2,7 @@ import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src
 import { researchPlan } from '../src/game/researchPlanning';
 import { reputationOutlook } from '../src/game/reputation';
 import { goalTiming } from '../src/game/goalTiming';
+import { dataCenterOutlook } from '../src/game/dataCenterOutlook';
 import { DATACENTER_PILOT_COST, nodeUpgradeCost, nodeCapitalCost } from '../src/game/constants';
 import {
   beginSignalTraining,
@@ -4752,6 +4753,69 @@ group('Service standard launch window');
     'an unfinished operator still loses after the extended window',
     scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
   );
+}
+
+group('Data centre financial outlook');
+{
+  const g = newGame(811);
+  const node = { ...g.nodes[0], id: 'outlook-dc', kind: 'datacenter' as const, tier: 0, capacityGbps: 10 };
+  const s = {
+    ...g,
+    money: 5000000,
+    researchDone: ['ftth', 'fiber10g', 'backbone100g', 'edge_compute'],
+    nodes: [...g.nodes, node],
+    links: [...g.links, { ...g.links[0], id: 'outlook-link', aId: g.nodes[0].id, bId: node.id, down: false }],
+  };
+  const before = JSON.stringify(s);
+  const quote = dataCenterOutlook(s, node.id)!;
+  const expanded = { ...s, nodes: s.nodes.map((n) => (n.id === node.id ? { ...n, tier: 1, capacityGbps: 40 } : n)) };
+  const originalMoney = monthlyBreakdown(s, researchModifiers(s.researchDone));
+  const nextMoney = monthlyBreakdown(expanded, researchModifiers(s.researchDone));
+  check(
+    'quoted expansion income matches the actual economy change',
+    Math.abs(quote.expansion!.addedNet - (nextMoney.profit - originalMoney.profit)) < 0.001,
+  );
+  check(
+    'payback uses incremental net income and the expansion price',
+    quote.expansion!.paybackMonths === 3200000 / quote.expansion!.addedNet && quote.expansion!.cashAfter === 1800000,
+  );
+  const isolated = dataCenterOutlook({ ...s, links: g.links }, node.id)!;
+  check(
+    'an isolated centre has costs but no income or promised payback',
+    !isolated.connected &&
+      isolated.current.revenue === 0 &&
+      isolated.current.net < 0 &&
+      isolated.expansion!.paybackMonths === null,
+  );
+  const loss = dataCenterOutlook({ ...s, stats: { ...s.stats, packetLoss: 0.5 } }, node.id)!;
+  check(
+    'packet loss reduces the quoted hosting revenue',
+    Math.abs(loss.current.revenue - quote.current.revenue * 0.875) < 0.001,
+  );
+  const solar = dataCenterOutlook({ ...s, energy: { ...s.energy, solarNodeIds: [node.id] } }, node.id)!;
+  check(
+    'solar changes power costs and improves incremental net income',
+    solar.current.power < quote.current.power && solar.expansion!.addedNet > quote.expansion!.addedNet,
+  );
+  const expensive = dataCenterOutlook({ ...s, energy: { ...s.energy, spotIndex: 100 } }, node.id)!;
+  check(
+    'a loss-making expansion has no payback estimate',
+    expensive.expansion!.addedNet < 0 && expensive.expansion!.paybackMonths === null,
+  );
+  check(
+    'unaffordable expansion reports the actual shortfall',
+    dataCenterOutlook({ ...s, money: 1000000 }, node.id)?.expansion?.cashMissing === 2200000,
+  );
+  check(
+    'edge research remains necessary for the quoted expansion',
+    dataCenterOutlook({ ...s, researchDone: [] }, node.id)?.expansion?.blockedBy === 'research',
+  );
+  check(
+    'maximum-tier centres show current finances without a fictional next stage',
+    dataCenterOutlook({ ...s, nodes: s.nodes.map((n) => (n.id === node.id ? { ...n, tier: 3 } : n)) }, node.id)
+      ?.expansion === null,
+  );
+  check('financial quotes do not mutate the game', JSON.stringify(s) === before);
 }
 
 group('Per-site hosting revenue');
