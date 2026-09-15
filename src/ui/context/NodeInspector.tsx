@@ -20,7 +20,13 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
           kind={node.kind}
           tier={node.tier}
           className="h-11 w-11 shrink-0"
-          title={`${NODE_SPECS[node.kind].label}, Tier ${node.tier}`}
+          title={
+            node.kind === 'datacenter' && node.tier === 0
+              ? cp.locale === 'tr'
+                ? 'Küçük veri merkezi'
+                : 'Small data centre'
+              : `${NODE_SPECS[node.kind].label}, Tier ${node.tier}`
+          }
         />
         <div className="min-w-0">
           <div className="mb-1 flex items-center gap-2">
@@ -37,6 +43,23 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
         label="Capacity"
         right={`${node.trafficGbps.toFixed(1)} / ${node.capacityGbps.toFixed(0)} Gbps`}
       />
+      {node.kind === 'datacenter' && node.tier === 0 && (
+        <section
+          className="panel p-3 text-xs"
+          aria-label={cp.locale === 'tr' ? 'Küçük veri merkezi' : 'Small data centre'}
+        >
+          <p>
+            {cp.locale === 'tr'
+              ? 'İlk aşama · 10 Gbps. Tam merkezin %25 barındırma geliri, elektrik ve bakım gideri.'
+              : 'First stage · 10 Gbps. 25% of full hosting revenue and site operating costs.'}
+          </p>
+          <p className="mt-2">
+            {cp.locale === 'tr'
+              ? 'Edge araştırması + 3.200.000 ₺ → 40 Gbps tam merkez. Kampanya için genişletmen gerekir.'
+              : 'Edge research + 3,200,000 ₺ → 40 Gbps full centre. Expand to meet the campaign objective.'}
+          </p>
+        </section>
+      )}
       <Bar value={1 - node.health / 100} label="Wear" right={`${Math.round(node.health)}% health`} />
 
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -162,8 +185,12 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" disabled={node.tier >= cp.nodeMaxTier} onClick={() => cp.upgradeNode(node.id)}>
           {node.tier >= cp.nodeMaxTier
-            ? 'Max tier'
-            : `Upgrade · ${fmtMoneyExact(nodeUpgradeCost(node.kind, node.tier))}`}
+            ? node.kind === 'datacenter' && node.tier === 0
+              ? cp.locale === 'tr'
+                ? 'Edge araştırması gerekiyor'
+                : 'Edge research required'
+              : 'Max tier'
+            : `${node.kind === 'datacenter' && node.tier === 0 ? (cp.locale === 'tr' ? 'Tam merkeze genişlet' : 'Expand to full centre') : 'Upgrade'} · ${fmtMoneyExact(nodeUpgradeCost(node.kind, node.tier))}`}
         </button>
         <button
           className="btn"

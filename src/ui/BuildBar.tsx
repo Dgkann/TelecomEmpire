@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NODE_SPECS } from '../game/constants';
+import { NODE_SPECS, DATACENTER_PILOT_COST, initialNodeTier } from '../game/constants';
 import { effectiveNodeCapacity } from '../game/capacity';
 import { researchModifiers } from '../game/research';
 import { useGame, type BuildTool } from '../store/gameStore';
@@ -62,8 +62,8 @@ const TOOLS: Array<{
     label: 'Data Centre',
     labelKey: 'dataCentre',
     nodeKind: 'datacenter',
-    cost: () => `$${(NODE_SPECS.datacenter.baseCost / 1000).toFixed(0)}k`,
-    locked: 'edge_compute',
+    cost: () => `$${(DATACENTER_PILOT_COST / 1000).toFixed(0)}k`,
+    locked: 'backbone100g',
   },
 ];
 
@@ -108,7 +108,7 @@ export default function BuildBar() {
   const mods = researchModifiers(game.researchDone);
   const activeNodeTool = tool && tool !== 'fiber' ? NODE_SPECS[tool] : null;
   const activeNodeCapacity =
-    tool && tool !== 'fiber' ? effectiveNodeCapacity(tool, 1, game.spectrum, game.researchDone) : 0;
+    tool && tool !== 'fiber' ? effectiveNodeCapacity(tool, initialNodeTier(tool), game.spectrum, game.researchDone) : 0;
   const linkFromName = linkFrom ? game.nodes.find((node) => node.id === linkFrom)?.name : null;
 
   return (
@@ -226,7 +226,13 @@ export default function BuildBar() {
                     <span className="absolute -right-1 -top-1 h-2.5 w-2.5 animate-ping rounded-full bg-neon-cyan" />
                   )}
                   <span className="grid h-6 place-items-center text-lg leading-none">
-                    {locked ? '—' : t.nodeKind ? <SiteIcon kind={t.nodeKind} tier={1} className="h-6 w-6" /> : t.icon}
+                    {locked ? (
+                      '—'
+                    ) : t.nodeKind ? (
+                      <SiteIcon kind={t.nodeKind} tier={initialNodeTier(t.nodeKind)} className="h-6 w-6" />
+                    ) : (
+                      t.icon
+                    )}
                   </span>
                   <span className="font-display text-[10px] font-semibold uppercase tracking-wide leading-none sm:text-[12px]">
                     {translate(locale, t.labelKey)}

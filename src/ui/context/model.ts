@@ -50,7 +50,9 @@ export function useContextModel() {
       ? mods.maxCoreTier
       : node.kind === 'tower'
         ? mods.maxTowerTier
-        : NODE_SPECS[node.kind].maxTier
+        : node.kind === 'datacenter' && node.tier === 0 && !game.researchDone.includes('edge_compute')
+          ? 0
+          : NODE_SPECS[node.kind].maxTier
     : 0;
   const nextNodeCapacity =
     node && node.tier < nodeMaxTier

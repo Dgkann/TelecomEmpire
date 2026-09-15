@@ -19,7 +19,7 @@ const TR: Record<string, [string, string, string[]]> = {
   backbone100g: [
     '100G omurga',
     'Çekirdek ağ kapasitesini artırarak omurga darboğazını azaltır.',
-    ['5. seviye çekirdek', 'Üst bağlantı maliyeti −%15'],
+    ['5. seviye çekirdek', 'Küçük veri merkezi (10 Gbps)', 'Üst bağlantı maliyeti −%15'],
   ],
   metro_mesh: [
     'Metro fiber örgüsü',
@@ -50,7 +50,7 @@ const TR: Record<string, [string, string, string[]]> = {
   edge_compute: [
     'Uç bilişim',
     'İçeriği müşteriye yakın işler ve önbellekler; üst bağlantı giderini azaltır.',
-    ['Veri merkezleri', 'Üst bağlantı maliyeti −%30'],
+    ['Tam merkeze genişletme (40 Gbps)', 'Üst bağlantı maliyeti −%30'],
   ],
   onsite_solar: [
     'Saha üstü üretim',

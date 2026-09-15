@@ -6,16 +6,14 @@ test('campaign victory explains retained research and initializes mobile service
   await page.goto('/');
   await page.evaluate(() => {
     const store = (window as any).__game;
-    store
-      .getState()
-      .newGame({
-        companyName: 'Continued research',
-        logo: 'x',
-        difficulty: 'standard',
-        cityName: 'Marmara',
-        mode: 'campaign',
-        seed: 12345,
-      });
+    store.getState().newGame({
+      companyName: 'Continued research',
+      logo: 'x',
+      difficulty: 'standard',
+      cityName: 'Marmara',
+      mode: 'campaign',
+      seed: 12345,
+    });
     const game = store.getState().game;
     store.setState({
       game: {
@@ -107,7 +105,7 @@ test('reputation points to the actual obligation and completed edge research poi
   await expect(page.locator('#pricing')).toBeInViewport();
   await page.evaluate(() => (window as any).__game.getState().setScreen('research'));
   const construction = page.getByRole('region', { name: 'Veri merkezi kurulumu' });
-  await expect(construction).toContainText('4.400.000 ₺');
+  await expect(construction).toContainText('1.200.000 ₺');
   await construction.getByRole('button', { name: 'Veri merkezi yerini seç' }).click();
   expect(
     await page.evaluate(() => {

@@ -30,9 +30,9 @@ export function TierBadge({
       className={`inline-flex items-center gap-1.5 rounded border border-white/[0.12] bg-black/20 font-mono font-bold text-white/75 ${
         compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-1 text-[10px]'
       }`}
-      title={`Tier ${tier} of ${maxTier}`}
+      title={tier === 0 ? 'Mini · 10 Gbps' : `Tier ${tier} of ${maxTier}`}
     >
-      <span>T{tier}</span>
+      <span>{tier === 0 ? 'Mini' : `T${tier}`}</span>
       <span className="flex gap-0.5" aria-hidden="true">
         {Array.from({ length: maxTier }, (_, index) => (
           <i key={index} className={`h-1.5 w-0.5 rounded-full ${index < tier ? 'bg-neon-cyan' : 'bg-white/15'}`} />
@@ -163,7 +163,7 @@ export default function SiteIcon({
             fontWeight={800}
             fill={accent}
           >
-            T{tier}
+            {tier === 0 ? 'Mini' : `T${tier}`}
           </text>
         </g>
       )}

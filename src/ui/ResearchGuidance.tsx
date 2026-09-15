@@ -2,7 +2,7 @@ import { fmtMoneyExact } from '../game/economy';
 import { researchPlan } from '../game/researchPlanning';
 import { useGame } from '../store/gameStore';
 import { researchCopy } from './researchCopy';
-import { NODE_SPECS } from '../game/constants';
+import { NODE_SPECS, DATACENTER_PILOT_COST, nodeUpgradeCost } from '../game/constants';
 import GoalWait from './GoalWait';
 
 export default function ResearchGuidance({
@@ -18,41 +18,69 @@ export default function ResearchGuidance({
   const startResearch = useGame((s) => s.startResearch);
   const plan = researchPlan(game);
   const tr = locale === 'tr';
+  const pilot = game.nodes.find((n) => n.kind === 'datacenter' && n.tier === 0);
+  const needsExpansion =
+    !!pilot &&
+    game.researchDone.includes('edge_compute') &&
+    !game.nodes.some((n) => n.kind === 'datacenter' && n.tier >= 1);
+  const siteCost = needsExpansion ? nodeUpgradeCost('datacenter', 0) : DATACENTER_PILOT_COST;
   const needsDataCenter =
-    game.researchDone.includes('edge_compute') && !game.nodes.some((n) => n.kind === 'datacenter');
-  if (needsDataCenter)
+    game.researchDone.includes('backbone100g') && !game.nodes.some((n) => n.kind === 'datacenter');
+  if (needsDataCenter || needsExpansion)
     return (
       <section
         aria-label={tr ? 'Veri merkezi kurulumu' : 'Data centre construction'}
         className={compact ? 'panel my-2 p-3' : 'panel mb-5 border-neon-cyan/25 p-4'}
       >
         <h2 className="text-sm font-semibold">
-          {tr ? 'Araştırma hazır: veri merkezini kur' : 'Research ready: build your data centre'}
+          {needsExpansion
+            ? tr
+              ? 'Sonraki aşama: tam kapasiteli merkez'
+              : 'Next stage: full data centre'
+            : tr
+              ? 'İlk aşama: küçük veri merkezi'
+              : 'First stage: small data centre'}
         </h2>
         <p className="mt-2 text-xs text-white/60">
-          {tr ? 'Saha bedeli: ' : 'Site cost: '}
-          {fmtMoneyExact(NODE_SPECS.datacenter.baseCost)}.{' '}
+          {needsExpansion ? (tr ? 'Genişletme bedeli: ' : 'Expansion cost: ') : tr ? 'Saha bedeli: ' : 'Site cost: '}
+          {fmtMoneyExact(siteCost)}.{' '}
           {tr
             ? 'Fiber bağlantısı ve işletme giderleri ayrıca hesaplanır.'
             : 'Fibre connections and operating expenses are additional.'}
         </p>
-        {game.money < NODE_SPECS.datacenter.baseCost && (
+        <p className="mt-2 text-xs leading-relaxed text-white/60">
+          {tr
+            ? 'Küçük merkez: 10 Gbps ve tam merkezin %25 barındırma geliri, elektrik ve bakım gideri. Edge araştırması + 3.200.000 ₺ ile 40 Gbps tam merkeze genişlet. Kampanya hedefi tam merkezi gerektirir.'
+            : 'Small centre: 10 Gbps and 25% of full hosting income, power and maintenance costs. Expand to 40 Gbps with edge research and 3,200,000 ₺. Campaign objectives require the full centre.'}
+        </p>
+        {game.money < siteCost && (
           <p className="mt-2 text-xs text-neon-amber">
-            {fmtMoneyExact(NODE_SPECS.datacenter.baseCost - game.money)}{' '}
-            {tr ? 'en az eksik nakit' : 'minimum cash shortfall'}
+            {fmtMoneyExact(siteCost - game.money)} {tr ? 'en az eksik nakit' : 'minimum cash shortfall'}
           </p>
         )}
-        <GoalWait cost={NODE_SPECS.datacenter.baseCost} needsLab={false} compact={compact} />
+        <GoalWait cost={siteCost} needsLab={false} compact={compact} />
         <button
           className="btn-primary mt-3 text-xs"
           onClick={() => {
             setScreen('map');
-            useGame.getState().setAutoConnect(true);
-            useGame.getState().setTool('datacenter');
+            if (needsExpansion && pilot) {
+              useGame.getState().setTool(null);
+              useGame.getState().select({ type: 'node', id: pilot.id });
+              useGame.getState().focus(pilot.gx, pilot.gy);
+            } else {
+              useGame.getState().setAutoConnect(true);
+              useGame.getState().setTool('datacenter');
+            }
             onNavigate?.();
           }}
         >
-          {tr ? 'Veri merkezi yerini seç' : 'Choose a data centre site'}
+          {needsExpansion
+            ? tr
+              ? 'Genişletmeyi incele'
+              : 'Review expansion'
+            : tr
+              ? 'Veri merkezi yerini seç'
+              : 'Choose a data centre site'}
         </button>
       </section>
     );
@@ -101,6 +129,13 @@ export default function ResearchGuidance({
       <div className="stat-label text-neon-cyan">
         {tr ? 'Önerilen hedef' : 'Suggested goal'} · {name(plan.target)}
       </div>
+      {pilot && (
+        <p className="mt-2 text-xs text-neon-lime">
+          {tr
+            ? 'Küçük merkez kuruldu. Tam kapasiteye geçmek için Edge araştırmasını tamamla.'
+            : 'Small centre built. Complete edge research to expand to full capacity.'}
+        </p>
+      )}
       <h2 className="mt-1 text-base font-semibold">
         {tr ? 'Sonraki araştırma' : 'Next research'}: {name(plan.next ?? plan.target)}
       </h2>
@@ -122,10 +157,12 @@ export default function ResearchGuidance({
       {plan.target.id === 'edge_compute' && (
         <p className="mt-2 text-xs text-neon-cyan">
           {tr
-            ? 'Araştırma ve ilk veri merkezi sahası için en az: '
-            : 'Minimum for research and the first data centre site: '}
-          {fmtMoneyExact(plan.remainingCost + NODE_SPECS.datacenter.baseCost)}.{' '}
-          {tr ? 'Fiber bağlantısı hariç.' : 'Excludes fibre connections.'}
+            ? 'Tam merkeze kadar kalan araştırma ve saha yatırımı: '
+            : 'Remaining research and site investment to a full centre: '}
+          {fmtMoneyExact(
+            plan.remainingCost + (pilot ? nodeUpgradeCost('datacenter', 0) : NODE_SPECS.datacenter.baseCost),
+          )}
+          . {tr ? 'Fiber bağlantısı hariç.' : 'Excludes fibre connections.'}
         </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
