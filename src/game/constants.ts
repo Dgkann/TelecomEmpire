@@ -1,7 +1,7 @@
 import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
-export const SAVE_VERSION = 24;
+export const SAVE_VERSION = 25;
 
 export const MINUTES_PER_STEP = 5;
 export const STEP_MS = 260;
@@ -280,14 +280,27 @@ export function utilColor(u: number) {
 }
 
 export function nodeCapacity(kind: NodeKind, tier: number) {
+  if (kind === 'datacenter' && tier === 0) return 10;
   const spec = NODE_SPECS[kind];
   return spec.baseCapacity * Math.pow(spec.tierCapacityMul, tier - 1);
 }
 
 export function nodeUpgradeCost(kind: NodeKind, currentTier: number) {
+  if (kind === 'datacenter' && currentTier === 0) return NODE_SPECS.datacenter.baseCost - DATACENTER_PILOT_COST;
   const spec = NODE_SPECS[kind];
   return Math.round(spec.baseCost * Math.pow(spec.tierCostMul, currentTier - 1) * 0.8);
 }
+
+// Tier zero is a small data centre; existing tier-one sites remain full size.
+export const DATACENTER_PILOT_COST = 1200000;
+export const DATACENTER_PILOT_SHARE = 0.25;
+export const initialNodeTier = (kind: NodeKind) => (kind === 'datacenter' ? 0 : 1);
+export const nodeCapitalCost = (kind: NodeKind, tier: number) =>
+  kind === 'datacenter' && tier === 0 ? DATACENTER_PILOT_COST : NODE_SPECS[kind].baseCost * tier;
+export const nodePowerScale = (kind: NodeKind, tier: number) =>
+  kind === 'datacenter' && tier === 0 ? DATACENTER_PILOT_SHARE : 1 + (tier - 1) * 0.55;
+export const nodeMaintenanceScale = (kind: NodeKind, tier: number) =>
+  kind === 'datacenter' && tier === 0 ? DATACENTER_PILOT_SHARE : 1 + (tier - 1) * 0.5;
 
 export function linkCapacity(tier: number) {
   return FIBER_BASE_CAPACITY * Math.pow(FIBER_TIER_MUL, tier - 1);

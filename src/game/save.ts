@@ -357,6 +357,8 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   // Energy became a decision: existing networks start on the spot tariff.
   22: (s) => ({ ...s, energy: initialEnergy(Number(s.minutes) || 0) }),
   23: (s) => ({ ...s, signalTraining: initialSignalTraining() }),
+  // Existing full data centres retain their tiers; new sites may start at tier zero.
+  24: (s) => ({ ...s }),
 };
 
 const DEFAULTS = {
@@ -599,7 +601,7 @@ function isNode(value: unknown, gridSize: number) {
     isInteger(value.gx, 0, gridSize - 1) &&
     isInteger(value.gy, 0, gridSize - 1) &&
     isId(value.districtId) &&
-    isInteger(value.tier, 1, spec.maxTier) &&
+    isInteger(value.tier, value.kind === 'datacenter' ? 0 : 1, spec.maxTier) &&
     isNumber(value.capacityGbps, 0, 1_000_000) &&
     isNumber(value.trafficGbps, 0, 1_000_000_000) &&
     isNumber(value.health, 0, 100) &&

@@ -1,4 +1,11 @@
-import { ENERGY, MINUTES_PER_DAY, MINUTES_PER_MONTH, NODE_SPECS, POWER_COST_PER_KW_MONTH } from './constants';
+import {
+  ENERGY,
+  MINUTES_PER_DAY,
+  MINUTES_PER_MONTH,
+  NODE_SPECS,
+  POWER_COST_PER_KW_MONTH,
+  nodePowerScale,
+} from './constants';
 import { recordLedger } from './financeLedger';
 import type { EnergyPlan, EnergyState, GameState, NetNode } from './types';
 import type { Rng } from './rng';
@@ -74,14 +81,14 @@ export const hasSolar = (s: GameState, nodeId: string) => s.energy.solarNodeIds.
 
 // Draw after on-site generation. Tier raises consumption the same way it raises capacity.
 export function siteDrawKw(s: GameState, node: NetNode, modePower = 1) {
-  const base = NODE_SPECS[node.kind].powerKw * (1 + (node.tier - 1) * 0.55) * modePower;
+  const base = NODE_SPECS[node.kind].powerKw * nodePowerScale(node.kind, node.tier) * modePower;
   return hasSolar(s, node.id) ? base * (1 - ENERGY.solarDrawCut) : base;
 }
 
 export function solarCost(s: GameState, nodeId: string) {
   const node = s.nodes.find((n) => n.id === nodeId);
   if (!node) return 0;
-  const kw = NODE_SPECS[node.kind].powerKw * (1 + (node.tier - 1) * 0.55);
+  const kw = NODE_SPECS[node.kind].powerKw * nodePowerScale(node.kind, node.tier);
   return Math.round((kw * ENERGY.solarCostPerKw) / 1000) * 1000;
 }
 

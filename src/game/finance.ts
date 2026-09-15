@@ -1,4 +1,4 @@
-import { DIFFICULTY, MINUTES_PER_DAY, NODE_SPECS } from './constants';
+import { DIFFICULTY, MINUTES_PER_DAY, nodeCapitalCost } from './constants';
 import { monthlyBreakdown } from './economy';
 import { rankOf } from './progression';
 import { researchModifiers } from './research';
@@ -19,7 +19,7 @@ const RATES: Record<keyof typeof DIFFICULTY, number> = {
 
 // What your network would fetch if it were sold off.
 export function assetValue(s: GameState) {
-  const nodes = s.nodes.reduce((sum, n) => sum + NODE_SPECS[n.kind].baseCost * n.tier * 0.45, 0);
+  const nodes = s.nodes.reduce((sum, n) => sum + nodeCapitalCost(n.kind, n.tier) * 0.45, 0);
   const links = s.links.reduce((sum, l) => sum + l.length * 28000 * l.tier * 0.3, 0);
   const spectrum = s.spectrum.reduce((sum, h) => sum + h.paid * 0.5, 0);
   return nodes + links + spectrum;

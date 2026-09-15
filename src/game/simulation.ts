@@ -25,6 +25,7 @@ import {
   towerRadius,
 } from './constants';
 import { effectiveNodeCapacity } from './capacity';
+import { DATACENTER_PILOT_SHARE } from './constants';
 import { createAuction, grantStarterSpectrum, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
@@ -628,7 +629,7 @@ export function offeredTraffic(
     services.push({
       id: `workload:${node.id}`,
       districtId: node.districtId,
-      demandGbps: mode.workloadPerTier * node.tier * (0.45 + 0.55 * curve),
+      demandGbps: mode.workloadPerTier * (node.tier === 0 ? DATACENTER_PILOT_SHARE : node.tier) * (0.45 + 0.55 * curve),
       servingNodeIds: [node.id],
       priority: priorities.workload,
     });

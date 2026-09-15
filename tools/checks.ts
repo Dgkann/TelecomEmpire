@@ -2,6 +2,7 @@ import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src
 import { researchPlan } from '../src/game/researchPlanning';
 import { reputationOutlook } from '../src/game/reputation';
 import { goalTiming } from '../src/game/goalTiming';
+import { DATACENTER_PILOT_COST, nodeUpgradeCost, nodeCapitalCost } from '../src/game/constants';
 import {
   beginSignalTraining,
   turnSignalTile,
@@ -4750,6 +4751,75 @@ group('Service standard launch window');
   check(
     'an unfinished operator still loses after the extended window',
     scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
+  );
+}
+
+group('Staged data centre economics and saves');
+{
+  const g = newGame(811);
+  const d = g.districts.find((d) => d.unlocked)!;
+  const cell = d.cells.find((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy))!;
+  const pilot = {
+    ...g.nodes[0],
+    id: 'pilot-dc',
+    kind: 'datacenter' as const,
+    tier: 0,
+    capacityGbps: 10,
+    districtId: d.id,
+    ...cell,
+  };
+  const small = {
+    ...g,
+    nodes: [...g.nodes, pilot],
+    links: [
+      ...g.links,
+      {
+        id: 'pilot-fibre',
+        aId: g.nodes[0].id,
+        bId: pilot.id,
+        tier: 1,
+        capacityGbps: 40,
+        trafficGbps: 0,
+        down: false,
+        length: 1,
+        builtAt: g.minutes,
+      },
+    ],
+  };
+  const full = {
+    ...small,
+    nodes: small.nodes.map((n) => (n.id === pilot.id ? { ...n, tier: 1, capacityGbps: 40 } : n)),
+  };
+  check(
+    'a small centre plus its first expansion retains the full site price',
+    DATACENTER_PILOT_COST + nodeUpgradeCost('datacenter', 0) === 4400000,
+  );
+  check(
+    'small and full centres provide 10 and 40 Gbps',
+    nodeCapacity('datacenter', 0) === 10 && nodeCapacity('datacenter', 1) === 40,
+  );
+  check(
+    'a small centre earns one quarter of full hosting revenue',
+    hostingRevenue(small) > 0 && Math.abs(hostingRevenue(small) * 4 - hostingRevenue(full)) < 0.001,
+  );
+  check('small hosting requires a live connection', hostingRevenue({ ...small, links: g.links }) === 0);
+  check(
+    'small centres use one quarter of full site electricity',
+    siteDrawKw(small, pilot) * 4 === siteDrawKw(full, { ...pilot, tier: 1 }),
+  );
+  check('small centres retain a nonzero resale and collateral basis', nodeCapitalCost('datacenter', 0) === 1200000);
+  const roundTrip = migrate(JSON.parse(JSON.stringify(small)), SAVE_VERSION);
+  check('tier-zero data centres survive save loading', roundTrip?.nodes.find((n) => n.id === pilot.id)?.tier === 0);
+  const legacy = { ...full, version: 24 };
+  const restored = migrate(JSON.parse(JSON.stringify(legacy)), 24);
+  check(
+    'version 24 full centres retain their capacity and income',
+    restored?.nodes.find((n) => n.id === pilot.id)?.tier === 1 && hostingRevenue(restored!) === hostingRevenue(full),
+  );
+  const invalid = { ...g, nodes: g.nodes.map((n, i) => (i === 0 ? { ...n, tier: 0 } : n)) };
+  check(
+    'tier zero remains invalid for other equipment',
+    migrate(JSON.parse(JSON.stringify(invalid)), SAVE_VERSION) === null,
   );
 }
 

@@ -2,6 +2,8 @@ import { energyPriceIndex, siteDrawKw } from './energy';
 import {
   BASELINE_ARPU,
   DATACENTER_HOSTING_BASE,
+  DATACENTER_PILOT_SHARE,
+  nodeMaintenanceScale,
   FIBER_MAINTENANCE_PER_UNIT,
   NODE_SPECS,
   POWER_COST_PER_KW_MONTH,
@@ -65,7 +67,7 @@ export function monthlyBreakdown(state: GameState, mods: ResearchMods): MonthlyB
   const costPower = powerKw * POWER_COST_PER_KW_MONTH * energyPriceIndex(state);
 
   const costMaintenance =
-    (state.nodes.reduce((s, n) => s + NODE_SPECS[n.kind].maintenance * (1 + (n.tier - 1) * 0.5), 0) +
+    (state.nodes.reduce((s, n) => s + NODE_SPECS[n.kind].maintenance * nodeMaintenanceScale(n.kind, n.tier), 0) +
       state.links.reduce((s, l) => s + l.length * FIBER_MAINTENANCE_PER_UNIT * l.tier, 0)) *
     staff.maintenanceCostMul *
     mods.maintenanceCostMul;
@@ -137,7 +139,13 @@ export function hostingRevenue(state: GameState) {
     const district = state.districts.find((d) => d.id === n.districtId);
     const demand = 0.7 + (district?.businessDensity ?? 0.3);
     const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(state, n.id)];
-    return sum + DATACENTER_HOSTING_BASE * (1 + (n.tier - 1) * 1.2) * demand * mode.revenueMultiplier;
+    return (
+      sum +
+      DATACENTER_HOSTING_BASE *
+        (n.tier === 0 ? DATACENTER_PILOT_SHARE : 1 + (n.tier - 1) * 1.2) *
+        demand *
+        mode.revenueMultiplier
+    );
   }, 0);
 }
 

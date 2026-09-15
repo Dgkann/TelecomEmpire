@@ -1,4 +1,12 @@
-import { FIBER_COST_PER_UNIT, NODE_SPECS, POWER_COST_PER_KW_MONTH, nodeUpgradeCost } from './constants';
+import {
+  FIBER_COST_PER_UNIT,
+  NODE_SPECS,
+  POWER_COST_PER_KW_MONTH,
+  nodeUpgradeCost,
+  initialNodeTier,
+  nodePowerScale,
+  nodeMaintenanceScale,
+} from './constants';
 import { monthlyBreakdown } from './economy';
 import { researchModifiers } from './research';
 import { staffModifiers } from './staff';
@@ -17,8 +25,18 @@ export function investmentEstimate(state: GameState, kind: NodeKind, nodeId?: st
       ? DATA_CENTER_MODE_CONFIG[node ? dataCenterMode(state, node.id) : 'colocation'].powerMultiplier
       : 1;
   const monthlyCost =
-    spec.powerKw * POWER_COST_PER_KW_MONTH * (node ? 0.55 : 1) * powerMultiplier +
-    spec.maintenance * (node ? 0.5 : 1) * mods.maintenanceCostMul * staff.maintenanceCostMul;
+    spec.powerKw *
+      POWER_COST_PER_KW_MONTH *
+      (node
+        ? nodePowerScale(kind, node.tier + 1) - nodePowerScale(kind, node.tier)
+        : nodePowerScale(kind, initialNodeTier(kind))) *
+      powerMultiplier +
+    spec.maintenance *
+      (node
+        ? nodeMaintenanceScale(kind, node.tier + 1) - nodeMaintenanceScale(kind, node.tier)
+        : nodeMaintenanceScale(kind, initialNodeTier(kind))) *
+      mods.maintenanceCostMul *
+      staff.maintenanceCostMul;
   const cost = node ? nodeUpgradeCost(kind, node.tier) : nodePlacementCost(state, kind);
   const remaining = state.money - cost;
   const monthly = monthlyBreakdown(state, mods);
