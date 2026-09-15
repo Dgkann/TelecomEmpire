@@ -19,6 +19,7 @@ import { backupRouteEstimate } from '../src/game/redundancyBuild';
 import { networkResilience, regulationProgress } from '../src/game/regulator';
 import { priceIndex } from '../src/game/economy';
 import { reputationOutlook } from '../src/game/reputation';
+import { DATACENTER_PILOT_COST, nodeUpgradeCost } from '../src/game/constants';
 import type { NodeKind } from '../src/game/types';
 
 const memory = new Map<string, string>();
@@ -167,12 +168,22 @@ function policy(day: number) {
     finance.profit > 0
   )
     actions().setTransitTier(g.transitTier + 1);
+  // Open a small hosting business before saving for the edge research bill.
+  if (live().researchDone.includes('backbone100g') && !live().nodes.some((n) => n.kind === 'datacenter'))
+    build('datacenter', live().districts.find((d) => d.unlocked)!.id, reserve);
+  const smallCentre = live().nodes.find((n) => n.kind === 'datacenter' && n.tier === 0);
+  if (
+    smallCentre &&
+    live().researchDone.includes('edge_compute') &&
+    live().money >= nodeUpgradeCost('datacenter', 0) + reserve
+  )
+    actions().upgradeNode(smallCentre.id);
   if (
     !live().researchActive &&
     !(
       goalFunding &&
       live().researchDone.includes('edge_compute') &&
-      !live().nodes.some((node) => node.kind === 'datacenter')
+      !live().nodes.some((node) => node.kind === 'datacenter' && node.tier >= 1)
     )
   ) {
     const eligible = nextResearch();
@@ -217,12 +228,14 @@ function policy(day: number) {
     goalFunding &&
     live().researchDone.includes('mobile_4g') &&
     live().districts.filter((d) => d.unlocked).length >= 4 &&
-    !live().nodes.some((n) => n.kind === 'datacenter')
+    !live().nodes.some((n) => n.kind === 'datacenter' && n.tier >= 1)
       ? live().researchDone.includes('edge_compute')
-        ? NODE_SPECS.datacenter.baseCost + 300000
-        : live().researchActive
-          ? 0
-          : (nextResearch()[0]?.cost ?? 0)
+        ? (smallCentre ? nodeUpgradeCost('datacenter', 0) : NODE_SPECS.datacenter.baseCost) + 300000
+        : live().researchDone.includes('backbone100g') && !smallCentre
+          ? DATACENTER_PILOT_COST + 300000
+          : live().researchActive
+            ? 0
+            : (nextResearch()[0]?.cost ?? 0)
       : 0;
   if (day % 3 === 0) {
     const thin = live().districts.find((d) => d.unlocked && fixedCoverageTarget(live(), d.id) < 0.7);
@@ -326,7 +339,9 @@ for (const seed of seeds) {
       } else if (g.campaignStage === CAMPAIGN_STAGES.length - 1) campaignComplete = true;
       else throw new Error(`Campaign transition failed: ${g.cityName}, seed ${seed}`);
     }
-    const progression = `${g.rank}:${g.nodes.length}:${g.researchDone.length}:${g.districts.filter((d) => d.unlocked).length}`;
+    const fullCentres = g.nodes.filter((n) => n.kind === 'datacenter' && n.tier >= 1).length;
+    const smallCentres = g.nodes.filter((n) => n.kind === 'datacenter' && n.tier === 0).length;
+    const progression = `${g.rank}:${g.nodes.length}:${g.researchDone.length}:${g.districts.filter((d) => d.unlocked).length}:${fullCentres}`;
     if (progression !== previous) {
       events.push({
         day: day + 1,
@@ -335,6 +350,8 @@ for (const seed of seeds) {
         research: g.researchDone,
         activeResearch: g.researchActive?.id ?? null,
         nodes: g.nodes.length,
+        smallCentres,
+        fullCentres,
         districts: g.districts.filter((d) => d.unlocked).length,
         rank: g.rank,
       });
@@ -351,6 +368,8 @@ for (const seed of seeds) {
       national: g.rank >= 3,
       global: g.rank >= 4,
       mobile: g.researchDone.includes('mobile_4g'),
+      smallDataCentre: smallCentres > 0,
+      fullDataCentre: fullCentres > 0,
     };
     for (const [name, reached] of Object.entries(markers))
       if (reached && milestones[name] === undefined) milestones[name] = day + 1;
