@@ -10,7 +10,7 @@ import {
   TRANSIT_TIERS,
   BACKUP_TRANSIT_MONTHLY,
 } from './constants';
-import type { GameState, Package } from './types';
+import type { GameState, Package, NetNode } from './types';
 import type { ResearchMods } from './research';
 import { staffModifiers } from './staff';
 import {
@@ -135,18 +135,22 @@ export function averageSpeed(packages: Package[]) {
 
 // What the data centres bring in.
 export function hostingRevenue(state: GameState) {
-  return operationalDataCenters(state).reduce((sum, n) => {
-    const district = state.districts.find((d) => d.id === n.districtId);
-    const demand = 0.7 + (district?.businessDensity ?? 0.3);
-    const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(state, n.id)];
-    return (
-      sum +
-      DATACENTER_HOSTING_BASE *
-        (n.tier === 0 ? DATACENTER_PILOT_SHARE : 1 + (n.tier - 1) * 1.2) *
-        demand *
-        mode.revenueMultiplier
-    );
-  }, 0);
+  return operationalDataCenters(state).reduce((sum, node) => sum + potentialHostingRevenue(state, node), 0);
+}
+
+// Revenue at a live site before the company-wide packet-loss adjustment.
+// Callers must check connectivity; a disconnected site earns nothing.
+export function potentialHostingRevenue(state: GameState, node: NetNode) {
+  if (node.kind !== 'datacenter') return 0;
+  const district = state.districts.find((d) => d.id === node.districtId);
+  const demand = 0.7 + (district?.businessDensity ?? 0.3);
+  const mode = DATA_CENTER_MODE_CONFIG[dataCenterMode(state, node.id)];
+  return (
+    DATACENTER_HOSTING_BASE *
+    (node.tier === 0 ? DATACENTER_PILOT_SHARE : 1 + (node.tier - 1) * 1.2) *
+    demand *
+    mode.revenueMultiplier
+  );
 }
 
 // Below 1 means you are the cheap option against the market reference price.

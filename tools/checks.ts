@@ -90,7 +90,7 @@ import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } fr
 import { cacheRatio, mobileServingTowers, tickMaintenance } from '../src/game/simulation';
 import { contractRisk, operationsInsights } from '../src/game/operations';
 import { repairCost, repairOptions, dispatchCandidates, pendingIncidents } from '../src/game/incidents';
-import { hostingRevenue } from '../src/game/economy';
+import { hostingRevenue, potentialHostingRevenue } from '../src/game/economy';
 import { currentMonthCashFlow } from '../src/game/financeLedger';
 import { migrate } from '../src/game/save';
 import { clearSave, exportSave, importSave, listSaveMeta, loadGame, saveGame } from '../src/game/saveStorage';
@@ -4752,6 +4752,22 @@ group('Service standard launch window');
     'an unfinished operator still loses after the extended window',
     scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
   );
+}
+
+group('Per-site hosting revenue');
+{
+  const g = newGame(811);
+  const node = { ...g.nodes[0], kind: 'datacenter' as const, tier: 0 };
+  const small = potentialHostingRevenue(g, node);
+  check(
+    'site revenue retains the small centre quarter share',
+    Math.abs(small * 4 - potentialHostingRevenue(g, { ...node, tier: 1 })) < 0.001,
+  );
+  check(
+    'site revenue follows the selected workload',
+    Math.abs(potentialHostingRevenue({ ...g, dataCenterModes: { [node.id]: 'cloud' } }, node) - small * 1.45) < 0.001,
+  );
+  check('other equipment cannot quote hosting income', potentialHostingRevenue(g, g.nodes[0]) === 0);
 }
 
 group('Investment energy estimates');
