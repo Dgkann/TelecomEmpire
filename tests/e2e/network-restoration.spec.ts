@@ -68,3 +68,34 @@ test('restoration saves, repairs three faults and rewards without changing the l
     'Three cables are misaligned.',
   );
 });
+
+test('optional hints identify a cable without spending moves or rewards', async ({ page }, testInfo) => {
+  const original = await setup(page);
+  const launch = page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' });
+  await launch.click();
+  const dialog = page.getByRole('dialog', { name: 'Kesintiyi gider', exact: true });
+  const before = await page.evaluate(() => (window as any).__game.getState().game.signalTraining);
+  await dialog.getByRole('button', { name: 'İpucu göster' }).click();
+  await expect(dialog.getByText(/İpucu: .*Ödülün değişmez/)).toBeVisible();
+  const tile = dialog.getByRole('button', { name: /, ipucu$/ });
+  await expect(tile).toHaveCount(1);
+  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining)).toEqual(before);
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('restoration-hint-tr.png') });
+  await tile.click();
+  await expect(dialog.getByText(/İpucu: .*Ödülün değişmez/)).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.moves)).toBe(1);
+  await dialog.getByRole('button', { name: 'İpucu göster' }).click();
+  await dialog.press('Escape');
+  await launch.click();
+  await expect(dialog.getByRole('button', { name: /, ipucu$/ })).toHaveCount(0);
+  const rotations = await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.rotations);
+  const board = dialog.getByRole('group', { name: 'Kablo panosu' });
+  await dialog.getByRole('button', { name: 'İpucu göster' }).click();
+  for (let i = 0; i < rotations.length; i++) {
+    for (let j = 0; j < (4 - rotations[i]) % 4; j++) await board.getByRole('button').nth(i).click();
+  }
+  await expect(dialog.getByRole('button', { name: 'İpucu göster' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
+  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(original.money + 30000);
+});

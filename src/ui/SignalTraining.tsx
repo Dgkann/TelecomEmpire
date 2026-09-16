@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { MINUTES_PER_DAY } from '../game/constants';
 import { fmtMoney } from '../game/economy';
-import { signalConnection, TRAINING_REWARD, TRAINING_RESEARCH, TRAINING_LAB_DAYS } from '../game/signalTraining';
+import {
+  signalConnection,
+  signalHint,
+  TRAINING_REWARD,
+  TRAINING_RESEARCH,
+  TRAINING_LAB_DAYS,
+} from '../game/signalTraining';
 import { useGame } from '../store/gameStore';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
@@ -105,10 +111,13 @@ export default function SignalTrainingDialog() {
   const save = useGame((s) => s.save);
   const puzzle = game.signalTraining.active;
   const [message, setMessage] = useState('');
-  const ref = useDialogAccessibility(!!puzzle, () => {
+  const [hint, setHint] = useState<number | null>(null);
+  const leave = () => {
+    setHint(null);
     setMessage('');
     close();
-  });
+  };
+  const ref = useDialogAccessibility(!!puzzle, leave);
   if (!puzzle) return null;
   const route = signalConnection(puzzle);
   const fault = puzzle.mode === 'fault';
@@ -144,14 +153,7 @@ export default function SignalTrainingDialog() {
               {tr ? 'Şirket saati duraklatıldı' : 'Company clock paused'} · {puzzle.moves} {tr ? 'hamle' : 'moves'}
             </p>
           </div>
-          <button
-            className="icon-button"
-            aria-label={tr ? 'Mini oyunu kapat' : 'Close mini-game'}
-            onClick={() => {
-              setMessage('');
-              close();
-            }}
-          >
+          <button className="icon-button" aria-label={tr ? 'Mini oyunu kapat' : 'Close mini-game'} onClick={leave}>
             ×
           </button>
         </div>
@@ -180,13 +182,20 @@ export default function SignalTrainingDialog() {
               <button
                 key={index}
                 disabled={puzzle.completed}
-                className={`aspect-square min-w-0 rounded border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${route.lit.has(index) ? 'border-neon-cyan/70 bg-neon-cyan/15 text-neon-cyan' : 'border-white/15 bg-ink-800 text-white/45'}`}
-                aria-label={`${tr ? 'Satır' : 'Row'} ${Math.floor(index / puzzle.size) + 1}, ${tr ? 'sütun' : 'column'} ${(index % puzzle.size) + 1}: ${directions.filter((_, d) => ports & (1 << d)).join(', ')}${route.lit.has(index) ? (tr ? ', sinyal var' : ', signal present') : ''}`}
+                className={`relative aspect-square min-w-0 rounded border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${hint === index ? 'ring-2 ring-neon-amber' : ''} ${route.lit.has(index) ? 'border-neon-cyan/70 bg-neon-cyan/15 text-neon-cyan' : 'border-white/15 bg-ink-800 text-white/45'}`}
+                aria-label={`${tr ? 'Satır' : 'Row'} ${Math.floor(index / puzzle.size) + 1}, ${tr ? 'sütun' : 'column'} ${(index % puzzle.size) + 1}: ${directions.filter((_, d) => ports & (1 << d)).join(', ')}${route.lit.has(index) ? (tr ? ', sinyal var' : ', signal present') : ''}${hint === index ? (tr ? ', ipucu' : ', hint') : ''}`}
+                aria-describedby={hint === index ? 'signal-hint' : undefined}
                 onClick={() => {
                   setMessage('');
+                  setHint(null);
                   rotate(index);
                 }}
               >
+                {hint === index && (
+                  <span aria-hidden="true" className="absolute right-1 top-0 font-bold text-neon-amber">
+                    ?
+                  </span>
+                )}
                 <svg viewBox="0 0 60 60" className="h-full w-full" aria-hidden="true">
                   {[
                     ['30', '0'],
@@ -224,6 +233,13 @@ export default function SignalTrainingDialog() {
                 ? 'Sinyal henüz alıcıya ulaşmıyor. Işıklı parçaları takip et.'
                 : 'The signal has not reached the receiver. Follow the illuminated cables.'}
         </div>
+        {hint !== null && (
+          <p id="signal-hint" className="mt-3 text-sm text-neon-amber" role="status">
+            {tr
+              ? `İpucu: ${Math.floor(hint / puzzle.size) + 1}. satır, ${(hint % puzzle.size) + 1}. sütundaki kabloyu incele. Girişten gelen hattı bir sonraki parçaya bağlamayı dene. Ödülün değişmez.`
+              : `Hint: inspect row ${Math.floor(hint / puzzle.size) + 1}, column ${(hint % puzzle.size) + 1}. Try connecting the incoming line to the next tile. Your reward is unchanged.`}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           {!!puzzle.researchDaysSaved && (
             <p className="w-full text-xs text-neon-lime">
@@ -235,6 +251,11 @@ export default function SignalTrainingDialog() {
           {!puzzle.completed && (
             <button className="btn-primary" disabled={!route.connected} onClick={() => submit()}>
               {tr ? 'Rotayı doğrula' : 'Verify route'}
+            </button>
+          )}
+          {!puzzle.completed && (
+            <button className="btn" disabled={route.connected} onClick={() => setHint(signalHint(puzzle))}>
+              {tr ? 'İpucu göster' : 'Show hint'}
             </button>
           )}
           <button
@@ -253,13 +274,7 @@ export default function SignalTrainingDialog() {
           >
             {tr ? 'İlerlemeyi kaydet' : 'Save progress'}
           </button>
-          <button
-            className="btn"
-            onClick={() => {
-              setMessage('');
-              close();
-            }}
-          >
+          <button className="btn" onClick={leave}>
             {puzzle.completed ? (tr ? 'Şirkete dön' : 'Return to company') : tr ? 'Rotayı bırak' : 'Leave route'}
           </button>
         </div>
