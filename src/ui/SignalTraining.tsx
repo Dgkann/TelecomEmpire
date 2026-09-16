@@ -22,8 +22,8 @@ export function SignalTrainingCard() {
           <h2 className="text-lg font-semibold">{tr ? 'Kısa ağ görevleri' : 'Quick network exercises'}</h2>
           <p className="mt-1 text-sm leading-relaxed text-white/65">
             {tr
-              ? 'Sıfırdan sinyal rotası kur veya çalışan hattaki tek yanlış kabloyu bul. Arıza bulma, kısa bir mola için uygundur. Şirket zamanı durur; süre sınırı, giriş ücreti ve başarısızlık cezası yok.'
-              : 'Build a signal route or find the one incorrect cable in a working line. Fault finding is suited to a short break. Company time pauses; there is no timer, entry fee or failure penalty.'}
+              ? 'Rota kur, tek arızayı bul veya üç kablonun bozulduğu bir kesintiyi gider. Tek arıza kısa bir mola, kesinti görevi biraz daha uzun bir uğraş sunar. Şirket zamanı durur; süre sınırı, giriş ücreti ve başarısızlık cezası yok.'
+              : 'Build a route, find one fault or restore a line with three damaged cables. One fault suits a quick break; restoration offers a longer challenge. Company time pauses; there is no timer, entry fee or failure penalty.'}
           </p>
           <p className="mt-2 text-xs text-neon-amber">
             {days === 0
@@ -54,6 +54,16 @@ export function SignalTrainingCard() {
             }}
           >
             {tr ? 'Arıza bul · Kısa görev' : 'Find the fault · Quick exercise'}
+          </button>
+          <button
+            className="btn-primary"
+            disabled={!!game.gameOver || !!game.auction}
+            onClick={(event) => {
+              event.currentTarget.focus();
+              start(4, 'restoration');
+            }}
+          >
+            {tr ? 'Kesintiyi gider · 3 arıza' : 'Restore service · 3 faults'}
           </button>
           <button
             className="btn-primary"
@@ -102,6 +112,7 @@ export default function SignalTrainingDialog() {
   if (!puzzle) return null;
   const route = signalConnection(puzzle);
   const fault = puzzle.mode === 'fault';
+  const restoration = puzzle.mode === 'restoration';
   const directions = tr ? ['kuzey', 'doğu', 'güney', 'batı'] : ['north', 'east', 'south', 'west'];
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/80 p-3 backdrop-blur-sm">
@@ -117,7 +128,17 @@ export default function SignalTrainingDialog() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="signal-title" className="text-xl font-semibold">
-              {fault ? (tr ? 'Arıza bulma' : 'Fault finding') : tr ? 'Sinyal rotası' : 'Signal routing'}
+              {restoration
+                ? tr
+                  ? 'Kesintiyi gider'
+                  : 'Restore service'
+                : fault
+                  ? tr
+                    ? 'Arıza bulma'
+                    : 'Fault finding'
+                  : tr
+                    ? 'Sinyal rotası'
+                    : 'Signal routing'}
             </h2>
             <p className="mt-1 text-xs text-neon-amber">
               {tr ? 'Şirket saati duraklatıldı' : 'Company clock paused'} · {puzzle.moves} {tr ? 'hamle' : 'moves'}
@@ -135,13 +156,17 @@ export default function SignalTrainingDialog() {
           </button>
         </div>
         <p id="signal-instructions" className="mt-3 text-sm leading-relaxed text-white/65">
-          {fault
+          {restoration
             ? tr
-              ? 'Bu hatta yalnızca bir kablo yanlış yönde. Işıklı parçaları takip edip kesintiyi onar. Tıklama veya Enter/Boşluk kabloyu döndürür; Tab ile seçebilirsin.'
-              : 'Just one cable is misaligned. Follow the lit tiles and repair the break. Click or press Enter/Space to rotate; use Tab to select a tile.'
-            : tr
-              ? 'Her tıklama kabloyu saat yönünde döndürür. Sol üstteki girişten sağ alttaki çıkışa kesintisiz bir yol kur. Tüm parçaları kullanman gerekmez. Klavyede Tab ile seç, Enter veya Boşluk ile döndür.'
-              : 'Each click rotates a cable clockwise. Build an unbroken path from the top-left inlet to the bottom-right outlet. You do not need every tile. Use Tab to select and Enter or Space to rotate.'}
+              ? 'Bu hatta üç kablo yanlış yönde. Girişten başlayıp kesintileri sırayla onar; sinyali sağ alttaki çıkışa ulaştır. Tıklama veya Enter/Boşluk kabloyu döndürür; Tab ile seçebilirsin.'
+              : 'Three cables are misaligned. Work from the inlet, repair the breaks and carry the signal to the bottom-right outlet. Click or press Enter/Space to rotate; use Tab to select a tile.'
+            : fault
+              ? tr
+                ? 'Bu hatta yalnızca bir kablo yanlış yönde. Işıklı parçaları takip edip kesintiyi onar. Tıklama veya Enter/Boşluk kabloyu döndürür; Tab ile seçebilirsin.'
+                : 'Just one cable is misaligned. Follow the lit tiles and repair the break. Click or press Enter/Space to rotate; use Tab to select a tile.'
+              : tr
+                ? 'Her tıklama kabloyu saat yönünde döndürür. Sol üstteki girişten sağ alttaki çıkışa kesintisiz bir yol kur. Tüm parçaları kullanman gerekmez. Klavyede Tab ile seç, Enter veya Boşluk ile döndür.'
+                : 'Each click rotates a cable clockwise. Build an unbroken path from the top-left inlet to the bottom-right outlet. You do not need every tile. Use Tab to select and Enter or Space to rotate.'}
         </p>
         <div className="mx-auto mt-4 w-full" style={{ maxWidth: 'clamp(240px, calc(100dvh - 420px), 420px)' }}>
           <div className="mb-2 text-xs font-semibold text-neon-cyan">{tr ? 'Giriş →' : 'Inlet →'}</div>
