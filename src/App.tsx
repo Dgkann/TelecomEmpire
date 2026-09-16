@@ -234,6 +234,11 @@ function GameShell() {
 export default function App() {
   const started = useGame((s) => s.started);
   const hasGame = useGame((s) => s.game !== null);
+  const locale = useGame((s) => s.locale);
+  // Lets CSS casing and screen readers follow the chosen language (Turkish dotted İ).
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
   useEffect(() => {
     const warm = (event: Event) => {
       if (event.isTrusted && useGame.getState().soundOn) prepareAudio();
