@@ -69,6 +69,38 @@ test('restoration saves, repairs three faults and rewards without changing the l
   );
 });
 
+test('keyboard navigation stays within the board and only rotation keys spend moves', async ({ page }) => {
+  await setup(page);
+  const launch = page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' });
+  await launch.click();
+  const dialog = page.getByRole('dialog', { name: 'Kesintiyi gider', exact: true });
+  const tiles = dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button');
+  await tiles.nth(0).focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowUp');
+  await expect(tiles.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(tiles.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(tiles.nth(5)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tiles.nth(4)).toBeFocused();
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowRight');
+  await expect(tiles.nth(7)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(tiles.nth(15)).toBeFocused();
+  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.moves)).toBe(0);
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.moves)).toBe(2);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(launch).toBeFocused();
+});
+
 test('optional hints identify a cable without spending moves or rewards', async ({ page }, testInfo) => {
   const original = await setup(page);
   const launch = page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' });

@@ -170,6 +170,11 @@ export default function SignalTrainingDialog() {
                 ? 'Her tıklama kabloyu saat yönünde döndürür. Sol üstteki girişten sağ alttaki çıkışa kesintisiz bir yol kur. Tüm parçaları kullanman gerekmez. Klavyede Tab ile seç, Enter veya Boşluk ile döndür.'
                 : 'Each click rotates a cable clockwise. Build an unbroken path from the top-left inlet to the bottom-right outlet. You do not need every tile. Use Tab to select and Enter or Space to rotate.'}
         </p>
+        <p className="mt-2 text-xs text-white/50">
+          {tr
+            ? 'Panoda ok tuşlarıyla gezinebilir, Home/End ile satırın başına veya sonuna gidebilirsin.'
+            : 'Navigate the board with arrow keys; Home/End move to the start or end of the row.'}
+        </p>
         <div className="mx-auto mt-4 w-full" style={{ maxWidth: 'clamp(240px, calc(100dvh - 420px), 420px)' }}>
           <div className="mb-2 text-xs font-semibold text-neon-cyan">{tr ? 'Giriş →' : 'Inlet →'}</div>
           <div
@@ -185,6 +190,22 @@ export default function SignalTrainingDialog() {
                 className={`relative aspect-square min-w-0 rounded border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${hint === index ? 'ring-2 ring-neon-amber' : ''} ${route.lit.has(index) ? 'border-neon-cyan/70 bg-neon-cyan/15 text-neon-cyan' : 'border-white/15 bg-ink-800 text-white/45'}`}
                 aria-label={`${tr ? 'Satır' : 'Row'} ${Math.floor(index / puzzle.size) + 1}, ${tr ? 'sütun' : 'column'} ${(index % puzzle.size) + 1}: ${directions.filter((_, d) => ports & (1 << d)).join(', ')}${route.lit.has(index) ? (tr ? ', sinyal var' : ', signal present') : ''}${hint === index ? (tr ? ', ipucu' : ', hint') : ''}`}
                 aria-describedby={hint === index ? 'signal-hint' : undefined}
+                onKeyDown={(event) => {
+                  if (event.altKey || event.ctrlKey || event.metaKey) return;
+                  const rowStart = Math.floor(index / puzzle.size) * puzzle.size;
+                  const destinations: Record<string, number> = {
+                    ArrowLeft: Math.max(rowStart, index - 1),
+                    ArrowRight: Math.min(rowStart + puzzle.size - 1, index + 1),
+                    ArrowUp: index >= puzzle.size ? index - puzzle.size : index,
+                    ArrowDown: index + puzzle.size < puzzle.size ** 2 ? index + puzzle.size : index,
+                    Home: rowStart,
+                    End: rowStart + puzzle.size - 1,
+                  };
+                  const next = destinations[event.key];
+                  if (next === undefined) return;
+                  event.preventDefault();
+                  event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
+                }}
                 onClick={() => {
                   setMessage('');
                   setHint(null);
