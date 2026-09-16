@@ -152,7 +152,7 @@ interface Store extends UiState {
   advanceCampaign: () => boolean;
 
   tick: () => void;
-  startSignalTraining: (size: 4 | 5, mode?: 'routing' | 'fault') => void;
+  startSignalTraining: (size: 4 | 5, mode?: 'routing' | 'fault' | 'restoration') => void;
   rotateSignalTile: (index: number) => void;
   submitSignalTraining: () => boolean;
   closeSignalTraining: () => void;

@@ -59,9 +59,14 @@ export function signalConnection(puzzle: SignalPuzzle) {
 export function beginSignalTraining(
   s: GameState,
   size: 4 | 5,
-  mode: 'routing' | 'fault' = 'routing',
+  mode: NonNullable<SignalPuzzle['mode']> = 'routing',
 ): GameState | null {
-  if (s.gameOver || s.signalTraining.active || (size !== 4 && size !== 5) || !['routing', 'fault'].includes(mode))
+  if (
+    s.gameOver ||
+    s.signalTraining.active ||
+    (size !== 4 && size !== 5) ||
+    !['routing', 'fault', 'restoration'].includes(mode)
+  )
     return null;
   const seed = (s.rngSeed + Math.imul(s.signalTraining.sequence + 1, 2654435761)) >>> 0;
   const rng = makeRng(seed ^ 1234567);
@@ -84,6 +89,25 @@ export function beginSignalTraining(
     const path = [...signalConnection(active).lit].filter((cell) => cell !== 0 && cell !== size * size - 1);
     const broken = path[Math.floor(rng() * path.length)];
     active.rotations[broken] = 1;
+  }
+  if (mode === 'restoration') {
+    active.rotations.fill(0);
+    const path = [...signalConnection(active).lit];
+    const candidates = path.slice(1, -1);
+    for (let i = 0; i < 3; i++) {
+      const chosen = i + Math.floor(rng() * (candidates.length - i));
+      [candidates[i], candidates[chosen]] = [candidates[chosen], candidates[i]];
+      const cell = candidates[i];
+      active.rotations[cell] = 1 + Math.floor(rng() * 3);
+      if (rotatePorts(masks[cell], active.rotations[cell]) === masks[cell]) active.rotations[cell] = 1;
+    }
+    // The first damaged tile must reject the incoming signal, even if random
+    // spare cables could otherwise create an alternative path to the outlet.
+    const first = path.findIndex((cell) => active.rotations[cell] !== 0);
+    const cell = path[first];
+    const incomingPort = cell - path[first - 1] === 1 ? 8 : 1;
+    while (rotatePorts(masks[cell], active.rotations[cell]) & incomingPort)
+      active.rotations[cell] = (active.rotations[cell] + 1) % 4;
   }
   return { ...s, speed: 0, signalTraining: { ...s.signalTraining, sequence: s.signalTraining.sequence + 1, active } };
 }
@@ -160,7 +184,7 @@ export function validSignalTraining(value: unknown): value is SignalTraining {
     ![4, 5].includes(active.size) ||
     !integer(active.moves) ||
     typeof active.completed !== 'boolean' ||
-    (active.mode !== undefined && !['routing', 'fault'].includes(active.mode)) ||
+    (active.mode !== undefined && !['routing', 'fault', 'restoration'].includes(active.mode)) ||
     ![0, TRAINING_REWARD].includes(active.reward)
   )
     return false;

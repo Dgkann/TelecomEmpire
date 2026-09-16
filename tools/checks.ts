@@ -4676,6 +4676,46 @@ group('optional signal routing exercises');
   );
 }
 
+group('Network restoration exercises');
+{
+  const g = newGame(811);
+  let generated = true;
+  let repaired = true;
+  for (const size of [4, 5] as const) {
+    for (let seed = 0; seed < 200; seed++) {
+      const start = beginSignalTraining({ ...g, rngSeed: seed }, size, 'restoration')!;
+      const puzzle = start.signalTraining.active!;
+      const board = signalBoard(puzzle.seed, size);
+      generated &&= puzzle.rotations.filter(Boolean).length === 3;
+      generated &&= signalConnection(puzzle).ports.filter((mask, i) => mask !== board[i]).length === 3;
+      generated &&= !signalConnection(puzzle).connected && signalConnection(puzzle).lit.has(0);
+      let solved = start;
+      for (let i = 0; i < puzzle.rotations.length; i++) {
+        for (let turn = 0; turn < (4 - puzzle.rotations[i]) % 4; turn++) solved = turnSignalTile(solved, i)!;
+      }
+      repaired &&= signalConnection(solved.signalTraining.active!).connected;
+      const reward = finishSignalTraining(solved)!;
+      repaired &&= reward.money === g.money + TRAINING_REWARD && finishSignalTraining(reward) === null;
+      const practice = beginSignalTraining(
+        { ...reward, signalTraining: { ...reward.signalTraining, active: null } },
+        size,
+        'restoration',
+      )!;
+      practice.signalTraining.active!.rotations.fill(0);
+      repaired &&= finishSignalTraining(practice)!.money === reward.money;
+    }
+  }
+  check('400 restoration boards begin with three damaged interior cables and a broken connection', generated);
+  check('all restoration boards can be repaired and share the weekly reward limit', repaired);
+  const original = JSON.stringify(g);
+  const first = beginSignalTraining(g, 4, 'restoration')!;
+  check(
+    'restoration generation is deterministic without changing the company',
+    JSON.stringify(first) === JSON.stringify(beginSignalTraining(g, 4, 'restoration')) &&
+      JSON.stringify(g) === original,
+  );
+}
+
 group('Short fault finding exercises');
 {
   const g = newGame(811);
