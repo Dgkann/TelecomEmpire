@@ -165,7 +165,9 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                     />
                     <div className="num mt-2 flex justify-between text-[11px] text-white/40">
                       <span>{Math.round(share * 100)}% of sign-ups</span>
-                      <span>{fmtNum(p.subscribers)} vm.subs</span>
+                      <span>
+                        {fmtNum(p.subscribers)} {plural(Math.round(p.subscribers), 'subscriber')}
+                      </span>
                     </div>
                   </div>
                 );
