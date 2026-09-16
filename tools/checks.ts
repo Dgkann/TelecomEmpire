@@ -11,6 +11,7 @@ import {
   signalConnection,
   signalBoard,
   signalHint,
+  signalRewardPreview,
   validSignalTraining,
   TRAINING_REWARD,
   TRAINING_RESEARCH,
@@ -4675,6 +4676,40 @@ group('optional signal routing exercises');
     'closed companies cannot start an exercise',
     beginSignalTraining({ ...g, gameOver: { at: g.minutes, reason: 'closed' } }, 4) === null,
   );
+}
+
+group('Exercise reward previews');
+{
+  const g = newGame(811);
+  const ready = signalRewardPreview(g);
+  check(
+    'idle laboratories get money and points without banking research days',
+    ready.cash === TRAINING_REWARD && ready.points === TRAINING_RESEARCH && ready.researchDays === 0,
+  );
+  for (const daysLeft of [0, 0.25, 8]) {
+    const started = beginSignalTraining({ ...g, researchActive: { id: 'ftth', daysLeft } }, 4, 'restoration')!;
+    started.signalTraining.active!.rotations.fill(0);
+    const expected = signalRewardPreview(started);
+    const actual = finishSignalTraining(started)!;
+    check(
+      `preview matches the paid bonus with ${daysLeft} research days left`,
+      actual.money - started.money === expected.cash &&
+        actual.researchPoints - started.researchPoints === expected.points &&
+        daysLeft - actual.researchActive!.daysLeft === expected.researchDays,
+    );
+  }
+  const practice = {
+    ...g,
+    researchActive: { id: 'ftth', daysLeft: 5 },
+    signalTraining: { ...g.signalTraining, nextRewardAt: g.minutes + MINUTES_PER_DAY + 1 },
+  };
+  const original = JSON.stringify(practice);
+  const preview = signalRewardPreview(practice);
+  check(
+    'practice previews show the cooldown without promising money or research progress',
+    preview.cash === 0 && preview.points === 0 && preview.researchDays === 0 && preview.daysUntilReward === 2,
+  );
+  check('reward previews leave the company untouched', JSON.stringify(practice) === original);
 }
 
 group('Optional cable hints');

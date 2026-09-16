@@ -14,6 +14,16 @@ export const initialSignalTraining = (): SignalTraining => ({
   active: null,
 });
 
+export function signalRewardPreview(s: GameState) {
+  const ready = !s.gameOver && s.minutes >= s.signalTraining.nextRewardAt;
+  return {
+    cash: ready ? TRAINING_REWARD : 0,
+    points: ready ? TRAINING_RESEARCH : 0,
+    researchDays: ready && s.researchActive ? Math.max(0, Math.min(TRAINING_LAB_DAYS, s.researchActive.daysLeft)) : 0,
+    daysUntilReward: Math.max(0, Math.ceil((s.signalTraining.nextRewardAt - s.minutes) / MINUTES_PER_DAY)),
+  };
+}
+
 // Ports run clockwise: north, east, south, west. Every board contains a valid route.
 export function signalBoard(seed: number, size: number) {
   const rng = makeRng(seed);
@@ -148,12 +158,13 @@ export function turnSignalTile(s: GameState, index: number): GameState | null {
 export function finishSignalTraining(s: GameState): GameState | null {
   const active = s.signalTraining.active;
   if (s.gameOver || !active || active.completed || !signalConnection(active).connected) return null;
-  const reward = s.minutes >= s.signalTraining.nextRewardAt ? TRAINING_REWARD : 0;
-  const researchDaysSaved = reward && s.researchActive ? Math.min(TRAINING_LAB_DAYS, s.researchActive.daysLeft) : 0;
+  const preview = signalRewardPreview(s);
+  const reward = preview.cash;
+  const researchDaysSaved = preview.researchDays;
   const next: GameState = {
     ...s,
     money: s.money + reward,
-    researchPoints: s.researchPoints + (reward ? TRAINING_RESEARCH : 0),
+    researchPoints: s.researchPoints + preview.points,
     // Completion still goes through the simulation so unlocks and spectrum grants
     // run exactly once when the player resumes company time.
     researchActive: s.researchActive
