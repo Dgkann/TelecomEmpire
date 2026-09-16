@@ -19,8 +19,8 @@ export default function ExerciseShortcut({ onNavigate }: { onNavigate?: () => vo
       <span className="mt-1 block text-white/60">
         {days === 0
           ? tr
-            ? 'Haftalık ödül hazır · Arıza bul veya rota kur'
-            : 'Weekly reward ready · Find a fault or build a route'
+            ? 'Haftalık ödül hazır · Arıza bul, kesintiyi gider veya rota kur'
+            : 'Weekly reward ready · Find a fault, restore service or build a route'
           : tr
             ? `Ödül ${days} oyun günü sonra · Şimdi ödülsüz alıştırma`
             : `Reward in ${days} game days · Practise without rewards now`}

@@ -4,6 +4,7 @@ import { fmtMoney } from '../game/economy';
 import {
   signalConnection,
   signalHint,
+  signalRewardPreview,
   TRAINING_REWARD,
   TRAINING_RESEARCH,
   TRAINING_LAB_DAYS,
@@ -120,6 +121,7 @@ export default function SignalTrainingDialog() {
   const ref = useDialogAccessibility(!!puzzle, leave);
   if (!puzzle) return null;
   const route = signalConnection(puzzle);
+  const reward = signalRewardPreview(game);
   const fault = puzzle.mode === 'fault';
   const restoration = puzzle.mode === 'restoration';
   const directions = tr ? ['kuzey', 'doğu', 'güney', 'batı'] : ['north', 'east', 'south', 'west'];
@@ -157,6 +159,33 @@ export default function SignalTrainingDialog() {
             ×
           </button>
         </div>
+        {!puzzle.completed && (
+          <section
+            aria-label={tr ? 'Bu turun ödülü' : 'This round’s reward'}
+            className="mt-3 rounded border border-neon-amber/25 bg-black/20 p-3 text-xs"
+          >
+            <p className="font-semibold text-neon-amber">
+              {reward.cash
+                ? `${tr ? 'Bu turun ödülü' : 'This round’s reward'}: ${fmtMoney(reward.cash)} + ${reward.points} ${tr ? 'AP' : 'RP'}`
+                : tr
+                  ? `Ödülsüz alıştırma · Yeni ödüle ${reward.daysUntilReward} oyun günü`
+                  : `Practice without rewards · Next reward in ${reward.daysUntilReward} game days`}
+            </p>
+            <p className="mt-1 text-white/60">
+              {reward.researchDays > 0
+                ? tr
+                  ? `Tamamlayınca süren araştırmadan ${reward.researchDays.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} oyun günü düşer.`
+                  : `Completion saves ${reward.researchDays.toLocaleString('en-US', { maximumFractionDigits: 2 })} game days of active research.`
+                : reward.cash
+                  ? tr
+                    ? 'Şu anda kısaltılacak araştırma süresi yok; araştırma bonusu birikmez.'
+                    : 'There is no research time to save right now; the research bonus does not bank.'
+                  : tr
+                    ? 'Bu tur nakit, araştırma puanı veya araştırma süresi bonusu vermez.'
+                    : 'This round awards no cash, research points or research time bonus.'}
+            </p>
+          </section>
+        )}
         <p id="signal-instructions" className="mt-3 text-sm leading-relaxed text-white/65">
           {restoration
             ? tr

@@ -69,6 +69,40 @@ test('restoration saves, repairs three faults and rewards without changing the l
   );
 });
 
+test('the dialog distinguishes actual research bonuses from practice without rewards', async ({ page }) => {
+  const original = await setup(page);
+  await page.evaluate(() => {
+    const store = (window as any).__game;
+    store.setState({ game: { ...store.getState().game, researchActive: { id: 'ftth', daysLeft: 0.25 } } });
+  });
+  await page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Kesintiyi gider', exact: true });
+  const preview = dialog.getByRole('region', { name: 'Bu turun ödülü' });
+  await expect(preview).toContainText('30k ₺ + 3 AP');
+  await expect(preview).toContainText('0,25 oyun günü');
+  await page.evaluate(() => {
+    const store = (window as any).__game;
+    store.setState({ game: { ...store.getState().game, researchActive: null } });
+  });
+  await expect(preview).toContainText('araştırma bonusu birikmez');
+  await page.evaluate(() => {
+    const store = (window as any).__game;
+    const g = store.getState().game;
+    store.setState({ game: { ...g, signalTraining: { ...g.signalTraining, nextRewardAt: g.minutes + 1441 } } });
+  });
+  await expect(preview).toContainText('Ödülsüz alıştırma · Yeni ödüle 2 oyun günü');
+  await expect(preview).not.toContainText('30k');
+  const rotations = await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.rotations);
+  const tiles = dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button');
+  for (let i = 0; i < rotations.length; i++) {
+    for (let j = 0; j < (4 - rotations[i]) % 4; j++) await tiles.nth(i).click();
+  }
+  await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
+  await expect(dialog).toContainText('Alıştırma tamamlandı! Bu tur ödülsüzdü.');
+  await expect(preview).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(original.money);
+});
+
 test('keyboard navigation stays within the board and only rotation keys spend moves', async ({ page }) => {
   await setup(page);
   const launch = page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' });
