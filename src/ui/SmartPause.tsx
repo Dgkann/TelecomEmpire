@@ -18,7 +18,7 @@ function SettingsDialog({ close }: { close: () => void }) {
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label="Smart pause settings"
+        aria-label={locale === 'tr' ? 'Akıllı duraklatma ayarları' : 'Smart pause settings'}
         tabIndex={-1}
         className="panel max-h-full w-full min-w-0 max-w-[440px] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -75,13 +75,14 @@ function SettingsDialog({ close }: { close: () => void }) {
 export function SmartPauseSettings({ children }: { children: ReactNode }) {
   const preferences = useGame((s) => s.smartPause);
   const setSpeed = useGame((s) => s.setSpeed);
+  const tr = useGame((s) => s.locale) === 'tr';
   const [open, setOpen] = useState(false);
   return (
     <>
       <button
         className="relative rounded px-0.5 py-1 text-right hover:bg-white/5"
-        aria-label="Smart pause settings"
-        title="Choose which events pause the game"
+        aria-label={tr ? 'Akıllı duraklatma ayarları' : 'Smart pause settings'}
+        title={tr ? 'Hangi olayların oyunu duraklatacağını seç' : 'Choose which events pause the game'}
         onClick={(e) => {
           if (document.querySelector('[aria-modal="true"]')) return;
           e.currentTarget.focus();

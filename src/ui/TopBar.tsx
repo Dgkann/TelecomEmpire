@@ -30,6 +30,14 @@ export default function TopBar() {
   const locale = useGame((s) => s.locale);
   const peakHour = hourOfDay(game.minutes) >= 18 && hourOfDay(game.minutes) < 23;
   const mission = scenarioStatus(game);
+  const tr = locale === 'tr';
+  const alertLabel = tr
+    ? incidents
+      ? `${incidents} aktif alarm`
+      : 'Aktif alarm yok'
+    : incidents
+      ? `${incidents} active ${plural(incidents, 'alert')}`
+      : 'No active alerts';
   const missionProgress = mission.objectives.length
     ? mission.objectives.reduce((sum, objective) => sum + objective.progress, 0) / mission.objectives.length
     : null;
@@ -53,7 +61,7 @@ export default function TopBar() {
             shortLabel={t(locale, 'cashFlow')}
             value={`${cashFlow.freeCashFlow >= 0 ? '+' : ''}${fmtMoney(cashFlow.freeCashFlow)}`}
             tone={cashFlow.freeCashFlow >= 0 ? 'text-neon-lime' : 'text-neon-red'}
-            secondary={`op ${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoney(cashFlow.operatingCash)}`}
+            secondary={`${tr ? 'işl.' : 'op'} ${cashFlow.operatingCash >= 0 ? '+' : ''}${fmtMoney(cashFlow.operatingCash)}`}
           />
         </div>
         <div className="hidden min-w-0 flex-1 md:flex">
@@ -61,7 +69,7 @@ export default function TopBar() {
             label={t(locale, 'customers')}
             shortLabel={locale === 'tr' ? 'Abone' : 'Subs'}
             value={fmtNum(customers)}
-            secondary={`rep ${Math.round(game.reputation)}`}
+            secondary={`${tr ? 'itibar' : 'rep'} ${Math.round(game.reputation)}`}
           />
         </div>
         <div className="hidden min-w-0 flex-1 lg:flex">
@@ -97,16 +105,8 @@ export default function TopBar() {
       <button
         onClick={() => setScreen('network')}
         className={`flex w-14 shrink-0 items-center justify-center border-l border-white/[0.07] transition-colors ${incidents ? 'bg-neon-red/10 text-neon-red' : 'text-white/35 hover:bg-white/5 hover:text-white/70'}`}
-        title={incidents ? `${incidents} active alert${incidents > 1 ? 's' : ''}` : 'No active alerts'}
-        aria-label={
-          locale === 'tr'
-            ? incidents
-              ? `${incidents} aktif alarm`
-              : 'Aktif alarm yok'
-            : incidents
-              ? `${incidents} active alerts`
-              : 'No active alerts'
-        }
+        title={alertLabel}
+        aria-label={alertLabel}
       >
         <span className="relative">
           <AlertIcon className="h-5 w-5" />
@@ -154,8 +154,10 @@ export default function TopBar() {
                   ? 'bg-white/[0.09] text-white'
                   : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
               }`}
-              title={s.v === 0 ? `${t(locale, 'pause')} (Space)` : `${s.v}x speed`}
-              aria-label={s.v === 0 ? t(locale, 'pause') : `${s.v}x speed`}
+              title={
+                s.v === 0 ? `${t(locale, 'pause')} (${tr ? 'Boşluk' : 'Space'})` : `${s.v}x ${tr ? 'hız' : 'speed'}`
+              }
+              aria-label={s.v === 0 ? t(locale, 'pause') : `${s.v}x ${tr ? 'hız' : 'speed'}`}
               aria-pressed={game.speed === s.v}
             >
               {s.label}
