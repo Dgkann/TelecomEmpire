@@ -4676,6 +4676,38 @@ group('optional signal routing exercises');
   );
 }
 
+group('Restoration save compatibility');
+{
+  const g = newGame(811);
+  for (const mode of ['routing', 'fault', 'restoration'] as const) {
+    const started = beginSignalTraining(g, 4, mode)!;
+    const playing = turnSignalTile(started, 2)!;
+    const restored = migrate(JSON.parse(JSON.stringify(playing)), SAVE_VERSION);
+    check(
+      `${mode} progress survives save and load`,
+      JSON.stringify(restored?.signalTraining) === JSON.stringify(playing.signalTraining),
+    );
+  }
+  const legacy = beginSignalTraining(g, 4)!;
+  legacy.version = 25;
+  delete legacy.signalTraining.active!.mode;
+  legacy.signalTraining.nextRewardAt = legacy.minutes + TRAINING_COOLDOWN;
+  const restored = migrate(JSON.parse(JSON.stringify(legacy)), 25)!;
+  check(
+    'version 25 boards retain their rotations and reward timer',
+    restored.version === SAVE_VERSION &&
+      JSON.stringify(restored.signalTraining) === JSON.stringify(legacy.signalTraining),
+  );
+  const solved = beginSignalTraining(g, 4, 'restoration')!;
+  solved.signalTraining.active!.rotations.fill(0);
+  const rewarded = finishSignalTraining(solved)!;
+  const reloaded = migrate(JSON.parse(JSON.stringify(rewarded)), SAVE_VERSION)!;
+  check(
+    'a restored completion cannot award twice',
+    reloaded.money === rewarded.money && finishSignalTraining(reloaded) === null,
+  );
+}
+
 group('Network restoration exercises');
 {
   const g = newGame(811);

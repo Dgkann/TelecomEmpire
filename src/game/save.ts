@@ -359,6 +359,8 @@ const MIGRATIONS: Record<number, (s: LegacyState) => LegacyState> = {
   23: (s) => ({ ...s, signalTraining: initialSignalTraining() }),
   // Existing full data centres retain their tiers; new sites may start at tier zero.
   24: (s) => ({ ...s }),
+  // Restoration is a new exercise mode. Existing boards and reward timers survive.
+  25: (s) => ({ ...s }),
 };
 
 const DEFAULTS = {
