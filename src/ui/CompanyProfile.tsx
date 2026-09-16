@@ -24,6 +24,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
   const earned = selectedRank <= game.rank;
   const issue = companyIdentityIssue(name, locale);
   const changed = name.trim() !== game.companyName || logo !== game.logo;
+  const tr = locale === 'tr';
   return createPortal(
     <div
       className="fixed inset-0 z-[80] grid place-items-center bg-[#07121b]/80 p-4 backdrop-blur-sm"
@@ -33,7 +34,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label="Company profile"
+        aria-label={tr ? 'Şirket profili' : 'Company profile'}
         tabIndex={-1}
         className="panel max-h-full w-full min-w-0 max-w-[800px] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -48,25 +49,37 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
             </span>
             <div className="min-w-0">
               <p className="text-xs text-neon-cyan">
-                {game.cityName} · {rankOf(game).name}
+                {game.cityName} · {tr ? rankOf(game).nameTr : rankOf(game).name}
               </p>
               <h2 className="mt-1 break-words text-xl font-semibold">{name.trim() || game.companyName}</h2>
               <p className="mt-1 text-xs text-white/50">{t(locale, 'companyJourneyBlurb')}</p>
             </div>
           </div>
-          <button className="btn shrink-0 px-2 text-xs" aria-label="Close company profile" onClick={onClose}>
+          <button
+            className="btn shrink-0 px-2 text-xs"
+            aria-label={tr ? 'Şirket profilini kapat' : 'Close company profile'}
+            onClick={onClose}
+          >
             {t(locale, 'close')}
           </button>
         </div>
         <div className="space-y-5 p-5">
-          <section aria-label="Company identity">
+          <section aria-label={t(locale, 'companyIdentity')}>
             <button
               className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold"
               aria-expanded={editing}
               onClick={() => setEditing(!editing)}
             >
               <span>{t(locale, 'companyIdentity')}</span>
-              <span className="text-xs text-neon-cyan">{editing ? 'Hide editor −' : 'Edit name & emblem +'}</span>
+              <span className="text-xs text-neon-cyan">
+                {editing
+                  ? tr
+                    ? 'Düzenleyiciyi gizle −'
+                    : 'Hide editor −'
+                  : tr
+                    ? 'Ad ve amblemi düzenle +'
+                    : 'Edit name & emblem +'}
+              </span>
             </button>
             {editing && (
               <form
@@ -75,8 +88,8 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                   e.preventDefault();
                   if (update(name, logo)) {
                     setName(name.trim());
-                    setStatus('Company identity updated.');
-                  } else setStatus('Check the company name and emblem.');
+                    setStatus(tr ? 'Şirket kimliği güncellendi.' : 'Company identity updated.');
+                  } else setStatus(tr ? 'Şirket adını ve amblemi kontrol et.' : 'Check the company name and emblem.');
                 }}
               >
                 <label className="block text-xs text-white/60">
@@ -102,7 +115,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                         <input
                           type="radio"
                           name="company-emblem"
-                          aria-label={emblem.name}
+                          aria-label={tr ? emblem.nameTr : emblem.name}
                           checked={logo === emblem.symbol}
                           onChange={() => {
                             setLogo(emblem.symbol);
@@ -134,10 +147,14 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
               </form>
             )}
           </section>
-          <section className="border-t border-white/10 pt-4" aria-label="Operator journey">
+          <section className="border-t border-white/10 pt-4" aria-label={t(locale, 'yourOperatorJourney')}>
             <h3 className="font-semibold">{t(locale, 'yourOperatorJourney')}</h3>
             <p className="mt-1 text-xs text-white/55">{t(locale, 'inspectLevelBlurb')}</p>
-            <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-5" role="group" aria-label="Operator levels">
+            <div
+              className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-5"
+              role="group"
+              aria-label={tr ? 'Operatör seviyeleri' : 'Operator levels'}
+            >
               {RANKS.map((r, index) => (
                 <button
                   key={r.id}
@@ -147,24 +164,38 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                 >
                   <span className="mb-1 block text-[10px] text-white/45">
                     {index < game.rank
-                      ? 'Earned'
+                      ? tr
+                        ? 'Kazanıldı'
+                        : 'Earned'
                       : index === game.rank
-                        ? 'Current level'
+                        ? tr
+                          ? 'Mevcut seviye'
+                          : 'Current level'
                         : index === game.rank + 1
-                          ? 'Next level'
-                          : 'Future level'}
+                          ? tr
+                            ? 'Sonraki seviye'
+                            : 'Next level'
+                          : tr
+                            ? 'İleriki seviye'
+                            : 'Future level'}
                   </span>
-                  <span className={index <= game.rank ? 'text-neon-cyan' : 'text-white/70'}>{r.name}</span>
+                  <span className={index <= game.rank ? 'text-neon-cyan' : 'text-white/70'}>
+                    {tr ? r.nameTr : r.name}
+                  </span>
                 </button>
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h4 className="text-lg font-semibold">{rank.name}</h4>
-                <p className="mt-1 max-w-md text-xs leading-relaxed text-white/55">{rank.blurb}</p>
+                <h4 className="text-lg font-semibold">{tr ? rank.nameTr : rank.name}</h4>
+                <p className="mt-1 max-w-md text-xs leading-relaxed text-white/55">{tr ? rank.blurbTr : rank.blurb}</p>
               </div>
               <div className="text-left text-xs sm:text-right">
-                <strong className="text-neon-amber">×{rank.creditMultiplier.toFixed(1)} credit multiplier</strong>
+                <strong className="text-neon-amber">
+                  {tr
+                    ? `×${rank.creditMultiplier.toFixed(1).replace('.', ',')} kredi çarpanı`
+                    : `×${rank.creditMultiplier.toFixed(1)} credit multiplier`}
+                </strong>
                 <p className="mt-1 text-[11px] text-white/40">{t(locale, 'creditDependsOnFinances')}</p>
               </div>
             </div>
@@ -174,8 +205,9 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
             )}
             {earned ? (
               <p className="mt-4 rounded border border-neon-cyan/20 bg-neon-cyan/5 p-3 text-sm text-neon-cyan">
-                {selectedRank === game.rank ? 'This is your current standing.' : 'You have already earned this level.'}{' '}
-                Earned levels are retained when your customer count fluctuates.
+                {tr
+                  ? `${selectedRank === game.rank ? 'Şu anki seviyen bu.' : 'Bu seviyeyi zaten kazandın.'} Müşteri sayın dalgalansa da kazanılan seviyeler korunur.`
+                  : `${selectedRank === game.rank ? 'This is your current standing.' : 'You have already earned this level.'} Earned levels are retained when your customer count fluctuates.`}
               </p>
             ) : (
               <>
@@ -186,14 +218,14 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                     return (
                       <li key={requirement.label} className="py-3">
                         <div className="flex flex-wrap justify-between gap-2 text-xs">
-                          <span className="font-semibold">{requirement.label}</span>
+                          <span className="font-semibold">{tr ? requirement.labelTr : requirement.label}</span>
                           <span className={progress >= 1 ? 'text-neon-cyan' : 'text-white/60'}>
-                            {requirement.detail(game)}
+                            {requirement.detail(game, tr)}
                           </span>
                         </div>
                         <div
                           role="progressbar"
-                          aria-label={requirement.label}
+                          aria-label={tr ? requirement.labelTr : requirement.label}
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-valuenow={Math.round(progress * 100)}
@@ -214,7 +246,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
                               setTool(action.tool ?? null);
                             }}
                           >
-                            {action.label}
+                            {tr ? action.labelTr : action.label}
                           </button>
                         )}
                       </li>
@@ -249,8 +281,8 @@ export default function CompanyProfile() {
   return (
     <>
       <button
-        aria-label="Company profile"
-        title="Company profile and operator journey"
+        aria-label={locale === 'tr' ? 'Şirket profili' : 'Company profile'}
+        title={locale === 'tr' ? 'Şirket profili ve operatör yolculuğu' : 'Company profile and operator journey'}
         onClick={(e) => {
           if (document.querySelector('[aria-modal="true"]')) return;
           e.currentTarget.focus();
@@ -267,17 +299,7 @@ export default function CompanyProfile() {
           <span className="block truncate text-[16px] font-semibold text-white/90">{game.companyName}</span>
           <span className="block truncate text-[11px] text-white/40">
             {game.cityName} <span className="px-1 text-white/20">/</span>{' '}
-            <span className="text-neon-cyan/80">
-              {locale === 'tr'
-                ? [
-                    'Yerel servis sağlayıcı',
-                    'Şehir operatörü',
-                    'Bölgesel operatör',
-                    'Ulusal operatör',
-                    'Küresel telekom',
-                  ][game.rank]
-                : rankOf(game).name}
-            </span>
+            <span className="text-neon-cyan/80">{locale === 'tr' ? rankOf(game).nameTr : rankOf(game).name}</span>
           </span>
         </span>
       </button>

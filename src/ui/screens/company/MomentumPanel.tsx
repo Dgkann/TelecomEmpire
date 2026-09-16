@@ -3,6 +3,12 @@ import { t } from '../../i18n';
 import type { CompanyModel } from './model';
 
 export default function MomentumPanel({ vm }: { vm: CompanyModel }) {
+  const tr = vm.locale === 'tr';
+  const perMonth = tr ? '/ay' : '/mo';
+  const upTo = (amount: number) =>
+    tr
+      ? `Mevcut teslim kalitesiyle ayda en fazla ${fmtMoney(amount)}`
+      : `Up to ${fmtMoney(amount)}/mo at current delivery quality`;
   return (
     <div className="panel panel-tone-amber p-5 lg:col-span-3">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
@@ -11,13 +17,17 @@ export default function MomentumPanel({ vm }: { vm: CompanyModel }) {
             {t(vm.locale, 'wholesalePartnerships')}
           </h2>
           <p className="mt-1 text-[11px] text-white/40">
-            Sell spare reach to partner brands. Revenue arrives immediately; their traffic competes at the lowest
-            priority.
+            {tr
+              ? 'Boştaki kapsamanı ortak markalara sat. Gelir hemen gelir; onların trafiği en düşük öncelikle yarışır.'
+              : 'Sell spare reach to partner brands. Revenue arrives immediately; their traffic competes at the lowest priority.'}
           </p>
         </div>
         <div className="text-right">
           <div className="stat-label">{t(vm.locale, 'wholesaleRevenue')}</div>
-          <div className="num text-lg font-semibold text-neon-lime">{fmtMoney(vm.money.revenueWholesale)}/mo</div>
+          <div className="num text-lg font-semibold text-neon-lime">
+            {fmtMoney(vm.money.revenueWholesale)}
+            {perMonth}
+          </div>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -29,9 +39,7 @@ export default function MomentumPanel({ vm }: { vm: CompanyModel }) {
             <div className="mt-1 text-[10px] leading-relaxed text-white/40">
               {t(vm.locale, 'fixedNetworkAccessBlurb')}
             </div>
-            <div className="num mt-1 text-[10px] text-neon-amber">
-              Up to {fmtMoney(vm.fixedWholesalePotential)}/mo at current delivery quality
-            </div>
+            <div className="num mt-1 text-[10px] text-neon-amber">{upTo(vm.fixedWholesalePotential)}</div>
           </div>
           <input
             type="checkbox"
@@ -46,9 +54,7 @@ export default function MomentumPanel({ vm }: { vm: CompanyModel }) {
           <div>
             <div className="text-sm font-semibold">{t(vm.locale, 'mvnoRadioAccess')}</div>
             <div className="mt-1 text-[10px] leading-relaxed text-white/40">{t(vm.locale, 'mvnoRadioAccessBlurb')}</div>
-            <div className="num mt-1 text-[10px] text-neon-violet">
-              Up to {fmtMoney(vm.mvnoPotential)}/mo at current delivery quality
-            </div>
+            <div className="num mt-1 text-[10px] text-neon-violet">{upTo(vm.mvnoPotential)}</div>
           </div>
           <input
             type="checkbox"

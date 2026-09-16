@@ -1,14 +1,14 @@
 import type { GameState } from './types';
 
 export const COMPANY_EMBLEMS = [
-  { symbol: '📡', name: 'Antenna' },
-  { symbol: '🛰️', name: 'Satellite' },
-  { symbol: '🌐', name: 'Globe' },
-  { symbol: '⚡', name: 'Lightning' },
-  { symbol: '🔷', name: 'Diamond' },
-  { symbol: '🦈', name: 'Shark' },
-  { symbol: '🐙', name: 'Octopus' },
-  { symbol: '🚀', name: 'Rocket' },
+  { symbol: '📡', name: 'Antenna', nameTr: 'Anten' },
+  { symbol: '🛰️', name: 'Satellite', nameTr: 'Uydu' },
+  { symbol: '🌐', name: 'Globe', nameTr: 'Küre' },
+  { symbol: '⚡', name: 'Lightning', nameTr: 'Şimşek' },
+  { symbol: '🔷', name: 'Diamond', nameTr: 'Elmas' },
+  { symbol: '🦈', name: 'Shark', nameTr: 'Köpekbalığı' },
+  { symbol: '🐙', name: 'Octopus', nameTr: 'Ahtapot' },
+  { symbol: '🚀', name: 'Rocket', nameTr: 'Roket' },
 ] as const;
 
 export function companyIdentityIssue(name: string, locale: 'en' | 'tr' = 'en') {

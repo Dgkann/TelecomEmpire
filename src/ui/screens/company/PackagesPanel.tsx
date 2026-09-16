@@ -6,6 +6,9 @@ import { GrowthDriver } from './shared';
 import type { CompanyModel } from './model';
 
 export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
+  const tr = vm.locale === 'tr';
+  const perMonth = tr ? '/ay' : '/mo';
+  const subscribers = (count: number) => (tr ? 'abone' : plural(Math.round(count), 'subscriber'));
   return (
     <div id="pricing" className="panel panel-tone-blue scroll-mt-6 p-5 lg:col-span-2">
       <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">
@@ -15,7 +18,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
 
       <div
         className="mb-4 rounded-lg border border-neon-cyan/20 bg-neon-cyan/[0.035] p-3"
-        aria-label="Customer growth drivers"
+        aria-label={tr ? 'Müşteri büyüme etkenleri' : 'Customer growth drivers'}
       >
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.07] pb-3">
           <div>
@@ -24,7 +27,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
           </div>
           <div className="flex gap-5 text-right">
             <div>
-              <div className="stat-label">Last 24h</div>
+              <div className="stat-label">{tr ? 'Son 24 saat' : 'Last 24h'}</div>
               <div
                 className={`num text-lg font-semibold ${vm.customerNet24h === null ? 'text-white/45' : vm.customerNet24h >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
               >
@@ -39,7 +42,8 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                 className={`num text-lg font-semibold ${vm.projectedDailyNet >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}
               >
                 {vm.projectedDailyNet >= 0 ? '+' : ''}
-                {Math.round(vm.projectedDailyNet)}/day
+                {Math.round(vm.projectedDailyNet)}
+                {tr ? '/gün' : '/day'}
               </div>
             </div>
             <div>
@@ -50,25 +54,25 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <GrowthDriver
-            label="Price pull"
+            label={tr ? 'Fiyat çekiciliği' : 'Price pull'}
             value={`${vm.averagePriceEffect.toFixed(2)}×`}
             fill={(vm.averagePriceEffect / 1.25) * 100}
             tone={vm.averagePriceEffect >= 1 ? '#76b98a' : vm.averagePriceEffect >= 0.8 ? '#d2a657' : '#d36e76'}
           />
           <GrowthDriver
-            label="Coverage"
+            label={t(vm.locale, 'coverage')}
             value={`${Math.round(vm.averageCoverage * 100)}%`}
             fill={vm.averageCoverage * 100}
             tone={vm.averageCoverage >= 0.7 ? '#76b98a' : vm.averageCoverage >= 0.45 ? '#d2a657' : '#d36e76'}
           />
           <GrowthDriver
-            label="Satisfaction"
+            label={t(vm.locale, 'satisfaction')}
             value={`${Math.round(vm.averageSatisfaction)}`}
             fill={vm.averageSatisfaction}
             tone={vm.averageSatisfaction >= 75 ? '#76b98a' : vm.averageSatisfaction >= 62 ? '#d2a657' : '#d36e76'}
           />
           <GrowthDriver
-            label="Reputation"
+            label={t(vm.locale, 'reputation')}
             value={`${Math.round(vm.game.reputation)}`}
             fill={vm.game.reputation}
             tone={vm.game.reputation >= 70 ? '#76b98a' : vm.game.reputation >= 50 ? '#d2a657' : '#d36e76'}
@@ -87,7 +91,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                   <span className="text-sm font-semibold">{p.name}</span>
                   <input
                     type="checkbox"
-                    aria-label={`${p.name} active`}
+                    aria-label={tr ? `${p.name} etkin` : `${p.name} active`}
                     checked={p.active}
                     onChange={(e) => vm.updatePackage(p.id, { active: e.target.checked })}
                     className="h-4 w-4 accent-[#3ee6d6]"
@@ -102,7 +106,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                   </div>
                   <input
                     type="range"
-                    aria-label={`${p.name} monthly price`}
+                    aria-label={tr ? `${p.name} aylık fiyatı` : `${p.name} monthly price`}
                     min={100}
                     max={2800}
                     value={p.price}
@@ -120,7 +124,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                     <motion.div className="h-full rounded-full bg-neon-cyan" animate={{ width: `${share * 100}%` }} />
                   </div>
                   <div className="num mt-1 text-[11px] text-white/40">
-                    {fmtNum(p.subscribers)} {plural(Math.round(p.subscribers), 'subscriber')}
+                    {fmtNum(p.subscribers)} {subscribers(p.subscribers)}
                   </div>
                 </div>
               </div>
@@ -143,7 +147,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                       <span className="text-sm font-semibold">{p.name}</span>
                       <input
                         type="checkbox"
-                        aria-label={`${p.name} active`}
+                        aria-label={tr ? `${p.name} etkin` : `${p.name} active`}
                         checked={p.active}
                         onChange={(e) => vm.updatePackage(p.id, { active: e.target.checked })}
                         className="h-4 w-4 accent-[#a78bfa]"
@@ -156,7 +160,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                     </div>
                     <input
                       type="range"
-                      aria-label={`${p.name} monthly price`}
+                      aria-label={tr ? `${p.name} aylık fiyatı` : `${p.name} monthly price`}
                       min={80}
                       max={1800}
                       value={p.price}
@@ -164,9 +168,13 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                       className="mt-1 w-full"
                     />
                     <div className="num mt-2 flex justify-between text-[11px] text-white/40">
-                      <span>{Math.round(share * 100)}% of sign-ups</span>
                       <span>
-                        {fmtNum(p.subscribers)} {plural(Math.round(p.subscribers), 'subscriber')}
+                        {tr
+                          ? `Yeni aboneliklerde %${Math.round(share * 100)}`
+                          : `${Math.round(share * 100)}% of sign-ups`}
+                      </span>
+                      <span>
+                        {fmtNum(p.subscribers)} {subscribers(p.subscribers)}
                       </span>
                     </div>
                   </div>
@@ -182,11 +190,14 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
             <h3 className="text-sm font-semibold">{t(vm.locale, 'marketingBudget')}</h3>
             <p className="text-[11px] text-white/40">{t(vm.locale, 'marketingBudgetBlurb')}</p>
           </div>
-          <span className="num text-lg font-semibold text-neon-cyan">{fmtMoney(vm.game.marketingBudget)}/mo</span>
+          <span className="num text-lg font-semibold text-neon-cyan">
+            {fmtMoney(vm.game.marketingBudget)}
+            {perMonth}
+          </span>
         </div>
         <input
           type="range"
-          aria-label="Monthly marketing budget"
+          aria-label={tr ? 'Aylık pazarlama bütçesi' : 'Monthly marketing budget'}
           min={0}
           max={800000}
           step={10000}
@@ -202,11 +213,14 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
             <h3 className="text-sm font-semibold">{t(vm.locale, 'retentionBudget')}</h3>
             <p className="text-[11px] text-white/40">{t(vm.locale, 'retentionBudgetBlurb')}</p>
           </div>
-          <span className="num text-lg font-semibold text-neon-violet">{fmtMoney(vm.game.retentionBudget)}/mo</span>
+          <span className="num text-lg font-semibold text-neon-violet">
+            {fmtMoney(vm.game.retentionBudget)}
+            {perMonth}
+          </span>
         </div>
         <input
           type="range"
-          aria-label="Monthly retention budget"
+          aria-label={tr ? 'Aylık elde tutma bütçesi' : 'Monthly retention budget'}
           min={0}
           max={600000}
           step={10000}

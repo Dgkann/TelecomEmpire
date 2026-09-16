@@ -54,14 +54,20 @@ export default function VictoryOverlay() {
               <div className="text-2xl font-bold">
                 {scenarioVictory
                   ? (localizedScenario?.name ?? scenario.name)
-                  : `${game.companyName} is a ${rankOf(game).name}`}
+                  : locale === 'tr'
+                    ? `${game.companyName}: ${rankOf(game).nameTr}`
+                    : `${game.companyName} is a ${rankOf(game).name}`}
               </div>
               <div className="num mt-1 text-[11px] text-white/50">{fmtDate(game.victoryAt!)}</div>
             </div>
 
             <div className="space-y-4 p-6">
               <p className="text-sm leading-relaxed text-white/70">
-                {scenarioVictory ? (localizedScenario?.description ?? scenario.description) : rankOf(game).blurb}
+                {scenarioVictory
+                  ? (localizedScenario?.description ?? scenario.description)
+                  : locale === 'tr'
+                    ? rankOf(game).blurbTr
+                    : rankOf(game).blurb}
               </p>
 
               <div className="grid grid-cols-3 gap-2 text-center">

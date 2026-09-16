@@ -9,10 +9,12 @@ export default function TrendChart({
   series,
   height = 86,
   formatValue = (value) => value.toFixed(1),
+  tr = false,
 }: {
   series: TrendSeries[];
   height?: number;
   formatValue?: (value: number) => string;
+  tr?: boolean;
 }) {
   const width = 420;
   const padX = 8;
@@ -35,8 +37,20 @@ export default function TrendChart({
     .map((item) => {
       const first = item.values[0] ?? 0;
       const last = item.values[item.values.length - 1] ?? 0;
-      const direction = last > first ? 'up' : last < first ? 'down' : 'flat';
-      return `${item.label}: ${formatValue(first)} to ${formatValue(last)}, ${direction}`;
+      const direction = tr
+        ? last > first
+          ? 'yükselişte'
+          : last < first
+            ? 'düşüşte'
+            : 'yatay'
+        : last > first
+          ? 'up'
+          : last < first
+            ? 'down'
+            : 'flat';
+      return tr
+        ? `${item.label}: ${formatValue(first)} değerinden ${formatValue(last)} değerine, ${direction}`
+        : `${item.label}: ${formatValue(first)} to ${formatValue(last)}, ${direction}`;
     })
     .join('. ');
 

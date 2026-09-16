@@ -4,7 +4,10 @@ import { t } from '../../i18n';
 import { HIRE_ROLES } from './shared';
 import type { CompanyModel } from './model';
 
+const CREW_STATE_TR = { idle: 'boşta', driving: 'yolda', working: 'çalışıyor', returning: 'dönüyor' } as const;
+
 export default function StaffPanel({ vm }: { vm: CompanyModel }) {
+  const tr = vm.locale === 'tr';
   return (
     <div id="staff" className="panel panel-tone-blue p-5">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">{t(vm.locale, 'staff')}</h2>
@@ -24,7 +27,9 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
         </div>
         <div className="rounded-md bg-white/[0.03] p-2">
           <div className="text-white/35">{t(vm.locale, 'researchPerDay')}</div>
-          <div className="num text-neon-cyan">+{vm.staff.researchPointsPerDay} RP</div>
+          <div className="num text-neon-cyan">
+            +{vm.staff.researchPointsPerDay} {tr ? 'AP' : 'RP'}
+          </div>
         </div>
       </div>
 
@@ -34,7 +39,9 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
             <div>
               <div className="text-sm">{t.name}</div>
               <div className="num text-[10px] text-white/40">
-                Field crew · skill {t.skill} · {t.experience} XP · {t.state}
+                {tr
+                  ? `Saha ekibi · yetkinlik ${t.skill} · ${t.experience} XP · ${CREW_STATE_TR[t.state]}`
+                  : `Field crew · skill ${t.skill} · ${t.experience} XP · ${t.state}`}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -49,15 +56,17 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
           <div
             key={e.id}
             className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2"
-            title={STAFF_ROLE_INFO[e.role].effect}
+            title={tr ? STAFF_ROLE_INFO[e.role].effectTr : STAFF_ROLE_INFO[e.role].effect}
           >
             <div>
               <div className="text-sm">{e.name}</div>
               <div className="num text-[10px] text-white/40">
-                {STAFF_ROLE_INFO[e.role].label} · skill {e.skill} · {e.experience} XP
+                {tr
+                  ? `${STAFF_ROLE_INFO[e.role].labelTr} · yetkinlik ${e.skill} · ${e.experience} XP`
+                  : `${STAFF_ROLE_INFO[e.role].label} · skill ${e.skill} · ${e.experience} XP`}
               </div>
               <div className="mt-0.5 max-w-[230px] text-[10px] leading-snug text-white/30">
-                {STAFF_ROLE_INFO[e.role].effect}
+                {tr ? STAFF_ROLE_INFO[e.role].effectTr : STAFF_ROLE_INFO[e.role].effect}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -78,10 +87,12 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
           <button
             key={role}
             className="btn text-xs"
-            title={STAFF_ROLE_INFO[role].effect}
+            title={tr ? STAFF_ROLE_INFO[role].effectTr : STAFF_ROLE_INFO[role].effect}
             onClick={() => vm.hireEmployee(role)}
           >
-            Hire {STAFF_ROLE_INFO[role].label.toLowerCase()} · 6k ₺
+            {tr
+              ? `${STAFF_ROLE_INFO[role].labelTr} işe al · 6k ₺`
+              : `Hire ${STAFF_ROLE_INFO[role].label.toLowerCase()} · 6k ₺`}
           </button>
         ))}
       </div>

@@ -1,32 +1,45 @@
 import { clamp } from './util';
 import type { Employee, GameState, StaffRole, Technician } from './types';
 
-export const STAFF_ROLE_INFO: Record<StaffRole, { label: string; effect: string }> = {
-  network_engineer: {
-    label: 'Network engineer',
-    effect: 'Reduces maintenance costs, improves equipment recovery, and generates research points.',
-  },
-  noc_engineer: {
-    label: 'NOC engineer',
-    effect: 'Reduces incident frequency and duration while accelerating research work.',
-  },
-  field_tech: {
-    label: 'Field operations',
-    effect: 'Coordinates field crews and shortens repair work across the company.',
-  },
-  support: {
-    label: 'Customer support',
-    effect: 'Raises satisfaction according to team skill and the number of customers served.',
-  },
-  sales: {
-    label: 'Sales',
-    effect: 'Improves customer growth, contract frequency, and contract signing bonuses.',
-  },
-  security: {
-    label: 'Security',
-    effect: 'Reduces DDoS frequency and the capacity lost during an attack.',
-  },
-};
+export const STAFF_ROLE_INFO: Record<StaffRole, { label: string; labelTr: string; effect: string; effectTr: string }> =
+  {
+    network_engineer: {
+      label: 'Network engineer',
+      labelTr: 'Şebeke mühendisi',
+      effect: 'Reduces maintenance costs, improves equipment recovery, and generates research points.',
+      effectTr: 'Bakım maliyetlerini düşürür, ekipmanın toparlanmasını hızlandırır ve araştırma puanı üretir.',
+    },
+    noc_engineer: {
+      label: 'NOC engineer',
+      labelTr: 'NOC mühendisi',
+      effect: 'Reduces incident frequency and duration while accelerating research work.',
+      effectTr: 'Arızaların sıklığını ve süresini azaltır, araştırma çalışmalarını hızlandırır.',
+    },
+    field_tech: {
+      label: 'Field operations',
+      labelTr: 'Saha operasyonları',
+      effect: 'Coordinates field crews and shortens repair work across the company.',
+      effectTr: 'Saha ekiplerini koordine eder ve şirket genelinde onarım sürelerini kısaltır.',
+    },
+    support: {
+      label: 'Customer support',
+      labelTr: 'Müşteri desteği',
+      effect: 'Raises satisfaction according to team skill and the number of customers served.',
+      effectTr: 'Ekibin yetkinliğine ve hizmet verilen müşteri sayısına göre memnuniyeti artırır.',
+    },
+    sales: {
+      label: 'Sales',
+      labelTr: 'Satış',
+      effect: 'Improves customer growth, contract frequency, and contract signing bonuses.',
+      effectTr: 'Müşteri büyümesini, sözleşme tekliflerinin sıklığını ve imza primlerini artırır.',
+    },
+    security: {
+      label: 'Security',
+      labelTr: 'Güvenlik',
+      effect: 'Reduces DDoS frequency and the capacity lost during an attack.',
+      effectTr: 'DDoS saldırılarının sıklığını ve saldırı sırasında kaybedilen kapasiteyi azaltır.',
+    },
+  };
 
 function rolePower(state: GameState, role: StaffRole) {
   return state.employees

@@ -1,4 +1,5 @@
 import StrategyDesk from '../StrategyDesk';
+import { plural } from '../../game/util';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
 import ScenarioCard from '../ScenarioCard';
@@ -17,6 +18,8 @@ import ReputationGuidance from '../ReputationGuidance';
 
 export default function CompanyScreen() {
   const vm = useCompanyModel();
+  const tr = vm.locale === 'tr';
+  const rivalMoves = vm.game.competition.moves.filter((move) => move.endsAt > vm.game.minutes).length;
 
   return (
     <div className="screen-shell">
@@ -34,7 +37,13 @@ export default function CompanyScreen() {
           >
             <div className="stat-label">{t(vm.locale, 'operatingPosition')}</div>
             <div className={`text-sm font-semibold ${vm.money.profit >= 0 ? 'text-neon-lime' : 'text-neon-red'}`}>
-              {vm.money.profit >= 0 ? 'Profitable' : 'Costs exceed revenue'}
+              {vm.money.profit >= 0
+                ? tr
+                  ? 'Kârlı'
+                  : 'Profitable'
+                : tr
+                  ? 'Giderler geliri aşıyor'
+                  : 'Costs exceed revenue'}
             </div>
           </div>
         </div>
@@ -44,7 +53,7 @@ export default function CompanyScreen() {
             <span className="mt-1 block text-xs text-white/60">{t(vm.locale, 'marketControlBlurb')}</span>
           </span>
           <span className="shrink-0 text-sm text-[#ed9e77]">
-            {vm.game.competition.moves.filter((move) => move.endsAt > vm.game.minutes).length} rival moves
+            {rivalMoves} {tr ? 'rakip hamlesi' : plural(rivalMoves, 'rival move')}
           </span>
         </button>
         <ScenarioCard game={vm.game} />

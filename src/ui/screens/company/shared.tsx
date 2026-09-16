@@ -55,14 +55,15 @@ export function GrowthDriver({
 
 export function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakdown> }) {
   const locale = useGame((s) => s.locale);
+  const tr = locale === 'tr';
   const network = money.costPower + money.costMaintenance + money.costTransit;
   const growth = money.costMarketing + money.costRetention;
   const other = Math.max(0, money.totalCost - network - money.costSalaries - growth);
   const deductions = [
-    { label: 'Network', value: network, color: '#7199bd' },
-    { label: 'People', value: money.costSalaries, color: '#9183ad' },
-    { label: 'Growth', value: growth, color: '#d2a657' },
-    ...(other > 0.5 ? [{ label: 'Other', value: other, color: '#9aa7ad' }] : []),
+    { label: tr ? 'Şebeke' : 'Network', value: network, color: '#7199bd' },
+    { label: tr ? 'Personel' : 'People', value: money.costSalaries, color: '#9183ad' },
+    { label: tr ? 'Büyüme' : 'Growth', value: growth, color: '#d2a657' },
+    ...(other > 0.5 ? [{ label: tr ? 'Diğer' : 'Other', value: other, color: '#9aa7ad' }] : []),
   ];
   let remaining = money.totalRevenue;
   const floor = Math.min(0, money.profit);
@@ -71,7 +72,7 @@ export function ProfitBridge({ money }: { money: ReturnType<typeof monthlyBreakd
   const zeroLeft = ((0 - floor) / span) * 100;
 
   return (
-    <div className="mt-4 border-t border-white/[0.07] pt-4" aria-label="Monthly profit bridge">
+    <div className="mt-4 border-t border-white/[0.07] pt-4" aria-label={t(locale, 'monthlyProfitBridge')}>
       <div className="mb-2 flex items-center justify-between">
         <div>
           <div className="stat-label">{t(locale, 'monthlyProfitBridge')}</div>

@@ -4,6 +4,7 @@ import { t } from '../../i18n';
 import type { CompanyModel } from './model';
 
 export default function ContractsPanel({ vm }: { vm: CompanyModel }) {
+  const tr = vm.locale === 'tr';
   return (
     <div className="panel panel-tone-violet p-5 lg:col-span-2">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
@@ -37,19 +38,26 @@ export default function ContractsPanel({ vm }: { vm: CompanyModel }) {
                   <span
                     className={`chip text-[10px] ${c.segment === 'enterprise' ? 'border-neon-violet/40 text-neon-violet' : 'border-neon-blue/40 text-neon-blue'}`}
                   >
-                    {c.segment}
+                    {tr ? (c.segment === 'enterprise' ? 'Kurumsal' : 'Ticari') : c.segment}
                   </span>
                 </div>
                 <div className="num mt-1 grid grid-cols-2 gap-x-3 text-[11px] text-white/50">
                   <span>{c.bandwidthGbps} Gbps</span>
-                  <span className="text-right text-neon-lime">{fmtMoney(c.monthlyRevenue)}/mo</span>
+                  <span className="text-right text-neon-lime">
+                    {fmtMoney(c.monthlyRevenue)}
+                    {tr ? '/ay' : '/mo'}
+                  </span>
                   <span>SLA {c.slaPercent}%</span>
                   <span className={`text-right ${breach ? 'text-neon-red' : 'text-white/50'}`}>
-                    {Math.round(c.downtimeMinutes)}m down
+                    {tr ? `${Math.round(c.downtimeMinutes)} dk kesinti` : `${Math.round(c.downtimeMinutes)}m down`}
                   </span>
-                  <span>Delivery {Math.round(risk.businessDelivery * 100)}%</span>
+                  <span>
+                    {tr
+                      ? `Teslim %${Math.round(risk.businessDelivery * 100)}`
+                      : `Delivery ${Math.round(risk.businessDelivery * 100)}%`}
+                  </span>
                   <span className={`text-right ${c.penaltyPaid > 0 ? 'text-neon-red' : 'text-white/50'}`}>
-                    {fmtMoney(c.penaltyPaid)} penalties
+                    {fmtMoney(c.penaltyPaid)} {tr ? 'ceza' : 'penalties'}
                   </span>
                 </div>
                 <div className="mt-2">
@@ -68,10 +76,16 @@ export default function ContractsPanel({ vm }: { vm: CompanyModel }) {
                   <div className="mt-1.5 flex items-center justify-between gap-2">
                     <span className="text-[10px] text-white/[0.38]">
                       {risk.districtOut
-                        ? 'District outage active'
+                        ? tr
+                          ? 'İlçede kesinti sürüyor'
+                          : 'District outage active'
                         : risk.fragile
-                          ? 'Single-path exposure'
-                          : `${Math.round(risk.allowance)}m monthly allowance`}
+                          ? tr
+                            ? 'Tek yola bağımlı'
+                            : 'Single-path exposure'
+                          : tr
+                            ? `Aylık ${Math.round(risk.allowance)} dk kesinti payı`
+                            : `${Math.round(risk.allowance)}m monthly allowance`}
                     </span>
                     {building && (
                       <button
