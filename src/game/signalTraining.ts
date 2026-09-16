@@ -56,6 +56,15 @@ export function signalConnection(puzzle: SignalPuzzle) {
   return { ports, lit, connected: lit.has(last) && !!(ports[last] & 2) };
 }
 
+// Suggest the next misaligned cable along one guaranteed solution. Equivalent
+// rotations of straight cables are already correct; unrelated tiles are ignored.
+export function signalHint(puzzle: SignalPuzzle): number | null {
+  const current = signalConnection(puzzle);
+  if (puzzle.completed || current.connected) return null;
+  const solved = signalConnection({ ...puzzle, rotations: puzzle.rotations.map(() => 0) });
+  return [...solved.lit].find((cell) => current.ports[cell] !== solved.ports[cell]) ?? null;
+}
+
 export function beginSignalTraining(
   s: GameState,
   size: 4 | 5,

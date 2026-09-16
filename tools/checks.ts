@@ -10,6 +10,7 @@ import {
   finishSignalTraining,
   signalConnection,
   signalBoard,
+  signalHint,
   validSignalTraining,
   TRAINING_REWARD,
   TRAINING_RESEARCH,
@@ -4673,6 +4674,45 @@ group('optional signal routing exercises');
   check(
     'closed companies cannot start an exercise',
     beginSignalTraining({ ...g, gameOver: { at: g.minutes, reason: 'closed' } }, 4) === null,
+  );
+}
+
+group('Optional cable hints');
+{
+  const g = newGame(811);
+  let helpful = true;
+  for (const mode of ['routing', 'fault', 'restoration'] as const) {
+    for (const size of [4, 5] as const) {
+      for (let seed = 0; seed < 50; seed++) {
+        let state = beginSignalTraining({ ...g, rngSeed: seed }, size, mode)!;
+        for (
+          let moves = 0;
+          moves < size * size * 3 && !signalConnection(state.signalTraining.active!).connected;
+          moves++
+        ) {
+          const hint = signalHint(state.signalTraining.active!);
+          if (hint === null) {
+            helpful = false;
+            break;
+          }
+          state = turnSignalTile(state, hint)!;
+        }
+        helpful &&=
+          signalConnection(state.signalTraining.active!).connected && signalHint(state.signalTraining.active!) === null;
+      }
+    }
+  }
+  check('hints guide all three modes to a solution across 300 boards', helpful);
+  const state = beginSignalTraining(g, 4, 'restoration')!;
+  const before = JSON.stringify(state);
+  signalHint(state.signalTraining.active!);
+  check('requesting a hint changes no moves, rotations, cash or reward eligibility', JSON.stringify(state) === before);
+  const solved = { ...state.signalTraining.active!, rotations: Array(16).fill(0) };
+  solved.rotations[0] = signalBoard(solved.seed, solved.size)[0] === 10 ? 2 : 0;
+  check('equivalent cable orientations need no hint', signalHint(solved) === null);
+  check(
+    'completed exercises never receive another hint',
+    signalHint({ ...state.signalTraining.active!, completed: true }) === null,
   );
 }
 
