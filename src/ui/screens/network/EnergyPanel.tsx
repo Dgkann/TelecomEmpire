@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { plural } from '../../../game/util';
 import { ENERGY, MINUTES_PER_DAY } from '../../../game/constants';
 import { fmtMoney } from '../../../game/economy';
 import { ENERGY_PLANS, energyPriceIndex, hasSolar, planIssue, solarCost, solarIssue } from '../../../game/energy';
@@ -18,6 +19,8 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
   const energy = m.game.energy;
+  const fixedDaysLeft =
+    energy.fixedUntil === null ? 0 : Math.max(0, Math.ceil((energy.fixedUntil - m.game.minutes) / MINUTES_PER_DAY));
   const index = energyPriceIndex(m.game);
   const bill = operatingPowerBill(m.game);
   const levy = levyOutlook(m.game);
@@ -104,8 +107,8 @@ export default function EnergyPanel({ m }: { m: NetworkModel }) {
       </p>
       {energy.plan === 'fixed' && energy.fixedUntil !== null && (
         <p className="mt-2 text-xs text-neon-amber">
-          {tr ? 'Sabit fiyat süresi' : 'Fixed rate remaining'}:{' '}
-          {Math.max(0, Math.ceil((energy.fixedUntil - m.game.minutes) / MINUTES_PER_DAY))} {tr ? 'gün' : 'days'}
+          {tr ? 'Sabit fiyat süresi' : 'Fixed rate remaining'}: {fixedDaysLeft}{' '}
+          {tr ? 'gün' : plural(fixedDaysLeft, 'day')}
         </p>
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-3">

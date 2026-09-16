@@ -9,6 +9,7 @@ import {
   TRAINING_RESEARCH,
   TRAINING_LAB_DAYS,
 } from '../game/signalTraining';
+import { plural } from '../game/util';
 import { useGame } from '../store/gameStore';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
@@ -37,7 +38,7 @@ export function SignalTrainingCard() {
               ? `${tr ? 'Tamamlama ödülü' : 'Completion reward'}: ${fmtMoney(TRAINING_REWARD)} + ${TRAINING_RESEARCH} ${tr ? 'AP' : 'RP'}`
               : tr
                 ? `Ödül ${days} oyun günü sonra yenilenir. Şimdi ödülsüz alıştırma yapabilirsin.`
-                : `Reward renews in ${days} game days. You can practise without rewards now.`}
+                : `Reward renews in ${days} ${plural(days, 'game day')}. You can practise without rewards now.`}
           </p>
           <p className="mt-1 text-xs text-white/50">
             {tr
@@ -48,7 +49,7 @@ export function SignalTrainingCard() {
             {tr
               ? 'Her 7 oyun gününde en fazla bir ödül. Tüm görevler aynı ödül hakkını paylaşır.'
               : 'At most one reward every 7 game days. All exercises share the same reward allowance.'}{' '}
-            · {training.completed} {tr ? 'görev tamamlandı' : 'exercises completed'}
+            · {training.completed} {tr ? 'görev tamamlandı' : `${plural(training.completed, 'exercise')} completed`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -152,7 +153,8 @@ export default function SignalTrainingDialog() {
                     : 'Signal routing'}
             </h2>
             <p className="mt-1 text-xs text-neon-amber">
-              {tr ? 'Şirket saati duraklatıldı' : 'Company clock paused'} · {puzzle.moves} {tr ? 'hamle' : 'moves'}
+              {tr ? 'Şirket saati duraklatıldı' : 'Company clock paused'} · {puzzle.moves}{' '}
+              {tr ? 'hamle' : plural(puzzle.moves, 'move')}
             </p>
           </div>
           <button className="icon-button" aria-label={tr ? 'Mini oyunu kapat' : 'Close mini-game'} onClick={leave}>
@@ -169,7 +171,7 @@ export default function SignalTrainingDialog() {
                 ? `${tr ? 'Bu turun ödülü' : 'This round’s reward'}: ${fmtMoney(reward.cash)} + ${reward.points} ${tr ? 'AP' : 'RP'}`
                 : tr
                   ? `Ödülsüz alıştırma · Yeni ödüle ${reward.daysUntilReward} oyun günü`
-                  : `Practice without rewards · Next reward in ${reward.daysUntilReward} game days`}
+                  : `Practice without rewards · Next reward in ${reward.daysUntilReward} ${plural(reward.daysUntilReward, 'game day')}`}
             </p>
             <p className="mt-1 text-white/60">
               {reward.researchDays > 0

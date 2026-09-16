@@ -48,7 +48,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
       id: `incident-${incident.id}`,
       severity: 'critical',
       title: `Unassigned: ${incident.title}`,
-      detail: `${incident.affected.toLocaleString()} customers are exposed while no crew is dispatched.`,
+      detail: `${incident.affected.toLocaleString()} ${incident.affected === 1 ? 'customer is' : 'customers are'} exposed while no crew is dispatched.`,
       action: 'Open incident',
       target: {
         type: incident.targetType,

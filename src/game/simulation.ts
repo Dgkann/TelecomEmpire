@@ -32,7 +32,7 @@ import { chargeLoans, checkSolvency } from './finance';
 import { recordLedger, recordOperatingMonth } from './financeLedger';
 import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
 import { checkPromotion, customerCount, isTopRank } from './progression';
-import { approach, clamp } from './util';
+import { approach, clamp, plural } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, fmtMoneyExact, monthlyBreakdown, packageMix, priceIndex } from './economy';
 import {
@@ -1658,7 +1658,7 @@ function tickContracts(s: GameState, mods: ResearchMods, dt: number, rng: Rng, i
         });
         pushLog(
           s,
-          `${contract.clientName} renewed for ${termMonths} months at ${fmtMoneyExact(monthlyRevenue)}/mo.`,
+          `${contract.clientName} renewed for ${termMonths} ${plural(termMonths, 'month')} at ${fmtMoneyExact(monthlyRevenue)}/mo.`,
           'good',
         );
       } else {
@@ -1803,7 +1803,7 @@ function tickAuction(s: GameState, rng: Rng) {
     }
     pushLog(
       s,
-      `Won ${settled.blocks} block(s) at ${SPECTRUM_BANDS[settled.band].label} for ${fmtMoneyExact(result.price)}.`,
+      `Won ${settled.blocks} ${plural(settled.blocks, 'block')} at ${SPECTRUM_BANDS[settled.band].label} for ${fmtMoneyExact(result.price)}.`,
       'good',
     );
     s.reputation = clamp(s.reputation + 2, 0, 100);

@@ -1,4 +1,5 @@
 import { MINUTES_PER_DAY } from './constants';
+import { plural } from './util';
 import { cityShare, customerCount } from './progression';
 import type { GameState, ScenarioId } from './types';
 
@@ -20,14 +21,14 @@ export interface ScenarioDefinition {
 const bounded = (value: number) => Math.max(0, Math.min(1, value));
 
 const customers = (target: number): ScenarioObjective => ({
-  label: `${target.toLocaleString()} customers`,
+  label: `${target.toLocaleString()} ${plural(target, 'customer')}`,
   labelTr: `${target.toLocaleString('tr-TR')} müşteri`,
   progress: (state) => bounded(customerCount(state) / target),
   detail: (state) => `${Math.round(customerCount(state)).toLocaleString()} / ${target.toLocaleString()}`,
 });
 
 const districts = (target: number): ScenarioObjective => ({
-  label: `${target} districts licensed`,
+  label: `${target} ${plural(target, 'district')} licensed`,
   labelTr: `${target} ilçe lisansı`,
   progress: (state) => bounded(state.districts.filter((district) => district.unlocked).length / target),
   detail: (state) => `${state.districts.filter((district) => district.unlocked).length} / ${target}`,
@@ -44,7 +45,10 @@ const debtFree: ScenarioObjective = {
   label: 'No outstanding loans',
   labelTr: 'Ödenmemiş kredi yok',
   progress: (state) => (state.loans.length === 0 && state.money >= 0 ? 1 : 0),
-  detail: (state) => (state.loans.length === 0 && state.money >= 0 ? 'clear' : `${state.loans.length} loan(s)`),
+  detail: (state) =>
+    state.loans.length === 0 && state.money >= 0
+      ? 'clear'
+      : `${state.loans.length} ${plural(state.loans.length, 'loan')}`,
 };
 
 const marketShare = (target: number): ScenarioObjective => ({

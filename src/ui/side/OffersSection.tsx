@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { plural } from '../../game/util';
 import { fmtMoney } from '../../game/economy';
 import { contractProfile, negotiatedTerms, premiumCounterChance } from '../../game/contracts';
 import { t } from '../i18n';
@@ -44,7 +45,9 @@ export default function OffersSection({ sp }: { sp: SideModel }) {
                       <span>SLA</span>
                       <span className="text-right text-white">{o.slaPercent}%</span>
                       <span>{t(locale, 'term')}</span>
-                      <span className="text-right text-white">{o.termMonths} months</span>
+                      <span className="text-right text-white">
+                        {o.termMonths} {plural(o.termMonths, 'month')}
+                      </span>
                       <span>{t(locale, 'signingBonus')}</span>
                       <span className="text-right text-white">{fmtMoney(o.signingBonus)}</span>
                       <span>{t(locale, 'district')}</span>

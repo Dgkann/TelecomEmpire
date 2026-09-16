@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { plural } from '../../../game/util';
 import { fmtMoneyExact, fmtMoney, fmtNum } from '../../../game/economy';
 import { t } from '../../i18n';
 import { GrowthDriver } from './shared';
@@ -118,7 +119,9 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
                     <motion.div className="h-full rounded-full bg-neon-cyan" animate={{ width: `${share * 100}%` }} />
                   </div>
-                  <div className="num mt-1 text-[11px] text-white/40">{fmtNum(p.subscribers)} subscribers</div>
+                  <div className="num mt-1 text-[11px] text-white/40">
+                    {fmtNum(p.subscribers)} {plural(Math.round(p.subscribers), 'subscriber')}
+                  </div>
                 </div>
               </div>
             );

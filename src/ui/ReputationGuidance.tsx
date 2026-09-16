@@ -1,4 +1,5 @@
 import { fmtMoneyExact } from '../game/economy';
+import { plural } from '../game/util';
 import { reputationOutlook } from '../game/reputation';
 import { regulationProgress } from '../game/regulator';
 import { useGame } from '../store/gameStore';
@@ -90,12 +91,13 @@ export default function ReputationGuidance() {
               : tr
                 ? `Ortalama fiyatı ${r.target.toFixed(2)}× sınırına indir`
                 : `Bring average pricing within ${r.target.toFixed(2)}×`;
+        const daysLeft = Math.max(0, Math.ceil((r.dueAt - game.minutes) / 1440));
         return (
           <div key={r.id} className="mt-3 rounded border border-neon-amber/25 p-3 text-xs">
             <div className="font-semibold text-neon-amber">{title}</div>
             <p className="mt-1 text-white/60">
-              {Math.max(0, Math.ceil((r.dueAt - game.minutes) / 1440))} {tr ? 'gün kaldı' : 'days left'} ·{' '}
-              {fmtMoneyExact(r.fine)} · −8 {tr ? 'itibar riski' : 'reputation at risk'}
+              {daysLeft} {tr ? 'gün kaldı' : `${plural(daysLeft, 'day')} left`} · {fmtMoneyExact(r.fine)} · −8{' '}
+              {tr ? 'itibar riski' : 'reputation at risk'}
             </p>
             <button
               className="btn mt-2 text-xs"

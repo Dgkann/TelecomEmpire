@@ -1,4 +1,5 @@
 import { t } from '../../i18n';
+import { plural } from '../../../game/util';
 import TrendChart from '../../TrendChart';
 import { Meter } from './Meter';
 import type { NetworkModel } from './model';
@@ -67,7 +68,8 @@ export default function DemandForecastPanel({ m }: { m: NetworkModel }) {
 
           {m.daysLeft !== null && m.daysLeft < 30 && (
             <div className="mt-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3 text-[12px] text-neon-red">
-              On the current trend you run out of access capacity in about {Math.round(m.daysLeft)} days.
+              On the current trend you run out of access capacity in about {Math.round(m.daysLeft)}{' '}
+              {plural(Math.round(m.daysLeft), 'day')}.
             </div>
           )}
         </>

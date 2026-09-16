@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { plural } from '../game/util';
 import { expansionProgress, expansionQuote, type ExpansionKind } from '../game/expansion';
 import { computeRoutes } from '../game/network';
 import { strongestRival } from '../game/competitors';
@@ -195,7 +196,7 @@ export default function ExpansionPlanner() {
                     <strong className="text-neon-cyan">+{fmtNum(quote.homes)} reachable homes</strong>
                     <p className="mt-1 text-xs leading-relaxed text-white/60">
                       {quote.breakEvenCustomers !== null
-                        ? `About ${quote.breakEvenCustomers} subscribers at your current package mix cover this network's added upkeep.`
+                        ? `About ${quote.breakEvenCustomers} ${plural(quote.breakEvenCustomers, 'subscriber')} at your current package mix ${quote.breakEvenCustomers === 1 ? 'covers' : 'cover'} this network's added upkeep.`
                         : 'Activate a residential package to earn subscription revenue.'}{' '}
                       Customer sign-ups take time; reach is not a sales forecast. This excludes the initial investment
                       and any future transit upgrades.

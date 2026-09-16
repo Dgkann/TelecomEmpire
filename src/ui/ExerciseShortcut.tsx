@@ -1,4 +1,5 @@
 import { MINUTES_PER_DAY } from '../game/constants';
+import { plural } from '../game/util';
 import { useGame } from '../store/gameStore';
 import { scrollToAnchor } from './side/shared';
 
@@ -23,7 +24,7 @@ export default function ExerciseShortcut({ onNavigate }: { onNavigate?: () => vo
             : 'Weekly reward ready · Find a fault, restore service or build a route'
           : tr
             ? `Ödül ${days} oyun günü sonra · Şimdi ödülsüz alıştırma`
-            : `Reward in ${days} game days · Practise without rewards now`}
+            : `Reward in ${days} ${plural(days, 'game day')} · Practise without rewards now`}
       </span>
     </button>
   );

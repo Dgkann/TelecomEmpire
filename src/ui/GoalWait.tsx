@@ -1,4 +1,5 @@
 import { fmtMoneyExact } from '../game/economy';
+import { plural } from '../game/util';
 import { goalTiming } from '../game/goalTiming';
 import { useGame } from '../store/gameStore';
 import ExerciseShortcut from './ExerciseShortcut';
@@ -23,7 +24,7 @@ export default function GoalWait({
   const summary = activeOnly
     ? tr
       ? `Süren araştırma: yaklaşık ${timing.activeDays} oyun günü kaldı`
-      : `Active research: about ${timing.activeDays} game days left`
+      : `Active research: about ${timing.activeDays} ${plural(timing.activeDays, 'game day')} left`
     : timing.readyInDays === null
       ? tr
         ? 'Yalnızca beklemek yetmiyor: gelir veya puan üretimini artır'
@@ -34,7 +35,7 @@ export default function GoalWait({
           : 'No wait needed to start'
         : tr
           ? `Başlatmaya tahminen ${timing.readyInDays} oyun günü`
-          : `About ${timing.readyInDays} game days until you can start`;
+          : `About ${timing.readyInDays} ${plural(timing.readyInDays, 'game day')} until you can start`;
   if (compact) return <span className="mt-1 block text-[11px] text-white/60">{summary}</span>;
   return (
     <section
@@ -58,14 +59,14 @@ export default function GoalWait({
                   : 'Review your engineers or complete a rewarded exercise.'
                 : tr
                   ? `Eksik puanlar yaklaşık ${timing.pointsDays} oyun gününde birikir.`
-                  : `Missing points accumulate in about ${timing.pointsDays} game days.`}
+                  : `Missing points accumulate in about ${timing.pointsDays} ${plural(timing.pointsDays, 'game day')}.`}
             </p>
           )}
           {needsLab && game.researchActive && (
             <p className="mt-1 text-xs text-white/60">
               {tr
                 ? `Laboratuvar yaklaşık ${timing.activeDays} oyun günü sonra boşalır.`
-                : `The lab becomes free in about ${timing.activeDays} game days.`}
+                : `The lab becomes free in about ${timing.activeDays} ${plural(timing.activeDays, 'game day')}.`}
             </p>
           )}
           <p className="mt-2 text-[11px] leading-relaxed text-white/45">

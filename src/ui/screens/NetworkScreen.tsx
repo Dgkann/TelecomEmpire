@@ -1,4 +1,5 @@
 import CapacityLab from '../CapacityLab';
+import { plural } from '../../game/util';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
 import { useNetworkModel, type NetworkView } from './network/model';
@@ -69,7 +70,7 @@ export default function NetworkScreen() {
                       : 'More than 1 year'
                     : tr
                       ? `${Math.round(m.daysLeft)} günlük kapasite`
-                      : `${Math.round(m.daysLeft)} days headroom`}
+                      : `${Math.round(m.daysLeft)} ${plural(Math.round(m.daysLeft), 'day')} headroom`}
             </div>
           </div>
         </div>

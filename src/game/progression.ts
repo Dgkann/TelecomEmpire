@@ -1,5 +1,5 @@
 import { playerShareTarget } from './competitors';
-import { clamp } from './util';
+import { clamp, plural } from './util';
 import type { GameState } from './types';
 
 // The company ladder.
@@ -40,14 +40,14 @@ export function cityShare(s: GameState) {
 
 const customers = (target: number): RankRequirement => ({
   action: () => ({ screen: 'company', label: 'Review customer growth' }),
-  label: `${target.toLocaleString()} customers`,
+  label: `${target.toLocaleString()} ${plural(target, 'customer')}`,
   progress: (s) => clamp(customerCount(s) / target, 0, 1),
   detail: (s) => `${Math.round(customerCount(s)).toLocaleString()} / ${target.toLocaleString()}`,
 });
 
 const districts = (target: number): RankRequirement => ({
   action: () => ({ screen: 'map', label: 'Explore districts' }),
-  label: `${target} districts licensed`,
+  label: `${target} ${plural(target, 'district')} licensed`,
   progress: (s) => clamp(s.districts.filter((d) => d.unlocked).length / target, 0, 1),
   detail: (s) => `${s.districts.filter((d) => d.unlocked).length} / ${target}`,
 });

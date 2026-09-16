@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { plural } from '../game/util';
 import { clearSave, exportSave, importSave, listSaveMeta, SAVE_SLOT_COUNT } from '../game/saveStorage';
 import { useGame } from '../store/gameStore';
 import { useDialogAccessibility } from './useDialogAccessibility';
@@ -7,7 +8,7 @@ type SaveMeta = NonNullable<ReturnType<typeof listSaveMeta>[number]>;
 type ManagerStatus = { tone: 'good' | 'bad' | 'info'; text: string };
 
 function saveContext(slot: number, meta: SaveMeta) {
-  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} customers\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
 }
 
 const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) => a?.savedAt === b?.savedAt && a?.company === b?.company;

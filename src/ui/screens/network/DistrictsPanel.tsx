@@ -1,4 +1,5 @@
 import { fmtMoney, fmtNum } from '../../../game/economy';
+import { plural } from '../../../game/util';
 import { residentialSubs } from '../../../game/simulation';
 import { t } from '../../i18n';
 import { Meter } from './Meter';
@@ -23,7 +24,9 @@ export default function DistrictsPanel({ m }: { m: NetworkModel }) {
                 {d.name}
               </span>
               <span className="num text-[11px] text-white/45">
-                {d.unlocked ? `${fmtNum(residentialSubs(m.game, d.id))} customers` : `Licence ${fmtMoney(d.entryCost)}`}
+                {d.unlocked
+                  ? `${fmtNum(residentialSubs(m.game, d.id))} ${plural(Math.round(residentialSubs(m.game, d.id)), 'customer')}`
+                  : `Licence ${fmtMoney(d.entryCost)}`}
               </span>
             </div>
             <div className="mt-1.5 flex gap-3">

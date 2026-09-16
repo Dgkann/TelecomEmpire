@@ -1,4 +1,5 @@
 import ExpansionPlanner from './ExpansionPlanner';
+import { plural } from '../game/util';
 import { useState } from 'react';
 import { useGame } from '../store/gameStore';
 import { DECISIONS, decisionIssue, challengeProgress } from '../game/board';
@@ -106,7 +107,7 @@ export default function StrategyDesk() {
             <p className="rounded-md border border-white/10 bg-black/10 p-4 text-sm text-white/60">
               {tr
                 ? `Yeni şehir teklifi yaklaşık ${days(game.strategy.nextDecisionAt)} gün içinde gelecek. Kararların maliyeti ve sonucu burada gösterilir.`
-                : `A new city proposal arrives in about ${days(game.strategy.nextDecisionAt)} days. Review its costs and consequences here.`}
+                : `A new city proposal arrives in about ${days(game.strategy.nextDecisionAt)} ${plural(days(game.strategy.nextDecisionAt), 'day')}. Review its costs and consequences here.`}
             </p>
           )}
         </div>
@@ -226,7 +227,8 @@ export default function StrategyDesk() {
                 />
                 <p className="my-2 text-xs text-white/60">
                   {tr ? 'Şebeke sağlığı en az 85 olmalı.' : 'Network health must be at least 85.'}{' '}
-                  {Math.round(game.stats.health)}/100 · {days(challenge.dueAt)} {tr ? 'gün' : 'days'}
+                  {Math.round(game.stats.health)}/100 · {days(challenge.dueAt)}{' '}
+                  {tr ? 'gün' : plural(days(challenge.dueAt), 'day')}
                 </p>
                 <button
                   className="btn-primary text-xs"
@@ -240,7 +242,7 @@ export default function StrategyDesk() {
               <p className="mt-2 text-xs text-white/60">
                 {tr
                   ? `Şehir Operatörü seviyesinde açılır. Sıradaki değerlendirme: ${days(game.strategy.nextChallengeAt)} gün. Her turda hedefler kademeli olarak yükselir.`
-                  : `Unlocks at City Operator rank. Next review: ${days(game.strategy.nextChallengeAt)} days. Targets increase across successive rounds.`}
+                  : `Unlocks at City Operator rank. Next review: ${days(game.strategy.nextChallengeAt)} ${plural(days(game.strategy.nextChallengeAt), 'day')}. Targets increase across successive rounds.`}
               </p>
             )}
           </article>
@@ -261,7 +263,7 @@ export default function StrategyDesk() {
                 >
                   <span>{district.name}</span>
                   <span>
-                    +{d.households} {tr ? 'hane' : 'homes'} ↗
+                    +{d.households} {tr ? 'hane' : plural(d.households, 'home')} ↗
                   </span>
                 </button>
               );

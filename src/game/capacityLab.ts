@@ -1,4 +1,5 @@
 import { effectiveNodeCapacity } from './capacity';
+import { plural } from './util';
 import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, TRANSIT_TIERS, linkCapacity, nodeUpgradeCost } from './constants';
 import { monthlyBreakdown } from './economy';
 import { recordLedger } from './financeLedger';
@@ -136,7 +137,12 @@ export function commissionCapacityPlan(state: GameState, items: CapacityUpgrade[
   const plan = capacityPlan(state, items);
   if (plan.error || !plan.affordable) return null;
   const next = { ...plan.state, money: state.money - plan.cost };
-  recordLedger(next, 'network_upgrade', `Capacity programme: ${items.length} upgrades`, -plan.cost);
+  recordLedger(
+    next,
+    'network_upgrade',
+    `Capacity programme: ${items.length} ${plural(items.length, 'upgrade')}`,
+    -plan.cost,
+  );
   pushLog(next, `${items.length} capacity upgrades commissioned.`, 'good');
   return next;
 }

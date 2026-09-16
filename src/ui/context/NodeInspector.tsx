@@ -1,4 +1,5 @@
 import { NODE_SPECS, nodeUpgradeCost } from '../../game/constants';
+import { plural } from '../../game/util';
 import { dataCenterExpansionBlocker } from '../../game/dataCenterOutlook';
 import { fmtMoneyExact } from '../../game/economy';
 import { nodeUtil } from '../../game/network';
@@ -143,7 +144,7 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
           <div className="mt-1 text-[11px] text-white/55">
             {MAINTENANCE_CONFIG[nodeMaintenance.mode].label} ·{' '}
             {nodeMaintenance.status === 'active'
-              ? `${Math.ceil(nodeMaintenance.minutesLeft)} minutes left`
+              ? `${Math.ceil(nodeMaintenance.minutesLeft)} ${plural(Math.ceil(nodeMaintenance.minutesLeft), 'minute')} left`
               : 'waiting for its window and a free crew'}
           </div>
           {nodeMaintenance.status === 'scheduled' && (

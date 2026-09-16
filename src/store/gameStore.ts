@@ -42,6 +42,7 @@ import { RESEARCH, researchById, researchModifiers } from '../game/research';
 import { CAMPAIGN_STAGES } from '../game/scenarios';
 import { claimMilestone as grantMilestone, MILESTONES } from '../game/milestones';
 import { fmtMoneyExact } from '../game/economy';
+import { plural } from '../game/util';
 import { beginSignalTraining, turnSignalTile, finishSignalTraining } from '../game/signalTraining';
 import { projectBlueprint, type BuildStep } from '../game/blueprint';
 import {
@@ -506,7 +507,11 @@ export const useGame = create<Store>((set, get) => ({
       );
       return;
     }
-    pushLog(result.state, `Network plan commissioned: ${s.blueprint.length} items.`, 'good');
+    pushLog(
+      result.state,
+      `Network plan commissioned: ${s.blueprint.length} ${plural(s.blueprint.length, 'item')}.`,
+      'good',
+    );
     set({
       game: { ...result.state, speed: 0 },
       planning: false,
@@ -1113,7 +1118,10 @@ export const useGame = create<Store>((set, get) => ({
     const cover = offer.requiresRedundancy ? districtRedundancy(g, offer.districtId) : null;
     if (cover && !cover.complete) {
       const name = g.districts.find((d) => d.id === offer.districtId)?.name ?? 'that district';
-      s.toast(`${name}: ${cover.done} of ${cover.total} sites have a second path.`, 'bad');
+      s.toast(
+        `${name}: ${cover.done} of ${cover.total} ${plural(cover.total, 'site')} ${cover.total === 1 ? 'has' : 'have'} a second path.`,
+        'bad',
+      );
       return;
     }
 
@@ -1412,7 +1420,8 @@ export const useGame = create<Store>((set, get) => ({
     const changedAt = g.dataCenterModeChangedAt[nodeId] ?? 0;
     const availableAt = changedAt > 0 ? changedAt + DATA_CENTER_MODE_COOLDOWN : -Infinity;
     if (g.minutes < availableAt) {
-      s.toast(`Workload change available in ${Math.ceil((availableAt - g.minutes) / MINUTES_PER_DAY)} day(s).`, 'bad');
+      const wait = Math.ceil((availableAt - g.minutes) / MINUTES_PER_DAY);
+      s.toast(`Workload change available in ${wait} ${plural(wait, 'day')}.`, 'bad');
       return;
     }
     const config = DATA_CENTER_MODE_CONFIG[mode];
@@ -1448,7 +1457,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.loans = [...draft.loans, createLoan(draft, principal, termMonths)];
       draft.money += principal;
       recordLedger(draft, 'loan_draw', 'Loan drawdown', principal);
-      pushLog(draft, `Borrowed ${fmtMoneyExact(principal)} over ${termMonths} months.`, 'info');
+      pushLog(draft, `Borrowed ${fmtMoneyExact(principal)} over ${termMonths} ${plural(termMonths, 'month')}.`, 'info');
     });
     s.toast('Loan drawn down', 'good');
   },

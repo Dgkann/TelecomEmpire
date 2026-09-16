@@ -1,4 +1,5 @@
 import { fmtMoney } from '../../../game/economy';
+import { plural } from '../../../game/util';
 import { loanRate, monthlyDebtService } from '../../../game/finance';
 import { t } from '../../i18n';
 import type { CompanyModel } from './model';
@@ -14,7 +15,9 @@ export default function BorrowingPanel({ vm }: { vm: CompanyModel }) {
       {vm.graceLeft !== null && (
         <div className="alert-blink mb-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3">
           <div className="text-sm font-semibold text-neon-red">{t(vm.locale, 'pastCreditLimit')}</div>
-          <div className="num text-[11px] text-white/60">{Math.ceil(vm.graceLeft)} days before the banks act</div>
+          <div className="num text-[11px] text-white/60">
+            {Math.ceil(vm.graceLeft)} {plural(Math.ceil(vm.graceLeft), 'day')} before the banks act
+          </div>
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { projectBlueprint, type BuildStep } from './blueprint';
+import { plural } from './util';
 import { computeRoutes } from './network';
 import { rivalArpu } from './competitors';
 import { packageMix } from './economy';
@@ -111,7 +112,7 @@ export function acquireCompany(state: GameState, rivalId: string): GameState | n
   recordLedger(next, 'company_acquisition', rival.name, -quote.price);
   boardHistory(
     next,
-    `${rival.name} acquired. ${quote.districtIds.length} districts integrated.`,
+    `${rival.name} acquired. ${quote.districtIds.length} ${plural(quote.districtIds.length, 'district')} integrated.`,
     `${rival.name} satın alındı. ${quote.districtIds.length} ilçe entegre edildi.`,
   );
   return next;

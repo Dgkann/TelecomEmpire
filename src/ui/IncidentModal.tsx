@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { plural } from '../game/util';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   crewTravelMinutes,
@@ -74,7 +75,9 @@ export default function IncidentModal() {
               <div className="text-xl font-bold">{incident.title}</div>
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/60">
                 <span>{district?.name}</span>
-                <span>{incident.affected.toLocaleString()} customers at incident start</span>
+                <span>
+                  {incident.affected.toLocaleString()} {plural(incident.affected, 'customer')} at incident start
+                </span>
               </div>
             </div>
             <div className="space-y-4 p-5">

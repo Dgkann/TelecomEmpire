@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { plural } from '../../game/util';
 import { fmtMoneyExact } from '../../game/economy';
 import { RESEARCH, isAvailable } from '../../game/research';
 import { totalCustomers } from '../../game/simulation';
@@ -88,7 +89,7 @@ export default function ResearchScreen() {
               </div>
               <div className="text-right">
                 <div className="num text-sm text-white/75">
-                  {Math.ceil(active!.daysLeft)} {tr ? 'gün' : 'days'}
+                  {Math.ceil(active!.daysLeft)} {tr ? 'gün' : plural(Math.ceil(active!.daysLeft), 'day')}
                 </div>
                 <div className="text-[11px] text-white/35">{tr ? 'kaldı' : 'remaining'}</div>
               </div>
@@ -249,7 +250,8 @@ export default function ResearchScreen() {
                                 </span>
                               </div>
                               <div className="num mt-0.5 text-[10px] text-white/35">
-                                {fmtMoneyExact(r.cost)} · {r.points} {tr ? 'AP' : 'RP'} · {r.days} {tr ? 'gün' : 'days'}
+                                {fmtMoneyExact(r.cost)} · {r.points} {tr ? 'AP' : 'RP'} · {r.days}{' '}
+                                {tr ? 'gün' : plural(r.days, 'day')}
                               </div>
                             </div>
                           </div>

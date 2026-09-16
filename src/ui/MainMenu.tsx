@@ -1,4 +1,5 @@
 import { COMPANY_EMBLEMS } from '../game/identity';
+import { plural } from '../game/util';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CITIES } from '../game/cities';
@@ -16,7 +17,7 @@ type SaveMeta = NonNullable<ReturnType<typeof listSaveMeta>[number]>;
 type ImportStatus = { tone: 'good' | 'bad' | 'info'; text: string };
 
 function saveContext(slot: number, meta: SaveMeta) {
-  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} customers\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
 }
 
 const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) => a?.savedAt === b?.savedAt && a?.company === b?.company;
@@ -152,8 +153,8 @@ export default function MainMenu() {
                         {locale === 'tr' ? 'Devam et · Yuva' : 'Continue · Slot'} {slot + 1}
                       </div>
                       <div className="num truncate text-[10px] text-white/45">
-                        {meta.company} · {meta.city} · {meta.customers.toLocaleString()} customers ·{' '}
-                        {new Date(meta.savedAt).toLocaleString()}
+                        {meta.company} · {meta.city} · {meta.customers.toLocaleString()}{' '}
+                        {plural(meta.customers, 'customer')} · {new Date(meta.savedAt).toLocaleString()}
                       </div>
                     </button>
                     <button
@@ -384,7 +385,7 @@ export default function MainMenu() {
                       {scenario.deadlineDays
                         ? locale === 'tr'
                           ? ` - ${scenario.deadlineDays} gün`
-                          : ` - ${scenario.deadlineDays} days`
+                          : ` - ${scenario.deadlineDays} ${plural(scenario.deadlineDays, 'day')}`
                         : ''}
                     </option>
                   ))}

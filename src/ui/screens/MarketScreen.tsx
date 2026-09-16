@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { plural } from '../../game/util';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
 import { districtPull, rivalPosture, rivalArpu } from '../../game/competitors';
@@ -20,6 +21,7 @@ import TrendChart from '../TrendChart';
 
 const signed = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(1);
 const daysLeft = (at: number, now: number) => Math.max(0, (at - now) / MINUTES_PER_DAY).toFixed(1);
+const customerLabel = (n: number) => `${Math.round(n)} ${plural(Math.round(n), 'customer')}`;
 const colours = { player: '#80c6b8', unserved: '#344954' };
 
 function MarketMap({
@@ -434,7 +436,7 @@ export default function MarketScreen() {
                         ? 'Licence needed'
                         : liveMoves.some((m) => m.districtId === d.id)
                           ? 'Under pressure'
-                          : `${Math.round(districtFixedCustomers(game, d.id))} customers`}
+                          : customerLabel(districtFixedCustomers(game, d.id))}
                     </span>
                   </button>
                 ))}

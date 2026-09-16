@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { plural } from '../../game/util';
 import {
   ACCEPTANCE_MINUTES,
   TENDER_PROGRAMMES,
@@ -129,8 +130,8 @@ function TenderDetail({ tender }: { tender: CityTender }) {
         <section>
           <h3 className="font-semibold">{t(locale, 'deliverySpecification')}</h3>
           <p className="mt-1 text-xs leading-relaxed text-white/50">
-            Build within {spec.days} days of award. Hold every condition for six consecutive game hours. Losing a
-            condition restarts the acceptance test.
+            Build within {spec.days} {plural(spec.days, 'day')} of award. Hold every condition for six consecutive game
+            hours. Losing a condition restarts the acceptance test.
           </p>
           <ul className="mt-3 divide-y divide-white/10">
             {progress.requirements

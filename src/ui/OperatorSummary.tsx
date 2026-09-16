@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { plural } from '../game/util';
 import { motion } from 'framer-motion';
 import { fmtMoney, fmtNum } from '../game/economy';
 import { currentMonthCashFlow } from '../game/financeLedger';
@@ -108,7 +109,7 @@ export function MobileOperatorSummary({ game }: { game: GameState }) {
                   ? t(locale, 'noDeadline')
                   : locale === 'tr'
                     ? `${mission.daysLeft} gün kaldı`
-                    : `${mission.daysLeft} days remaining`}
+                    : `${mission.daysLeft} ${plural(mission.daysLeft, 'day')} remaining`}
               </div>
             </div>
           )}

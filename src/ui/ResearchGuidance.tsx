@@ -1,4 +1,5 @@
 import { fmtMoneyExact } from '../game/economy';
+import { plural } from '../game/util';
 import { researchPlan } from '../game/researchPlanning';
 import { researchById } from '../game/research';
 import { useGame } from '../store/gameStore';
@@ -100,8 +101,9 @@ export default function ResearchGuidance({
                 : 'A small centre earns hosting income early. Choosing edge research first reserves your cash for research and leaves construction for later.'}
             </p>
             <p className="mt-2 text-xs text-white/60">
-              {fmtMoneyExact(edge.cost)} · {edge.points} {tr ? 'araştırma puanı' : 'research points'} · {edge.days}{' '}
-              {tr ? 'oyun günü' : 'game days'}
+              {fmtMoneyExact(edge.cost)} · {edge.points}{' '}
+              {tr ? 'araştırma puanı' : plural(edge.points, 'research point')} · {edge.days}{' '}
+              {tr ? 'oyun günü' : plural(edge.days, 'game day')}
             </p>
             <GoalWait cost={edge.cost} points={edge.points} activeOnly={game.researchActive?.id === edge.id} compact />
             {game.researchActive && game.researchActive.id !== edge.id && (
@@ -190,7 +192,8 @@ export default function ResearchGuidance({
       <GoalWait cost={plan.next?.cost ?? 0} points={plan.next?.points} activeOnly={!plan.next} />
       {plan.cashMissing > 0 && plan.pointsMissing > 0 && (
         <p className="mt-1 text-xs text-white/60">
-          {plan.pointsMissing} {tr ? 'araştırma puanı da gerekiyor' : 'research points also needed'}
+          {plan.pointsMissing}{' '}
+          {tr ? 'araştırma puanı da gerekiyor' : `${plural(plan.pointsMissing, 'research point')} also needed`}
         </p>
       )}
       <p className="mt-2 text-xs leading-relaxed text-white/50">

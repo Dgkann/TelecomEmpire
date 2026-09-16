@@ -1,4 +1,5 @@
 import { SmartPauseSettings } from './SmartPause';
+import { plural } from '../game/util';
 import { fmtMoney, fmtNum } from '../game/economy';
 import { currentMonthCashFlow } from '../game/financeLedger';
 import CompanyProfile from './CompanyProfile';
@@ -85,7 +86,7 @@ export default function TopBar() {
                   ? undefined
                   : locale === 'tr'
                     ? `${mission.daysLeft} gün kaldı`
-                    : `${mission.daysLeft} days left`
+                    : `${mission.daysLeft} ${plural(mission.daysLeft, 'day')} left`
               }
               bar={missionProgress}
             />
