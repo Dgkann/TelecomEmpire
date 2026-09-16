@@ -41,6 +41,7 @@ import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/saveStor
 import { RESEARCH, researchById, researchModifiers } from '../game/research';
 import { CAMPAIGN_STAGES } from '../game/scenarios';
 import { claimMilestone as grantMilestone, MILESTONES } from '../game/milestones';
+import { fmtMoneyExact } from '../game/economy';
 import { beginSignalTraining, turnSignalTile, finishSignalTraining } from '../game/signalTraining';
 import { projectBlueprint, type BuildStep } from '../game/blueprint';
 import {
@@ -543,7 +544,7 @@ export const useGame = create<Store>((set, get) => ({
     const goal = MILESTONES.find((m) => m.id === id)!;
     set({ game: next });
     s.toast(
-      `${goal.title[s.locale === 'tr' ? 1 : 0]} · +$${goal.reward.toLocaleString()} · +${goal.research} ${s.locale === 'tr' ? 'araştırma puanı' : 'research points'}`,
+      `${goal.title[s.locale === 'tr' ? 1 : 0]} · +${fmtMoneyExact(goal.reward)} · +${goal.research} ${s.locale === 'tr' ? 'araştırma puanı' : 'research points'}`,
       'good',
     );
   },
@@ -951,7 +952,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.dataCenterModeChangedAt = Object.fromEntries(
         Object.entries(draft.dataCenterModeChangedAt).filter(([nodeId]) => nodeId !== id),
       );
-      pushLog(draft, `${node.name} decommissioned (+$${refund.toLocaleString()}).`, 'info');
+      pushLog(draft, `${node.name} decommissioned (+${fmtMoneyExact(refund)}).`, 'info');
     });
     set({ selection: null });
   },
@@ -1154,7 +1155,7 @@ export const useGame = create<Store>((set, get) => ({
         b.id === agreed.buildingId ? { ...b, connected: 1, lastConnectedAt: draft.minutes } : b,
       );
       const term = mode === 'flexible' ? ' on a flexible SLA' : mode === 'premium' ? ' after a premium counter' : '';
-      pushLog(draft, `Signed ${agreed.clientName}${term} at $${agreed.monthlyRevenue.toLocaleString()}/mo.`, 'good');
+      pushLog(draft, `Signed ${agreed.clientName}${term} at ${fmtMoneyExact(agreed.monthlyRevenue)}/mo.`, 'good');
     });
     s.toast(
       mode === 'premium' ? 'Premium counter accepted' : `${agreed.clientName} signed`,
@@ -1427,7 +1428,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: draft.minutes };
       pushLog(draft, `${node.name} switched to ${config.label}.`, 'info');
     });
-    s.toast(`${config.label} workload applied · $${cost.toLocaleString()}`, 'good');
+    s.toast(`${config.label} workload applied · ${fmtMoneyExact(cost)}`, 'good');
   },
 
   takeLoan: (principal, termMonths) => {
@@ -1447,7 +1448,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.loans = [...draft.loans, createLoan(draft, principal, termMonths)];
       draft.money += principal;
       recordLedger(draft, 'loan_draw', 'Loan drawdown', principal);
-      pushLog(draft, `Borrowed $${principal.toLocaleString()} over ${termMonths} months.`, 'info');
+      pushLog(draft, `Borrowed ${fmtMoneyExact(principal)} over ${termMonths} months.`, 'info');
     });
     s.toast('Loan drawn down', 'good');
   },

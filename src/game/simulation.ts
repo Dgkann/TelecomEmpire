@@ -34,7 +34,7 @@ import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
 import { checkPromotion, customerCount, isTopRank } from './progression';
 import { approach, clamp } from './util';
 import { generateCity } from './cityGen';
-import { averageSpeed, monthlyBreakdown, packageMix, priceIndex } from './economy';
+import { averageSpeed, fmtMoneyExact, monthlyBreakdown, packageMix, priceIndex } from './economy';
 import {
   repairCost,
   repairMinutes,
@@ -1003,7 +1003,7 @@ export function step(prev: GameState): GameState {
     const debtPaid = chargeLoans(s);
     recordOperatingMonth(s, money, completedRevenue, completedExpense, completedPenalties, debtPaid);
     s.monthAccumulator = { revenue: 0, expense: 0 };
-    if (debtPaid > 0) pushLog(s, `Loan repayments of $${Math.round(debtPaid).toLocaleString()} went out.`, 'info');
+    if (debtPaid > 0) pushLog(s, `Loan repayments of ${fmtMoneyExact(debtPaid)} went out.`, 'info');
     s.contracts = s.contracts.map((contract) => ({ ...contract, downtimeMinutes: 0 }));
     s.finance = { ...s.finance, penalties: 0, costLoanPayments: debtPaid };
   }
@@ -1658,7 +1658,7 @@ function tickContracts(s: GameState, mods: ResearchMods, dt: number, rng: Rng, i
         });
         pushLog(
           s,
-          `${contract.clientName} renewed for ${termMonths} months at $${monthlyRevenue.toLocaleString()}/mo.`,
+          `${contract.clientName} renewed for ${termMonths} months at ${fmtMoneyExact(monthlyRevenue)}/mo.`,
           'good',
         );
       } else {
@@ -1781,7 +1781,7 @@ function tickAuction(s: GameState, rng: Rng) {
     playerDefaulted = true;
     pushLog(
       s,
-      `You could not cover your $${result.price.toLocaleString()} bid for ${SPECTRUM_BANDS[settled.band].label}. The lot went elsewhere.`,
+      `You could not cover your ${fmtMoneyExact(result.price)} bid for ${SPECTRUM_BANDS[settled.band].label}. The lot went elsewhere.`,
       'bad',
     );
     s.reputation = clamp(s.reputation - 4, 0, 100);
@@ -1803,7 +1803,7 @@ function tickAuction(s: GameState, rng: Rng) {
     }
     pushLog(
       s,
-      `Won ${settled.blocks} block(s) at ${SPECTRUM_BANDS[settled.band].label} for $${result.price.toLocaleString()}.`,
+      `Won ${settled.blocks} block(s) at ${SPECTRUM_BANDS[settled.band].label} for ${fmtMoneyExact(result.price)}.`,
       'good',
     );
     s.reputation = clamp(s.reputation + 2, 0, 100);
@@ -1874,7 +1874,7 @@ function tickRegulator(s: GameState, rng: Rng) {
       s.money -= outcome.regulation.fine;
       recordLedger(s, 'regulatory_fine', outcome.regulation.title, -outcome.regulation.fine);
       s.reputation = clamp(s.reputation - 8, 0, 100);
-      pushLog(s, `${outcome.regulation.title} missed. Fined $${outcome.regulation.fine.toLocaleString()}.`, 'bad');
+      pushLog(s, `${outcome.regulation.title} missed. Fined ${fmtMoneyExact(outcome.regulation.fine)}.`, 'bad');
     }
   }
 

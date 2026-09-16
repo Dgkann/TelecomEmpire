@@ -13,6 +13,7 @@ import { daylight, incidentLocation } from '../game/simulation';
 import { useGame } from '../store/gameStore';
 import { t } from './i18n';
 import { suggestedBackhaul } from '../game/investment';
+import { fmtMoneyExact } from '../game/economy';
 import { projectBlueprint } from '../game/blueprint';
 import type { District, GameState, NetLink, NetNode } from '../game/types';
 import { FLOOR_H, TILE_H, TILE_W, isoX, isoY, mix, tileDiamond, unIso } from './iso';
@@ -477,7 +478,7 @@ export default function MapView() {
                     strokeWidth={3}
                     paintOrder="stroke"
                   >
-                    {tr ? 'Önerilen fiber' : 'Suggested fibre'} +${backhaul.cost.toLocaleString()}
+                    {tr ? 'Önerilen fiber' : 'Suggested fibre'} +{fmtMoneyExact(backhaul.cost)}
                   </text>
                 </>
               )}
@@ -596,7 +597,7 @@ export default function MapView() {
                 fill={fibreColor}
                 className="num"
               >
-                {hoveredNode ? (fibreIssue ?? `READY · $${fibreCost.toLocaleString()}`) : 'CHOOSE A DESTINATION SITE'}
+                {hoveredNode ? (fibreIssue ?? `READY · ${fmtMoneyExact(fibreCost)}`) : 'CHOOSE A DESTINATION SITE'}
               </text>
             </g>
           )}
@@ -735,7 +736,7 @@ export default function MapView() {
                     fill="#8ea0b8"
                     opacity={0.75}
                   >
-                    {tr ? 'Lisans' : 'Licence'} ${d.entryCost.toLocaleString()}
+                    {tr ? 'Lisans' : 'Licence'} {fmtMoneyExact(d.entryCost)}
                   </text>
                 )}
                 {d.unlocked && status && (

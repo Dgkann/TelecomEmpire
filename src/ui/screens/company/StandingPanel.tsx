@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { averagePrice, fmtMoney, fmtNum } from '../../../game/economy';
+import { averagePrice, fmtMoney, fmtMoneyExact, fmtNum } from '../../../game/economy';
 import { t } from '../../i18n';
 import { ProfitBridge } from './shared';
 import type { CompanyModel } from './model';
@@ -40,7 +40,7 @@ export default function StandingPanel({ vm }: { vm: CompanyModel }) {
         </div>
         <div>
           <div className="stat-label">ARPU</div>
-          <div className="num text-2xl font-semibold">${averagePrice(vm.game.packages).toFixed(2)}</div>
+          <div className="num text-2xl font-semibold">{fmtMoneyExact(averagePrice(vm.game.packages))}</div>
         </div>
       </div>
       <div className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">

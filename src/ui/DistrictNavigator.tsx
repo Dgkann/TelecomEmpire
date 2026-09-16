@@ -1,3 +1,4 @@
+import { fmtMoney } from '../game/economy';
 import { useGame } from '../store/gameStore';
 import { t } from './i18n';
 
@@ -33,7 +34,7 @@ export default function DistrictNavigator() {
               <strong className="truncate text-xs">{d.name}</strong>
             </span>
             <span className="mt-1 block text-[10px] text-white/50">
-              {d.unlocked ? `${Math.round(d.coverage * 100)}% coverage` : `$${Math.round(d.entryCost / 1000)}k licence`}
+              {d.unlocked ? `${Math.round(d.coverage * 100)}% coverage` : `${fmtMoney(d.entryCost)} licence`}
             </span>
             <span className="mt-2 block h-0.5 bg-white/10">
               <span

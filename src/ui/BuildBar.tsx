@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NODE_SPECS, DATACENTER_PILOT_COST, initialNodeTier } from '../game/constants';
+import { fmtMoney, fmtMoneyExact } from '../game/economy';
 import { effectiveNodeCapacity } from '../game/capacity';
 import { researchModifiers } from '../game/research';
 import { useGame, type BuildTool } from '../store/gameStore';
@@ -29,7 +30,7 @@ const TOOLS: Array<{
     label: 'POP',
     labelKey: 'pop',
     nodeKind: 'pop',
-    cost: () => `$${(NODE_SPECS.pop.baseCost / 1000).toFixed(0)}k`,
+    cost: () => fmtMoney(NODE_SPECS.pop.baseCost),
   },
   {
     id: 'access',
@@ -37,7 +38,7 @@ const TOOLS: Array<{
     label: 'Access',
     labelKey: 'access',
     nodeKind: 'access',
-    cost: (m) => `$${((NODE_SPECS.access.baseCost * m.accessCostMul) / 1000).toFixed(1)}k`,
+    cost: (m) => fmtMoney(NODE_SPECS.access.baseCost * m.accessCostMul),
   },
   {
     id: 'core',
@@ -45,7 +46,7 @@ const TOOLS: Array<{
     label: 'Core',
     labelKey: 'core',
     nodeKind: 'core',
-    cost: () => `$${(NODE_SPECS.core.baseCost / 1000).toFixed(0)}k`,
+    cost: () => fmtMoney(NODE_SPECS.core.baseCost),
   },
   {
     id: 'tower',
@@ -53,7 +54,7 @@ const TOOLS: Array<{
     label: 'Tower',
     labelKey: 'tower',
     nodeKind: 'tower',
-    cost: () => `$${(NODE_SPECS.tower.baseCost / 1000).toFixed(0)}k`,
+    cost: () => fmtMoney(NODE_SPECS.tower.baseCost),
     locked: 'mobile_4g',
   },
   {
@@ -62,7 +63,7 @@ const TOOLS: Array<{
     label: 'Data Centre',
     labelKey: 'dataCentre',
     nodeKind: 'datacenter',
-    cost: () => `$${(DATACENTER_PILOT_COST / 1000).toFixed(0)}k`,
+    cost: () => fmtMoney(DATACENTER_PILOT_COST),
     locked: 'backbone100g',
   },
 ];
@@ -152,7 +153,7 @@ export default function BuildBar() {
               <b className="font-normal text-neon-cyan">{activeNodeCapacity.toFixed(1)}G</b>
               <span className="font-semibold text-white/60">T1</span>
               <span>{activeNodeTool.powerKw} kW</span>
-              <span>{`$${activeNodeTool.maintenance.toLocaleString()}/mo`}</span>
+              <span>{`${fmtMoneyExact(activeNodeTool.maintenance)}/mo`}</span>
             </span>
           )}
           <span className="text-white/25">•</span>

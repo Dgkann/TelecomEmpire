@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CITIES } from '../game/cities';
 import { DIFFICULTY } from '../game/constants';
+import { fmtMoney } from '../game/economy';
 import { SCENARIOS } from '../game/scenarios';
 import { clearSave, importSave, listSaveMeta, SAVE_SLOT_COUNT } from '../game/saveStorage';
 import { useGame } from '../store/gameStore';
@@ -418,7 +419,7 @@ export default function MainMenu() {
                         : DIFFICULTY[d].label}
                     </div>
                     <div className="num mt-0.5 text-[11px] text-white/45">
-                      ${(DIFFICULTY[d].startMoney / 1000).toFixed(0)}k {locale === 'tr' ? 'başlangıç' : 'start'}
+                      {fmtMoney(DIFFICULTY[d].startMoney)} {locale === 'tr' ? 'başlangıç' : 'start'}
                     </div>
                   </button>
                 ))}
