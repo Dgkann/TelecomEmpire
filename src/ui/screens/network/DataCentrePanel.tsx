@@ -13,6 +13,7 @@ import SiteIcon from '../../SiteIcon';
 import type { NetworkModel } from './model';
 
 export default function DataCentrePanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel panel-tone-green p-5 ${m.networkView === 'interconnect' ? '' : 'hidden'}`}>
       <div className="flex items-start justify-between gap-3">
@@ -65,13 +66,17 @@ export default function DataCentrePanel({ m }: { m: NetworkModel }) {
                         <span className="block truncate text-xs font-medium">{n.name}</span>
                         <span className={`num block text-[9px] ${routed ? 'text-white/35' : 'text-neon-red'}`}>
                           {routed
-                            ? `T${n.tier} · ${Math.round(nodeUtil(n) * 100)}% LOAD`
-                            : 'OFFLINE · NO ROUTE TO CORE'}
+                            ? tr
+                              ? `T${n.tier} · %${Math.round(nodeUtil(n) * 100)} YÜK`
+                              : `T${n.tier} · ${Math.round(nodeUtil(n) * 100)}% LOAD`
+                            : tr
+                              ? 'DEVRE DIŞI · ÇEKİRDEĞE ROTA YOK'
+                              : 'OFFLINE · NO ROUTE TO CORE'}
                         </span>
                       </span>
                     </button>
                     <select
-                      aria-label={`${n.name} workload`}
+                      aria-label={tr ? `${n.name} iş yükü` : `${n.name} workload`}
                       disabled={cooldownLeft > 0}
                       value={dataCenterMode(m.game, n.id)}
                       onChange={(event) => m.setDataCenterMode(n.id, event.target.value as DataCenterMode)}
@@ -83,20 +88,32 @@ export default function DataCentrePanel({ m }: { m: NetworkModel }) {
                         >
                       ).map(([id, mode]) => (
                         <option key={id} value={id}>
-                          {mode.label}
+                          {tr ? mode.labelTr : mode.label}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="num mt-2 grid grid-cols-3 gap-1 text-center text-[9px] text-white/40">
-                    <span>Cache {(activeMode.cachePerTier * n.tier * 100).toFixed(0)}%</span>
-                    <span>Load {(activeMode.workloadPerTier * n.tier).toFixed(1)}G</span>
-                    <span>Power ×{activeMode.powerMultiplier.toFixed(2)}</span>
+                    <span>
+                      {tr
+                        ? `Önbellek %${(activeMode.cachePerTier * n.tier * 100).toFixed(0)}`
+                        : `Cache ${(activeMode.cachePerTier * n.tier * 100).toFixed(0)}%`}
+                    </span>
+                    <span>
+                      {tr ? 'Yük' : 'Load'} {(activeMode.workloadPerTier * n.tier).toFixed(1)}G
+                    </span>
+                    <span>
+                      {tr ? 'Enerji' : 'Power'} ×{activeMode.powerMultiplier.toFixed(2)}
+                    </span>
                   </div>
                   <div className="num mt-1 text-right text-[9px] text-white/30">
                     {cooldownLeft > 0
-                      ? `Reconfiguration ready in ${Math.ceil(cooldownLeft / 1440)}d`
-                      : `Change fee ${fmtMoney(dataCenterModeChangeCost(n))} · 2d lock`}
+                      ? tr
+                        ? `Yeniden yapılandırma ${Math.ceil(cooldownLeft / 1440)} gün sonra`
+                        : `Reconfiguration ready in ${Math.ceil(cooldownLeft / 1440)}d`
+                      : tr
+                        ? `Değişim bedeli ${fmtMoney(dataCenterModeChangeCost(n))} · 2 gün kilit`
+                        : `Change fee ${fmtMoney(dataCenterModeChangeCost(n))} · 2d lock`}
                   </div>
                 </div>
               );

@@ -5,6 +5,8 @@ import { Meter } from './Meter';
 import type { NetworkModel } from './model';
 
 export default function UpstreamPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
+  const perMonth = tr ? '/ay' : '/mo';
   return (
     <div
       id="transit"
@@ -15,7 +17,7 @@ export default function UpstreamPanel({ m }: { m: NetworkModel }) {
       </h2>
       <Meter
         v={m.transitUse}
-        label="Transit usage"
+        label={tr ? 'Transit kullanımı' : 'Transit usage'}
         right={`${m.game.stats.transitGbps.toFixed(1)}/${m.transitCapacity.toFixed(0)} Gbps`}
       />
       <div className="mt-3 flex flex-col gap-2">
@@ -33,8 +35,10 @@ export default function UpstreamPanel({ m }: { m: NetworkModel }) {
               }`}
             >
               <div>
-                <div className="font-medium">{t.label}</div>
-                <div className="num text-[11px] text-white/45">{t.capacity} Gbps upstream</div>
+                <div className="font-medium">{tr ? t.labelTr : t.label}</div>
+                <div className="num text-[11px] text-white/45">
+                  {t.capacity} Gbps {tr ? 'üst bağlantı' : 'upstream'}
+                </div>
                 {i !== m.game.transitTier && (
                   <div className="num mt-1 text-[9px]">
                     <span className={capacityDelta >= 0 ? 'text-neon-lime' : 'text-neon-red'}>
@@ -44,12 +48,16 @@ export default function UpstreamPanel({ m }: { m: NetworkModel }) {
                     <span className="text-white/30"> · </span>
                     <span className={costDelta <= 0 ? 'text-neon-lime' : 'text-neon-amber'}>
                       {costDelta >= 0 ? '+' : ''}
-                      {fmtMoney(costDelta)}/mo
+                      {fmtMoney(costDelta)}
+                      {perMonth}
                     </span>
                   </div>
                 )}
               </div>
-              <div className="num text-sm text-white/70">{fmtMoney(t.monthly * m.mods.transitCostMul)}/mo</div>
+              <div className="num text-sm text-white/70">
+                {fmtMoney(t.monthly * m.mods.transitCostMul)}
+                {perMonth}
+              </div>
             </button>
           );
         })}
@@ -58,10 +66,17 @@ export default function UpstreamPanel({ m }: { m: NetworkModel }) {
       <label className="mt-3 flex cursor-pointer items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <div>
           <div className="text-sm font-medium">{t(m.locale, 'backupTransitProvider')}</div>
-          <div className="text-[11px] text-white/45">+35% headroom from a diverse second upstream.</div>
+          <div className="text-[11px] text-white/45">
+            {tr
+              ? 'Farklı bir ikinci üst bağlantıdan %35 ek kapasite.'
+              : '+35% headroom from a diverse second upstream.'}
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="num text-xs text-white/60">{fmtMoney(BACKUP_TRANSIT_MONTHLY)}/mo</span>
+          <span className="num text-xs text-white/60">
+            {fmtMoney(BACKUP_TRANSIT_MONTHLY)}
+            {perMonth}
+          </span>
           <input
             type="checkbox"
             checked={m.game.backupTransit}
@@ -80,8 +95,12 @@ export default function UpstreamPanel({ m }: { m: NetworkModel }) {
           <div className="text-sm font-medium">{t(m.locale, 'automaticTechnicianDispatch')}</div>
           <div className="text-[11px] text-white/45">
             {m.mods.hasAutoDispatch
-              ? 'Highest recorded customer impact first; sends the crew with the fastest travel + repair time.'
-              : 'Requires Automatic Dispatch research.'}
+              ? tr
+                ? 'Önce kayıtlı müşteri etkisi en yüksek arıza; yol + onarım süresi en kısa ekip gönderilir.'
+                : 'Highest recorded customer impact first; sends the crew with the fastest travel + repair time.'
+              : tr
+                ? 'Otomatik Yönlendirme araştırması gerekir.'
+                : 'Requires Automatic Dispatch research.'}
           </div>
         </div>
         <input

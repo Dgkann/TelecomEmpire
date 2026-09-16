@@ -6,6 +6,7 @@ import { Meter } from './Meter';
 import type { NetworkModel } from './model';
 
 export default function DistrictsPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel panel-tone-violet p-5 ${m.networkView === 'capacity' ? '' : 'hidden'}`}>
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">{t(m.locale, 'districts')}</h2>
@@ -25,13 +26,17 @@ export default function DistrictsPanel({ m }: { m: NetworkModel }) {
               </span>
               <span className="num text-[11px] text-white/45">
                 {d.unlocked
-                  ? `${fmtNum(residentialSubs(m.game, d.id))} ${plural(Math.round(residentialSubs(m.game, d.id)), 'customer')}`
-                  : `Licence ${fmtMoney(d.entryCost)}`}
+                  ? `${fmtNum(residentialSubs(m.game, d.id))} ${tr ? 'müşteri' : plural(Math.round(residentialSubs(m.game, d.id)), 'customer')}`
+                  : `${tr ? 'Lisans' : 'Licence'} ${fmtMoney(d.entryCost)}`}
               </span>
             </div>
             <div className="mt-1.5 flex gap-3">
-              <Meter v={d.coverage} label="Coverage" right={`${Math.round(d.coverage * 100)}%`} />
-              <Meter v={d.satisfaction / 100} label="Satisfaction" right={`${Math.round(d.satisfaction)}%`} />
+              <Meter v={d.coverage} label={t(m.locale, 'coverage')} right={`${Math.round(d.coverage * 100)}%`} />
+              <Meter
+                v={d.satisfaction / 100}
+                label={t(m.locale, 'satisfaction')}
+                right={`${Math.round(d.satisfaction)}%`}
+              />
             </div>
           </button>
         ))}

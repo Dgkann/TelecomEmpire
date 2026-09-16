@@ -4,7 +4,16 @@ import type { InterconnectPlan, TrafficClass, TrafficPolicy } from '../../../gam
 import { t } from '../../i18n';
 import type { NetworkModel } from './model';
 
+const SERVICE_TR: Record<TrafficClass, string> = {
+  residential: 'konut',
+  business: 'ticari',
+  mobile: 'mobil',
+  wholesale: 'toptan',
+  workload: 'veri merkezi',
+};
+
 export default function TrafficEngineeringPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div
       id="traffic-policy"
@@ -40,18 +49,35 @@ export default function TrafficEngineeringPanel({ m }: { m: NetworkModel }) {
                   onClick={() => m.setTrafficPolicy(id)}
                   className={`rounded-lg border p-2.5 text-left transition-colors ${m.game.trafficPolicy === id ? 'border-neon-violet/50 bg-neon-violet/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.08]'} disabled:cursor-not-allowed disabled:opacity-35`}
                 >
-                  <div className="text-xs font-semibold">{policy.label}</div>
+                  <div className="text-xs font-semibold">{tr ? policy.labelTr : policy.label}</div>
                   <div className="mt-1 text-[10px] leading-relaxed text-white/40">
-                    {locked ? (id === 'mobile' ? 'Requires 5G Standalone.' : 'Requires a NOC.') : policy.description}
+                    {locked
+                      ? id === 'mobile'
+                        ? tr
+                          ? 'Bağımsız 5G gerekir.'
+                          : 'Requires 5G Standalone.'
+                        : tr
+                          ? 'NOC gerekir.'
+                          : 'Requires a NOC.'
+                      : tr
+                        ? policy.descriptionTr
+                        : policy.description}
                   </div>
                   {!locked && (
-                    <div className="mt-2 flex gap-1" aria-label={`${policy.label} service priorities`}>
+                    <div
+                      className="mt-2 flex gap-1"
+                      aria-label={tr ? `${policy.labelTr} hizmet öncelikleri` : `${policy.label} service priorities`}
+                    >
                       {(Object.entries(policy.priorities) as Array<[TrafficClass, number]>).map(
                         ([service, priority]) => (
                           <span
                             key={service}
                             className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]"
-                            title={`${service}: ${priority.toFixed(2)} priority`}
+                            title={
+                              tr
+                                ? `${SERVICE_TR[service]}: öncelik ${priority.toFixed(2)}`
+                                : `${service}: ${priority.toFixed(2)} priority`
+                            }
                           >
                             <i
                               className="block h-full bg-neon-violet"
@@ -86,9 +112,15 @@ export default function TrafficEngineeringPanel({ m }: { m: NetworkModel }) {
                   className={`flex items-center justify-between gap-3 rounded-lg border p-2.5 text-left transition-colors ${m.game.interconnectPlan === id ? 'border-neon-cyan/50 bg-neon-cyan/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.08]'} disabled:cursor-not-allowed disabled:opacity-35`}
                 >
                   <div>
-                    <div className="text-xs font-semibold">{plan.label}</div>
+                    <div className="text-xs font-semibold">{tr ? plan.labelTr : plan.label}</div>
                     <div className="mt-0.5 text-[10px] leading-relaxed text-white/40">
-                      {locked ? 'Bring an online data centre onto the network.' : plan.description}
+                      {locked
+                        ? tr
+                          ? 'Şebekeye çevrimiçi bir veri merkezi bağla.'
+                          : 'Bring an online data centre onto the network.'
+                        : tr
+                          ? plan.descriptionTr
+                          : plan.description}
                     </div>
                     {m.game.interconnectPlan === id && id === 'cdn' && !m.interconnectOnline && (
                       <div className="mt-1 text-[10px] font-semibold text-neon-red">{t(m.locale, 'cdnSuspended')}</div>
@@ -102,7 +134,9 @@ export default function TrafficEngineeringPanel({ m }: { m: NetworkModel }) {
                         )}
                         {plan.cacheOffload > 0 && (
                           <span className="rounded-sm bg-neon-lime/[0.09] px-1.5 py-0.5 text-neon-lime">
-                            −{Math.round(plan.cacheOffload * 100)}% external traffic
+                            {tr
+                              ? `dış trafik −%${Math.round(plan.cacheOffload * 100)}`
+                              : `−${Math.round(plan.cacheOffload * 100)}% external traffic`}
                           </span>
                         )}
                         {plan.latencyDelta < 0 && (
@@ -114,7 +148,9 @@ export default function TrafficEngineeringPanel({ m }: { m: NetworkModel }) {
                     )}
                   </div>
                   <div className="num shrink-0 text-right text-[10px] text-white/55">
-                    <div>{plan.monthly ? `${fmtMoney(plan.monthly)}/mo` : 'NO FEE'}</div>
+                    <div>
+                      {plan.monthly ? `${fmtMoney(plan.monthly)}${tr ? '/ay' : '/mo'}` : tr ? 'ÜCRETSİZ' : 'NO FEE'}
+                    </div>
                     {plan.capacityBonus > 0 && <div className="text-neon-cyan">+{plan.capacityBonus}G</div>}
                   </div>
                 </button>

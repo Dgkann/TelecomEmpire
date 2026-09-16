@@ -7,11 +7,14 @@ import type { NetworkModel } from './model';
 
 export default function SpectrumPanel({ m }: { m: NetworkModel }) {
   if (!m.mods.hasMobile) return null;
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel panel-tone-violet p-5 ${m.networkView === 'interconnect' ? '' : 'hidden'}`}>
       <h2 className="mb-1 text-sm font-semibold uppercase tracking-widest text-white/50">{t(m.locale, 'spectrum')}</h2>
       <p className="mb-3 text-[11px] text-white/40">
-        Low bands reach further, high bands carry more. Reach comes from your best band, capacity from all of them.
+        {tr
+          ? 'Düşük bantlar daha uzağa ulaşır, yüksek bantlar daha çok taşır. Menzil en iyi bandından, kapasite hepsinden gelir.'
+          : 'Low bands reach further, high bands carry more. Reach comes from your best band, capacity from all of them.'}
       </p>
 
       {m.game.spectrum.length === 0 ? (
@@ -25,13 +28,17 @@ export default function SpectrumPanel({ m }: { m: NetworkModel }) {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-neon-violet">{spec.label}</span>
                   <span className="num text-[11px] text-white/45">
-                    {h.blocks} block{h.blocks > 1 ? 's' : ''}
+                    {h.blocks} {tr ? 'blok' : `block${h.blocks > 1 ? 's' : ''}`}
                   </span>
                 </div>
                 <div className="num mt-0.5 flex gap-3 text-[10px] text-white/40">
-                  <span>reach {spec.radius.toFixed(2)}x</span>
-                  <span>capacity {spec.capacity.toFixed(1)}x</span>
-                  <span>{h.paid > 0 ? `paid ${fmtMoney(h.paid)}` : 'granted'}</span>
+                  <span>
+                    {tr ? 'menzil' : 'reach'} {spec.radius.toFixed(2)}x
+                  </span>
+                  <span>
+                    {tr ? 'kapasite' : 'capacity'} {spec.capacity.toFixed(1)}x
+                  </span>
+                  <span>{h.paid > 0 ? `${tr ? 'ödenen' : 'paid'} ${fmtMoney(h.paid)}` : tr ? 'hibe' : 'granted'}</span>
                 </div>
               </div>
             );
@@ -54,7 +61,7 @@ export default function SpectrumPanel({ m }: { m: NetworkModel }) {
           <div className="stat-label">{t(m.locale, 'nextAuction')}</div>
           <div className="num text-sm">
             {isFinite(m.game.nextAuctionAt)
-              ? `${Math.max(0, Math.round((m.game.nextAuctionAt - m.game.minutes) / 1440))}d`
+              ? `${Math.max(0, Math.round((m.game.nextAuctionAt - m.game.minutes) / 1440))}${tr ? ' gün' : 'd'}`
               : '-'}
           </div>
         </div>
@@ -70,7 +77,11 @@ export default function SpectrumPanel({ m }: { m: NetworkModel }) {
                 key={d.id}
                 v={d.mobileCoverage}
                 label={d.name}
-                right={`${Math.round(d.mobileCoverage * 100)}% · ${fmtNum(d.mobileSubs)} subs`}
+                right={
+                  tr
+                    ? `%${Math.round(d.mobileCoverage * 100)} · ${fmtNum(d.mobileSubs)} abone`
+                    : `${Math.round(d.mobileCoverage * 100)}% · ${fmtNum(d.mobileSubs)} subs`
+                }
               />
             ))}
         </div>

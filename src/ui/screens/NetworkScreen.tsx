@@ -27,7 +27,7 @@ const NETWORK_VIEWS: Array<{ id: NetworkView; label: string; note: string }> = [
 ];
 const NETWORK_VIEWS_TR: Record<NetworkView, [string, string]> = {
   live: ['Canlı', 'Kalite ve hizmet'],
-  lab: ['Ağ laboratuvarı', 'Yük testi ve yükseltme'],
+  lab: ['Şebeke laboratuvarı', 'Yük testi ve yükseltme'],
   policy: ['Politikalar', 'QoS ve eşleşme'],
   capacity: ['Kapasite', 'Sahalar ve tahmin'],
   operations: ['Operasyonlar', 'Bakım'],

@@ -66,28 +66,38 @@ export const TRAFFIC_POLICY_CONFIG: Record<
   TrafficPolicy,
   {
     label: string;
+    labelTr: string;
     description: string;
+    descriptionTr: string;
     priorities: { residential: number; business: number; mobile: number; wholesale: number; workload: number };
   }
 > = {
   balanced: {
     label: 'Balanced',
+    labelTr: 'Dengeli',
     description: 'Share congestion evenly across every service.',
+    descriptionTr: 'Tıkanıklığı tüm hizmetlere eşit dağıt.',
     priorities: { residential: 1, business: 1, mobile: 1, wholesale: 0.7, workload: 0.85 },
   },
   residential: {
     label: 'Household first',
+    labelTr: 'Önce haneler',
     description: 'Protect fixed subscribers when capacity gets tight.',
+    descriptionTr: 'Kapasite daraldığında sabit aboneleri koru.',
     priorities: { residential: 1.6, business: 0.8, mobile: 0.85, wholesale: 0.5, workload: 0.7 },
   },
   business: {
     label: 'SLA first',
+    labelTr: 'Önce SLA',
     description: 'Prioritise contracted circuits and enterprise traffic.',
+    descriptionTr: 'Sözleşmeli hatlara ve kurumsal trafiğe öncelik ver.',
     priorities: { residential: 0.7, business: 2, mobile: 0.8, wholesale: 0.45, workload: 0.85 },
   },
   mobile: {
     label: '5G slice',
+    labelTr: '5G dilimi',
     description: 'Reserve the strongest service class for mobile traffic.',
+    descriptionTr: 'En güçlü hizmet sınıfını mobil trafiğe ayır.',
     priorities: { residential: 0.8, business: 0.75, mobile: 1.8, wholesale: 0.5, workload: 0.7 },
   },
 };
@@ -96,7 +106,9 @@ export const INTERCONNECT_CONFIG: Record<
   InterconnectPlan,
   {
     label: string;
+    labelTr: string;
     description: string;
+    descriptionTr: string;
     monthly: number;
     capacityBonus: number;
     cacheOffload: number;
@@ -106,7 +118,9 @@ export const INTERCONNECT_CONFIG: Record<
 > = {
   transit: {
     label: 'Transit only',
+    labelTr: 'Yalnız transit',
     description: 'No commitment. All external traffic uses paid upstream transit.',
+    descriptionTr: 'Taahhüt yok. Tüm dış trafik ücretli üst bağlantı transitini kullanır.',
     monthly: 0,
     capacityBonus: 0,
     cacheOffload: 0,
@@ -115,7 +129,9 @@ export const INTERCONNECT_CONFIG: Record<
   },
   ixp: {
     label: 'Metro IXP',
+    labelTr: 'Metro IXP',
     description: 'Adds 22 Gbps of peering headroom and trims latency.',
+    descriptionTr: '22 Gbps eşleşme kapasitesi ekler ve gecikmeyi azaltır.',
     monthly: 150000,
     capacityBonus: 22,
     cacheOffload: 0.04,
@@ -124,7 +140,9 @@ export const INTERCONNECT_CONFIG: Record<
   },
   cdn: {
     label: 'CDN partnership',
+    labelTr: 'CDN ortaklığı',
     description: 'Keeps popular traffic local, but needs an online data centre.',
+    descriptionTr: 'Popüler trafiği yerelde tutar ama çevrimiçi bir veri merkezi gerektirir.',
     monthly: 220000,
     capacityBonus: 8,
     cacheOffload: 0.12,
@@ -137,6 +155,7 @@ export const DATA_CENTER_MODE_CONFIG: Record<
   DataCenterMode,
   {
     label: string;
+    labelTr: string;
     description: string;
     revenueMultiplier: number;
     cachePerTier: number;
@@ -146,6 +165,7 @@ export const DATA_CENTER_MODE_CONFIG: Record<
 > = {
   cache: {
     label: 'Edge cache',
+    labelTr: 'Uç önbellek',
     description: 'Maximum traffic offload, modest hosting income.',
     revenueMultiplier: 0.55,
     cachePerTier: 0.12,
@@ -154,6 +174,7 @@ export const DATA_CENTER_MODE_CONFIG: Record<
   },
   colocation: {
     label: 'Colocation',
+    labelTr: 'Kolokasyon',
     description: 'Reliable rack income with predictable load.',
     revenueMultiplier: 1,
     cachePerTier: 0.08,
@@ -162,6 +183,7 @@ export const DATA_CENTER_MODE_CONFIG: Record<
   },
   cloud: {
     label: 'Cloud compute',
+    labelTr: 'Bulut bilişim',
     description: 'High-margin workloads that consume real capacity and power.',
     revenueMultiplier: 1.45,
     cachePerTier: 0.04,
@@ -170,6 +192,7 @@ export const DATA_CENTER_MODE_CONFIG: Record<
   },
   recovery: {
     label: 'Disaster recovery',
+    labelTr: 'Felaket kurtarma',
     description: 'Cuts contract outage exposure while earning steady fees.',
     revenueMultiplier: 0.85,
     cachePerTier: 0,

@@ -3,24 +3,30 @@ import TrendChart from '../../TrendChart';
 import type { NetworkModel } from './model';
 
 export default function CapacityOutlookPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel panel-tone-blue p-5 lg:col-span-2 ${m.networkView === 'live' ? '' : 'hidden'}`}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">24-hour traffic timeline</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+            {tr ? '24 saatlik trafik akışı' : '24-hour traffic timeline'}
+          </h2>
           <p className="mt-1 text-[11px] text-white/40">{t(m.locale, 'capacityOutlookBlurb')}</p>
         </div>
-        <div className="num text-[10px] text-white/35">{m.dayTelemetry.length}/24 SAMPLES</div>
+        <div className="num text-[10px] text-white/35">
+          {m.dayTelemetry.length}/24 {tr ? 'ÖRNEK' : 'SAMPLES'}
+        </div>
       </div>
       {m.dayTelemetry.length > 1 ? (
         <TrendChart
           height={112}
+          tr={tr}
           formatValue={(v) => `${v.toFixed(1)}G`}
           series={[
-            { label: 'Demand', values: m.dayTelemetry.map((p) => p.demandGbps), color: '#68a5ff' },
-            { label: 'Carried', values: m.dayTelemetry.map((p) => p.servedGbps), color: '#2dd4bf' },
+            { label: tr ? 'Talep' : 'Demand', values: m.dayTelemetry.map((p) => p.demandGbps), color: '#68a5ff' },
+            { label: t(m.locale, 'carried'), values: m.dayTelemetry.map((p) => p.servedGbps), color: '#2dd4bf' },
             {
-              label: 'Loss ×10',
+              label: tr ? 'Kayıp ×10' : 'Loss ×10',
               values: m.dayTelemetry.map((p) => p.packetLoss * 10),
               color: '#ff6577',
               dashed: true,

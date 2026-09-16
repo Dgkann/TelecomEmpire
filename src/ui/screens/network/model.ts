@@ -65,12 +65,13 @@ export function useNetworkModel() {
   const finance = monthlyBreakdown(game, mods);
   const resilience = networkResilience(game);
   const openMaintenance = game.maintenanceOrders.filter((order) => order.status !== 'completed');
+  const tr = locale === 'tr';
   const trafficClasses: Array<{ id: TrafficClass; label: string; color: string }> = [
-    { id: 'residential', label: 'Residential', color: '#68a5ff' },
-    { id: 'business', label: 'Business SLA', color: '#a78bfa' },
-    { id: 'mobile', label: 'Mobile', color: '#f59e0b' },
-    { id: 'wholesale', label: 'Wholesale', color: '#f3b843' },
-    { id: 'workload', label: 'Data centre', color: '#2dd4bf' },
+    { id: 'residential', label: tr ? 'Konut' : 'Residential', color: '#68a5ff' },
+    { id: 'business', label: tr ? 'Ticari SLA' : 'Business SLA', color: '#a78bfa' },
+    { id: 'mobile', label: tr ? 'Mobil' : 'Mobile', color: '#f59e0b' },
+    { id: 'wholesale', label: tr ? 'Toptan' : 'Wholesale', color: '#f3b843' },
+    { id: 'workload', label: tr ? 'Veri merkezi' : 'Data centre', color: '#2dd4bf' },
   ];
 
   return {

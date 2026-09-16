@@ -3,29 +3,30 @@ import { t } from '../../i18n';
 import type { NetworkModel } from './model';
 
 export default function LiveDeliveryPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel p-5 lg:col-span-2 ${m.networkView === 'live' ? '' : 'hidden'}`}>
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
         {[
           {
-            label: 'Network health',
+            label: tr ? 'Şebeke sağlığı' : 'Network health',
             value: `${Math.round(m.game.stats.health)}%`,
             tone: m.game.stats.health > 80 ? 'text-neon-lime' : 'text-neon-amber',
           },
-          { label: 'Demand', value: `${m.game.stats.demandGbps.toFixed(1)} Gbps` },
-          { label: 'Carried', value: `${m.game.stats.servedGbps.toFixed(1)} Gbps` },
+          { label: tr ? 'Talep' : 'Demand', value: `${m.game.stats.demandGbps.toFixed(1)} Gbps` },
+          { label: t(m.locale, 'carried'), value: `${m.game.stats.servedGbps.toFixed(1)} Gbps` },
           {
-            label: 'Packet loss',
+            label: tr ? 'Paket kaybı' : 'Packet loss',
             value: `${(m.game.stats.packetLoss * 100).toFixed(1)}%`,
             tone: m.game.stats.packetLoss > 0.02 ? 'text-neon-red' : 'text-neon-lime',
           },
           {
-            label: 'Latency',
+            label: tr ? 'Gecikme' : 'Latency',
             value: `${Math.round(m.game.stats.latencyMs)} ms`,
             tone: m.game.stats.latencyMs > 40 ? 'text-neon-amber' : undefined,
           },
           {
-            label: 'Resilient sites',
+            label: tr ? 'Yedekli noktalar' : 'Resilient sites',
             value: `${Math.round(m.resilience * 100)}%`,
             tone: m.resilience >= 0.7 ? 'text-neon-lime' : 'text-neon-amber',
           },
@@ -43,8 +44,10 @@ export default function LiveDeliveryPanel({ m }: { m: NetworkModel }) {
             <div className="text-[12px] text-white/40">{t(m.locale, 'trafficAcceptedNow')}</div>
           </div>
           <div className="num text-[12px] text-white/55">
-            <span className="text-neon-cyan">{m.game.stats.servedGbps.toFixed(2)}G carried</span> /{' '}
-            {m.game.stats.demandGbps.toFixed(2)}G requested
+            <span className="text-neon-cyan">
+              {m.game.stats.servedGbps.toFixed(2)}G {tr ? 'taşınan' : 'carried'}
+            </span>{' '}
+            / {m.game.stats.demandGbps.toFixed(2)}G {tr ? 'talep' : 'requested'}
           </div>
         </div>
         <div className="relative h-2 overflow-hidden rounded-full bg-neon-red/[0.18]">
@@ -73,7 +76,7 @@ export default function LiveDeliveryPanel({ m }: { m: NetworkModel }) {
         </div>
         <div
           className="mt-4 overflow-hidden rounded-lg border border-white/[0.08]"
-          aria-label="Traffic carried by service class"
+          aria-label={tr ? 'Hizmet sınıfına göre taşınan trafik' : 'Traffic carried by service class'}
         >
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3 bg-black/15 px-3 py-2 text-[10px] text-white/35">
             <span>{t(m.locale, 'service')}</span>

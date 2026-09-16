@@ -12,11 +12,12 @@ export default function CapacityLab() {
   const [filter, setFilter] = useState('');
   const [message, setMessage] = useState('');
   const locale = useGame((s) => s.locale);
+  const tr = locale === 'tr';
   const commission = useGame((s) => s.commissionUpgrades);
   const cash = useGame((s) => s.game!.money);
   const blocked = useGame((s) => s.planning || !!s.drillTarget);
-  const options = useMemo(() => capacityOptions(snapshot), [snapshot]);
-  const plan = useMemo(() => capacityPlan(snapshot, items), [snapshot, items]);
+  const options = useMemo(() => capacityOptions(snapshot, locale), [snapshot, locale]);
+  const plan = useMemo(() => capacityPlan(snapshot, items, locale), [snapshot, items, locale]);
   const before = useMemo(() => testCapacity(snapshot, { multiplier, cutLinkId }), [snapshot, multiplier, cutLinkId]);
   const after = useMemo(() => testCapacity(plan.state, { multiplier, cutLinkId }), [plan.state, multiplier, cutLinkId]);
   const chosen = new Set(items.map(upgradeKey));
@@ -27,7 +28,7 @@ export default function CapacityLab() {
   const refresh = () => {
     setSnapshot(useGame.getState().game!);
     setItems([]);
-    setMessage('Snapshot refreshed.');
+    setMessage(tr ? 'Anlık görüntü yenilendi.' : 'Snapshot refreshed.');
   };
   const toggle = (option: CapacityUpgrade) => {
     setItems((list) =>
@@ -38,7 +39,7 @@ export default function CapacityLab() {
     setMessage('');
   };
   return (
-    <section className="capacity-lab lg:col-span-2" aria-label="Network Lab">
+    <section className="capacity-lab lg:col-span-2" aria-label={t(locale, 'networkLab')}>
       <div className="lab-heading">
         <div>
           <h2>{t(locale, 'networkLab')}</h2>
@@ -59,7 +60,7 @@ export default function CapacityLab() {
                 className={`lab-preset ${multiplier === m ? 'active' : ''}`}
                 onClick={() => setMultiplier(m)}
               >
-                {m === 1 ? 'Current' : `${m}× demand`}
+                {m === 1 ? t(locale, 'current') : `${m}× ${tr ? 'talep' : 'demand'}`}
               </button>
             ))}
           </div>
@@ -67,7 +68,7 @@ export default function CapacityLab() {
         <label>
           {t(locale, 'failureScenario')}
           <select
-            aria-label="Lab fibre failure"
+            aria-label={tr ? 'Laboratuvar fiber arızası' : 'Lab fibre failure'}
             value={cutLinkId ?? ''}
             onChange={(e) => setCutLinkId(e.target.value || null)}
           >
@@ -76,7 +77,7 @@ export default function CapacityLab() {
               .filter((o) => o.type === 'link' && !snapshot.links.find((l) => l.id === o.id)?.down)
               .map((o) => (
                 <option key={o.id} value={o.id}>
-                  Cut: {o.label}
+                  {tr ? 'Kesinti' : 'Cut'}: {o.label}
                 </option>
               ))}
           </select>
@@ -95,7 +96,7 @@ export default function CapacityLab() {
             <p>
               {after.served.toFixed(2)} / {after.demand.toFixed(2)} Gbps
               <br />
-              <span>with your proposed upgrades</span>
+              <span>{tr ? 'önerdiğin yükseltmelerle' : 'with your proposed upgrades'}</span>
             </p>
           </div>
           <div className="lab-legend">
@@ -108,12 +109,22 @@ export default function CapacityLab() {
               {t(locale, 'proposedNetwork')}
             </span>
           </div>
-          <div role="img" aria-label="District service delivery comparison" className="lab-districts">
+          <div
+            role="img"
+            aria-label={tr ? 'İlçe hizmet teslimi karşılaştırması' : 'District service delivery comparison'}
+            className="lab-districts"
+          >
             {before.districts.map((d, i) => (
               <div className="lab-district" key={d.id}>
                 <div>
                   <strong>{d.name}</strong>
-                  <span>{d.demand > 0 ? `${d.demand.toFixed(2)} Gbps requested` : 'No current demand'}</span>
+                  <span>
+                    {d.demand > 0
+                      ? `${d.demand.toFixed(2)} Gbps ${tr ? 'talep' : 'requested'}`
+                      : tr
+                        ? 'Şu an talep yok'
+                        : 'No current demand'}
+                  </span>
                 </div>
                 <div className="lab-track-pair">
                   <div>
@@ -130,18 +141,19 @@ export default function CapacityLab() {
             ))}
           </div>
           <p className="lab-note">
-            Snapshot at day {Math.floor(snapshot.minutes / 1440) + 1}. Fixed, mobile, business and data-centre traffic
-            share real route and transit limits. This test holds customers and prices constant; it is not a growth
-            forecast.
+            {tr
+              ? `${Math.floor(snapshot.minutes / 1440) + 1}. gün anlık görüntüsü. Sabit, mobil, ticari ve veri merkezi trafiği gerçek rota ve transit sınırlarını paylaşır. Bu test müşterileri ve fiyatları sabit tutar; büyüme tahmini değildir.`
+              : `Snapshot at day ${Math.floor(snapshot.minutes / 1440) + 1}. Fixed, mobile, business and data-centre traffic share real route and transit limits. This test holds customers and prices constant; it is not a growth forecast.`}
           </p>
           {cutLinkId && (
             <p className="lab-warning">
-              The selected fibre is cut only in this test. Capacity upgrades cannot reconnect an isolated site. Build an
-              independent route from the map.
+              {tr
+                ? 'Seçili fiber yalnızca bu testte kesilir. Kapasite yükseltmeleri kopmuş bir noktayı yeniden bağlayamaz. Haritadan bağımsız bir rota kur.'
+                : 'The selected fibre is cut only in this test. Capacity upgrades cannot reconnect an isolated site. Build an independent route from the map.'}
             </p>
           )}
         </div>
-        <aside className="lab-order" aria-label="Capacity upgrade order">
+        <aside className="lab-order" aria-label={tr ? 'Kapasite yükseltme emri' : 'Capacity upgrade order'}>
           <h3>
             {t(locale, 'commissioningOrder')} <span>{items.length}/32</span>
           </h3>
@@ -167,7 +179,11 @@ export default function CapacityLab() {
                 <li key={upgradeKey(item)}>
                   <span>{options.find((o) => upgradeKey(o) === upgradeKey(item))?.label}</span>
                   <button
-                    aria-label={`Remove ${options.find((o) => upgradeKey(o) === upgradeKey(item))?.label}`}
+                    aria-label={
+                      tr
+                        ? `${options.find((o) => upgradeKey(o) === upgradeKey(item))?.label} öğesini kaldır`
+                        : `Remove ${options.find((o) => upgradeKey(o) === upgradeKey(item))?.label}`
+                    }
                     onClick={() => toggle(item)}
                   >
                     ×
@@ -188,11 +204,24 @@ export default function CapacityLab() {
               if (commission(items)) {
                 setItems([]);
                 setSnapshot(useGame.getState().game!);
-                setMessage('Upgrades are live. Your new capacity is ready for service.');
-              } else setMessage('Network conditions changed. Refresh the snapshot before trying again.');
+                setMessage(
+                  tr
+                    ? 'Yükseltmeler devrede. Yeni kapasiten hizmete hazır.'
+                    : 'Upgrades are live. Your new capacity is ready for service.',
+                );
+              } else
+                setMessage(
+                  tr
+                    ? 'Şebeke koşulları değişti. Tekrar denemeden önce anlık görüntüyü yenile.'
+                    : 'Network conditions changed. Refresh the snapshot before trying again.',
+                );
             }}
           >
-            Commission {items.length || ''} upgrade{items.length === 1 ? '' : 's'}
+            {tr
+              ? items.length
+                ? `${items.length} yükseltmeyi devreye al`
+                : 'Yükseltmeleri devreye al'
+              : `Commission ${items.length || ''} upgrade${items.length === 1 ? '' : 's'}`}
           </button>
           <button
             className="mt-2 w-full text-xs text-white/60 disabled:opacity-30"
@@ -212,8 +241,8 @@ export default function CapacityLab() {
           <p>{t(locale, 'capacityWorkbenchBlurb')}</p>
         </div>
         <input
-          aria-label="Find capacity asset"
-          placeholder="Find site, fibre or transit"
+          aria-label={tr ? 'Kapasite varlığı ara' : 'Find capacity asset'}
+          placeholder={tr ? 'Nokta, fiber veya transit ara' : 'Find site, fibre or transit'}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -225,27 +254,37 @@ export default function CapacityLab() {
           return (
             <div className={`lab-asset ${chosen.has(key) ? 'chosen' : ''}`} key={key}>
               <div className={`lab-load ${pressure > 1 ? 'overloaded' : ''}`}>
-                {Math.round(pressure * 100)}%<small>offered load</small>
+                {Math.round(pressure * 100)}%<small>{tr ? 'sunulan yük' : 'offered load'}</small>
               </div>
               <div className="min-w-0">
                 <strong>{option.label}</strong>
                 <p>
                   {option.type === 'transit'
-                    ? 'Transit plan'
-                    : `${option.type === 'link' ? 'Fibre' : 'Site'} tier ${option.tier}`}{' '}
+                    ? tr
+                      ? 'Transit planı'
+                      : 'Transit plan'
+                    : tr
+                      ? `${option.type === 'link' ? 'Fiber' : 'Nokta'} seviye ${option.tier}`
+                      : `${option.type === 'link' ? 'Fibre' : 'Site'} tier ${option.tier}`}{' '}
                   · {option.capacity.toFixed(1)} → {option.nextCapacity.toFixed(1)} Gbps
                 </p>
                 {option.issue && <p className="text-neon-amber">{option.issue}</p>}
               </div>
-              <span className="lab-asset-cost">{option.cost ? fmtMoney(option.cost) : 'Monthly plan'}</span>
+              <span className="lab-asset-cost">
+                {option.cost ? fmtMoney(option.cost) : tr ? 'Aylık plan' : 'Monthly plan'}
+              </span>
               <button
-                aria-label={`${chosen.has(key) ? 'Remove' : 'Add'} upgrade ${option.label}`}
+                aria-label={
+                  tr
+                    ? `${option.label} yükseltmesini ${chosen.has(key) ? 'kaldır' : 'ekle'}`
+                    : `${chosen.has(key) ? 'Remove' : 'Add'} upgrade ${option.label}`
+                }
                 aria-pressed={chosen.has(key)}
                 disabled={!chosen.has(key) && (!!option.issue || items.length >= 32)}
                 className="lab-preset"
                 onClick={() => toggle(option)}
               >
-                {chosen.has(key) ? 'Remove' : 'Add'}
+                {chosen.has(key) ? (tr ? 'Kaldır' : 'Remove') : tr ? 'Ekle' : 'Add'}
               </button>
             </div>
           );

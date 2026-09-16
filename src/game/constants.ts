@@ -138,11 +138,11 @@ export const ENERGY = {
 export const BASELINE_ARPU = 680;
 
 export const TRANSIT_TIERS = [
-  { label: 'Basic transit', capacity: 12, monthly: 64000, reliability: 0.9 },
-  { label: 'Metro peering', capacity: 26, monthly: 124000, reliability: 0.92 },
-  { label: 'Dual-homed transit', capacity: 45, monthly: 220000, reliability: 0.95 },
-  { label: 'Tier-1 blend', capacity: 160, monthly: 680000, reliability: 0.98 },
-  { label: 'Global backbone', capacity: 700, monthly: 1920000, reliability: 0.995 },
+  { label: 'Basic transit', labelTr: 'Temel transit', capacity: 12, monthly: 64000, reliability: 0.9 },
+  { label: 'Metro peering', labelTr: 'Metro eşleşme', capacity: 26, monthly: 124000, reliability: 0.92 },
+  { label: 'Dual-homed transit', labelTr: 'Çift bağlantılı transit', capacity: 45, monthly: 220000, reliability: 0.95 },
+  { label: 'Tier-1 blend', labelTr: 'Tier-1 karma', capacity: 160, monthly: 680000, reliability: 0.98 },
+  { label: 'Global backbone', labelTr: 'Küresel omurga', capacity: 700, monthly: 1920000, reliability: 0.995 },
 ];
 export const BACKUP_TRANSIT_MONTHLY = 300000;
 // A month of breaches cannot cost more than this many months of the fee.

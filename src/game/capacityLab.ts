@@ -20,7 +20,8 @@ export interface LabScenario {
 }
 export const upgradeKey = (item: Pick<CapacityUpgrade, 'type' | 'id'>) => `${item.type}:${item.id}`;
 
-export function capacityOptions(state: GameState) {
+export function capacityOptions(state: GameState, locale: 'en' | 'tr' = 'en') {
+  const tr = locale === 'tr';
   const mods = researchModifiers(state.researchDone);
   const nodes = new Map(state.nodes.map((n) => [n.id, n]));
   return [
@@ -34,66 +35,91 @@ export function capacityOptions(state: GameState) {
       cost: nodeUpgradeCost(n.kind, n.tier),
       issue:
         n.kind === 'datacenter' && n.tier === 0 && !state.researchDone.includes('edge_compute')
-          ? 'Research edge compute to expand this data centre.'
+          ? tr
+            ? 'Bu veri merkezini genişletmek için uç bilişimi araştır.'
+            : 'Research edge compute to expand this data centre.'
           : n.down || state.incidents.some((i) => !i.resolved && i.targetType === 'node' && i.targetId === n.id)
-            ? 'Resolve the site fault first.'
+            ? tr
+              ? 'Önce noktadaki arızayı gider.'
+              : 'Resolve the site fault first.'
             : state.maintenanceOrders.some((o) => o.nodeId === n.id && o.status !== 'completed')
-              ? 'Finish planned maintenance first.'
+              ? tr
+                ? 'Önce planlı bakımı bitir.'
+                : 'Finish planned maintenance first.'
               : n.tier >=
                   (n.kind === 'core'
                     ? mods.maxCoreTier
                     : n.kind === 'tower'
                       ? mods.maxTowerTier
                       : NODE_SPECS[n.kind].maxTier)
-                ? 'Maximum available tier. Research may unlock more.'
+                ? tr
+                  ? 'Mevcut en yüksek seviye. Araştırma daha fazlasını açabilir.'
+                  : 'Maximum available tier. Research may unlock more.'
                 : null,
     })),
     ...state.links.map((l) => ({
       type: 'link' as const,
       id: l.id,
       tier: l.tier,
-      label: `${nodes.get(l.aId)?.name ?? 'Missing site'} / ${nodes.get(l.bId)?.name ?? 'Missing site'}`,
+      label: `${nodes.get(l.aId)?.name ?? (tr ? 'Eksik nokta' : 'Missing site')} / ${nodes.get(l.bId)?.name ?? (tr ? 'Eksik nokta' : 'Missing site')}`,
       capacity: l.capacityGbps,
       nextCapacity: linkCapacity(l.tier + 1) * mods.linkCapacityMul,
       cost: Math.round(l.length * FIBER_UPGRADE_COST_PER_UNIT * l.tier),
       issue:
         l.down || state.incidents.some((i) => !i.resolved && i.targetType === 'link' && i.targetId === l.id)
-          ? 'Repair the fibre first.'
+          ? tr
+            ? 'Önce fiberi onar.'
+            : 'Repair the fibre first.'
           : l.tier >= mods.maxLinkTier
-            ? 'Higher grade optics need research.'
+            ? tr
+              ? 'Daha üst sınıf optik araştırma gerektirir.'
+              : 'Higher grade optics need research.'
             : null,
     })),
     {
       type: 'transit' as const,
       id: 'upstream',
       tier: state.transitTier,
-      label: 'Upstream transit',
+      label: tr ? 'Üst bağlantı transiti' : 'Upstream transit',
       capacity: TRANSIT_TIERS[state.transitTier].capacity,
       nextCapacity: TRANSIT_TIERS[Math.min(TRANSIT_TIERS.length - 1, state.transitTier + 1)].capacity,
       cost: 0,
-      issue: state.transitTier >= TRANSIT_TIERS.length - 1 ? 'Highest transit plan active.' : null,
+      issue:
+        state.transitTier >= TRANSIT_TIERS.length - 1
+          ? tr
+            ? 'En yüksek transit planı etkin.'
+            : 'Highest transit plan active.'
+          : null,
     },
   ];
 }
 
 // One tier per asset per order. Validate the whole order before applying any charge.
-export function capacityPlan(state: GameState, items: CapacityUpgrade[]) {
-  const options = new Map(capacityOptions(state).map((o) => [upgradeKey(o), o]));
+export function capacityPlan(state: GameState, items: CapacityUpgrade[], locale: 'en' | 'tr' = 'en') {
+  const tr = locale === 'tr';
+  const options = new Map(capacityOptions(state, locale).map((o) => [upgradeKey(o), o]));
   const unique = new Set<string>();
   let error: string | null = state.gameOver
-    ? 'This company has closed.'
+    ? tr
+      ? 'Bu şirket kapandı.'
+      : 'This company has closed.'
     : items.length > 32
-      ? 'Choose up to 32 upgrades.'
+      ? tr
+        ? 'En fazla 32 yükseltme seç.'
+        : 'Choose up to 32 upgrades.'
       : null;
   let cost = 0;
   for (const item of items) {
     const key = upgradeKey(item),
       option = options.get(key);
     if (!option || option.tier !== item.tier)
-      error ??= 'The network changed. Refresh the snapshot and review your plan.';
+      error ??= tr
+        ? 'Şebeke değişti. Anlık görüntüyü yenile ve planını gözden geçir.'
+        : 'The network changed. Refresh the snapshot and review your plan.';
     else if (option.issue) error ??= option.issue;
     else cost += option.cost;
-    if (unique.has(key)) error ??= 'An asset can appear only once in an order.';
+    if (unique.has(key))
+      error ??= tr ? 'Bir varlık emirde yalnızca bir kez yer alabilir.' : 'An asset can appear only once in an order.';
     unique.add(key);
   }
   const next: GameState = error

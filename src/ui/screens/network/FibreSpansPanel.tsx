@@ -4,6 +4,7 @@ import { Meter } from './Meter';
 import type { NetworkModel } from './model';
 
 export default function FibreSpansPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel panel-tone-blue p-5 ${m.networkView === 'capacity' ? '' : 'hidden'}`}>
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">
@@ -30,11 +31,13 @@ export default function FibreSpansPanel({ m }: { m: NetworkModel }) {
                 <span className="truncate text-sm">
                   {a?.name} <span className="text-white/30">↔</span> {b?.name}
                 </span>
-                {l.down && <span className="chip border-neon-red/40 text-[10px] text-neon-red">CUT</span>}
+                {l.down && (
+                  <span className="chip border-neon-red/40 text-[10px] text-neon-red">{tr ? 'KESİK' : 'CUT'}</span>
+                )}
                 {stranded && (
                   <span
                     className="chip border-neon-red/40 text-[10px] text-neon-red"
-                    title="Neither end can reach a core right now"
+                    title={tr ? 'İki uç da şu an bir çekirdeğe ulaşamıyor' : 'Neither end can reach a core right now'}
                   >
                     {t(m.locale, 'noRoute')}
                   </span>
@@ -42,15 +45,19 @@ export default function FibreSpansPanel({ m }: { m: NetworkModel }) {
                 {standby && (
                   <span
                     className="chip border-white/20 text-[10px] text-white/50"
-                    title="Nothing routes over this span today. It is what keeps the district redundant."
+                    title={
+                      tr
+                        ? 'Bugün bu hattan trafik geçmiyor. İlçeyi yedekli tutan hat bu.'
+                        : 'Nothing routes over this span today. It is what keeps the district redundant.'
+                    }
                   >
-                    STANDBY
+                    {tr ? 'YEDEKTE' : 'STANDBY'}
                   </span>
                 )}
               </div>
               <Meter
                 v={linkUtil(l)}
-                label={`Tier ${l.tier} · ${l.length.toFixed(1)} km`}
+                label={`${tr ? 'Seviye' : 'Tier'} ${l.tier} · ${l.length.toFixed(1)} km`}
                 right={`${l.trafficGbps.toFixed(1)}/${l.capacityGbps.toFixed(0)} Gbps`}
               />
             </button>

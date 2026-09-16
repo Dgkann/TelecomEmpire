@@ -1,9 +1,10 @@
 import { SPECTRUM_BANDS } from '../../../game/constants';
-import { rivalPosture } from '../../../game/competitors';
+import { rivalMoveCopy, rivalPosture } from '../../../game/competitors';
 import { t } from '../../i18n';
 import type { NetworkModel } from './model';
 
 export default function CompetitorPanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div className={`panel panel-tone-violet p-5 ${m.networkView === 'interconnect' ? '' : 'hidden'}`}>
       <div className="flex items-start justify-between gap-3">
@@ -46,26 +47,36 @@ export default function CompetitorPanel({ m }: { m: NetworkModel }) {
                   <i className="h-2 w-2 rounded-full" style={{ background: rival.color }} />
                   {rival.name}
                 </span>
-                <span className="num text-[10px] text-white/45">PRICE {rival.priceIndex.toFixed(2)}×</span>
+                <span className="num text-[10px] text-white/45">
+                  {tr ? 'FİYAT' : 'PRICE'} {rival.priceIndex.toFixed(2)}×
+                </span>
               </div>
               <div className="mt-1 flex items-center gap-2 text-[10px]">
                 <span
                   className="rounded border px-1.5 py-0.5 font-semibold"
                   style={{ borderColor: `${rival.color}66`, color: rival.color }}
                 >
-                  {posture.label}
+                  {tr ? posture.labelTr : posture.label}
                 </span>
-                <span className="truncate text-white/35">{posture.detail}</span>
+                <span className="truncate text-white/35">{tr ? posture.detailTr : posture.detail}</span>
               </div>
               <div className="mt-1 grid grid-cols-3 text-[10px] text-white/[0.42]">
-                <span>{Math.round(avgCoverage * 100)}% cover</span>
-                <span className="text-center">Tech {Math.round(rival.tech * 100)}</span>
-                <span className="truncate text-right">Lead: {strongest?.name}</span>
+                <span>
+                  {tr ? `kapsama %${Math.round(avgCoverage * 100)}` : `${Math.round(avgCoverage * 100)}% cover`}
+                </span>
+                <span className="text-center">
+                  {tr ? 'Teknoloji' : 'Tech'} {Math.round(rival.tech * 100)}
+                </span>
+                <span className="truncate text-right">
+                  {tr ? 'En güçlü' : 'Lead'}: {strongest?.name}
+                </span>
               </div>
-              <div className="mt-1 truncate text-[10px] text-white/35">Spectrum: {rivalSpectrum || 'none'}</div>
+              <div className="mt-1 truncate text-[10px] text-white/35">
+                {tr ? 'Spektrum' : 'Spectrum'}: {rivalSpectrum || (tr ? 'yok' : 'none')}
+              </div>
               {rival.lastMove && (
                 <div className="mt-1 truncate text-[10px]" style={{ color: rival.color }}>
-                  {rival.lastMove}
+                  {rivalMoveCopy(rival.lastMove, tr)}
                 </div>
               )}
             </button>

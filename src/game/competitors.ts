@@ -97,15 +97,60 @@ export function rivalPosture(s: GameState, c: Competitor) {
       (sum, district) => sum + Math.max(c.coverage[district.id] ?? 0, c.mobileCoverage[district.id] ?? 0),
       0,
     ) / Math.max(1, s.districts.length);
-  if (c.cash < 0) return { label: 'Recovery', detail: 'Raising margin and pausing expansion.' };
+  if (c.cash < 0)
+    return {
+      label: 'Recovery',
+      labelTr: 'Toparlanma',
+      detail: 'Raising margin and pausing expansion.',
+      detailTr: 'Marjını artırıyor ve genişlemeye ara verdi.',
+    };
   const defence = bestDefence(s, c);
-  if (defence) return { label: 'Defending', detail: `Protecting market share in ${defence.name}.` };
-  if (averageCoverage < 0.35) return { label: 'Expansion', detail: 'Prioritising new district coverage.' };
+  if (defence)
+    return {
+      label: 'Defending',
+      labelTr: 'Savunma',
+      detail: `Protecting market share in ${defence.name}.`,
+      detailTr: `${defence.name} ilçesinde pazar payını koruyor.`,
+    };
+  if (averageCoverage < 0.35)
+    return {
+      label: 'Expansion',
+      labelTr: 'Genişleme',
+      detail: 'Prioritising new district coverage.',
+      detailTr: 'Yeni ilçe kapsamasına öncelik veriyor.',
+    };
   if (c.spectrum.length && s.districts.some((district) => (c.mobileCoverage[district.id] ?? 0) < 0.25)) {
-    return { label: 'Mobile push', detail: 'Turning spectrum holdings into radio coverage.' };
+    return {
+      label: 'Mobile push',
+      labelTr: 'Mobil atak',
+      detail: 'Turning spectrum holdings into radio coverage.',
+      detailTr: 'Spektrum varlıklarını radyo kapsamasına dönüştürüyor.',
+    };
   }
-  if (c.tech < 0.65) return { label: 'Modernising', detail: 'Saving for network technology upgrades.' };
-  return { label: 'Consolidating', detail: 'Balancing price, coverage and cash reserves.' };
+  if (c.tech < 0.65)
+    return {
+      label: 'Modernising',
+      labelTr: 'Modernleşme',
+      detail: 'Saving for network technology upgrades.',
+      detailTr: 'Şebeke teknolojisi yükseltmeleri için birikim yapıyor.',
+    };
+  return {
+    label: 'Consolidating',
+    labelTr: 'Güçlenme',
+    detail: 'Balancing price, coverage and cash reserves.',
+    detailTr: 'Fiyat, kapsama ve nakit rezervini dengeliyor.',
+  };
+}
+
+// Rival moves are stored as English phrases; this keeps their Turkish wording next to the source.
+export function rivalMoveCopy(move: string, tr: boolean) {
+  if (!tr) return move;
+  return move
+    .replace(/^reinforcing (.+)$/, '$1 ilçesini güçlendiriyor')
+    .replace(/^building in (.+)$/, '$1 ilçesinde kurulum yapıyor')
+    .replace(/^expanding mobile coverage in (.+)$/, '$1 ilçesinde mobil kapsamayı genişletiyor')
+    .replace(/^upgrading their network$/, 'şebekesini yükseltiyor')
+    .replace(/^cutting prices$/, 'fiyatları düşürüyor');
 }
 
 const COVERAGE_STEP = 0.06;

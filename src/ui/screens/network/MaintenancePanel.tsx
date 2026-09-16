@@ -1,7 +1,11 @@
+import { MAINTENANCE_CONFIG } from '../../../game/strategy';
 import { t } from '../../i18n';
 import type { NetworkModel } from './model';
 
+const STATUS_TR = { scheduled: 'PLANLANDI', active: 'SÜRÜYOR', completed: 'TAMAMLANDI' } as const;
+
 export default function MaintenancePanel({ m }: { m: NetworkModel }) {
+  const tr = m.locale === 'tr';
   return (
     <div
       id="maintenance"
@@ -14,7 +18,9 @@ export default function MaintenancePanel({ m }: { m: NetworkModel }) {
           </h2>
           <p className="mt-1 text-[11px] text-white/40">{t(m.locale, 'maintenanceBoardBlurb')}</p>
         </div>
-        <span className="chip border-neon-amber/30 text-[10px] text-neon-amber">{m.openMaintenance.length} OPEN</span>
+        <span className="chip border-neon-amber/30 text-[10px] text-neon-amber">
+          {m.openMaintenance.length} {tr ? 'AÇIK' : 'OPEN'}
+        </span>
       </div>
       <div className="mt-4 flex flex-col gap-2">
         {m.openMaintenance.length ? (
@@ -29,20 +35,28 @@ export default function MaintenancePanel({ m }: { m: NetworkModel }) {
                 className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.07]"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-semibold">{node?.name ?? 'Removed site'}</span>
+                  <span className="truncate text-xs font-semibold">
+                    {node?.name ?? (tr ? 'Kaldırılmış nokta' : 'Removed site')}
+                  </span>
                   <span
                     className={`chip text-[9px] ${order.status === 'active' ? 'border-neon-amber/40 text-neon-amber' : 'border-white/15 text-white/45'}`}
                   >
-                    {order.status.toUpperCase()}
+                    {tr ? STATUS_TR[order.status] : order.status.toUpperCase()}
                   </span>
                 </div>
                 <div className="num mt-1 text-[10px] text-white/40">
-                  {order.mode.toUpperCase()} ·{' '}
+                  {tr ? MAINTENANCE_CONFIG[order.mode].labelTr.toLocaleUpperCase('tr-TR') : order.mode.toUpperCase()} ·{' '}
                   {order.status === 'active'
-                    ? `${Math.ceil(order.minutesLeft)} MIN · ${technician?.name ?? 'CREW'}`
+                    ? tr
+                      ? `${Math.ceil(order.minutesLeft)} DK · ${technician?.name ?? 'EKİP'}`
+                      : `${Math.ceil(order.minutesLeft)} MIN · ${technician?.name ?? 'CREW'}`
                     : waitDays
-                      ? `IN ${waitDays}D`
-                      : 'AWAITING CREW'}
+                      ? tr
+                        ? `${waitDays} GÜN SONRA`
+                        : `IN ${waitDays}D`
+                      : tr
+                        ? 'EKİP BEKLENİYOR'
+                        : 'AWAITING CREW'}
                 </div>
               </button>
             );
