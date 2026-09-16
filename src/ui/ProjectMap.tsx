@@ -25,6 +25,7 @@ export function ProjectFootprint({ game }: { game: GameState }) {
   );
 }
 export function ProjectMapLabel({ game }: { game: GameState }) {
+  const tr = useGame((s) => s.locale) === 'tr';
   const project = game.procurement.tenders.find((t) => t.status === 'delivery');
   const district = game.districts.find((d) => d.id === project?.districtId);
   if (!project || !district) return null;
@@ -32,11 +33,13 @@ export function ProjectMapLabel({ game }: { game: GameState }) {
     <g
       pointerEvents="none"
       transform={`translate(${isoX(district.center.gx, district.center.gy)} ${isoY(district.center.gx, district.center.gy) - 146})`}
-      aria-label="Active city project"
+      aria-label={tr ? 'Aktif şehir projesi' : 'Active city project'}
     >
       <rect x={-89} y={-14} width={178} height={25} rx={4} fill="#273333" stroke="#d2a657" strokeWidth={1} />
       <text textAnchor="middle" y={2} fill="#f2ce8b" fontSize={12} fontWeight={600}>
-        City project · {(project.qualifyingMinutes / 60).toFixed(1)} / 6h
+        {tr
+          ? `Şehir projesi · ${(project.qualifyingMinutes / 60).toFixed(1).replace('.', ',')} / 6 sa`
+          : `City project · ${(project.qualifyingMinutes / 60).toFixed(1)} / 6h`}
       </text>
     </g>
   );
@@ -49,18 +52,29 @@ export function DistrictProjectCard({ districtId }: { districtId: string }) {
     (t) => t.districtId === districtId && (t.status === 'open' || t.status === 'delivery'),
   );
   if (!tender) return null;
+  const tr = locale === 'tr';
   return (
     <section
       className="rounded border border-neon-amber/30 bg-neon-amber/5 p-3"
-      aria-label="District infrastructure project"
+      aria-label={tr ? 'İlçe altyapı projesi' : 'District infrastructure project'}
     >
       <p className="text-[11px] text-neon-amber">
-        {tender.status === 'open' ? 'City tender available' : 'Your city delivery project'}
+        {tender.status === 'open'
+          ? tr
+            ? 'Şehir ihalesi açık'
+            : 'City tender available'
+          : tr
+            ? 'Teslim ettiğin şehir projesi'
+            : 'Your city delivery project'}
       </p>
       <h3 className="mt-1 text-sm font-semibold">{TENDER_PROGRAMMES[tender.kind].title}</h3>
       {tender.status === 'delivery' && (
         <>
-          <p className="mt-2 text-xs text-white/60">Acceptance: {(tender.qualifyingMinutes / 60).toFixed(1)} / 6h</p>
+          <p className="mt-2 text-xs text-white/60">
+            {tr
+              ? `Kabul: ${(tender.qualifyingMinutes / 60).toFixed(1).replace('.', ',')} / 6 sa`
+              : `Acceptance: ${(tender.qualifyingMinutes / 60).toFixed(1)} / 6h`}
+          </p>
           <div className="mt-1 h-1 bg-white/10">
             <div
               className="h-full bg-neon-amber"

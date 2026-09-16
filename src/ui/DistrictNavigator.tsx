@@ -18,14 +18,22 @@ export default function DistrictNavigator() {
     focus(d.center.gx, d.center.gy);
   };
   if (planning || selection) return null;
+  const tr = locale === 'tr';
+  const coverage = (value: number) =>
+    tr ? `Kapsama %${Math.round(value * 100)}` : `${Math.round(value * 100)}% coverage`;
   return (
     <nav
-      aria-label="District navigator"
+      aria-label={tr ? 'İlçe gezgini' : 'District navigator'}
       className="absolute right-3 top-3 z-10 max-w-[calc(100%-145px)] lg:left-[300px] lg:right-16 lg:max-w-none"
     >
       <div className="hidden justify-center gap-1.5 lg:flex">
         {game.districts.map((d) => (
-          <button key={d.id} onClick={() => go(d.id)} className="district-stop" aria-label={`Explore ${d.name}`}>
+          <button
+            key={d.id}
+            onClick={() => go(d.id)}
+            className="district-stop"
+            aria-label={tr ? `${d.name} ilçesini keşfet` : `Explore ${d.name}`}
+          >
             <span className="flex items-center gap-2">
               <i
                 className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -34,7 +42,7 @@ export default function DistrictNavigator() {
               <strong className="truncate text-xs">{d.name}</strong>
             </span>
             <span className="mt-1 block text-[10px] text-white/50">
-              {d.unlocked ? `${Math.round(d.coverage * 100)}% coverage` : `${fmtMoney(d.entryCost)} licence`}
+              {d.unlocked ? coverage(d.coverage) : `${fmtMoney(d.entryCost)} ${tr ? 'lisans' : 'licence'}`}
             </span>
             <span className="mt-2 block h-0.5 bg-white/10">
               <span
@@ -47,14 +55,14 @@ export default function DistrictNavigator() {
       </div>
       <select
         className="max-w-full rounded-md border border-white/15 bg-[#142c37] px-3 py-2 text-xs text-white lg:hidden"
-        aria-label="Explore district"
+        aria-label={tr ? 'İlçe keşfet' : 'Explore district'}
         value=""
         onChange={(e) => go(e.target.value)}
       >
         <option value="">{t(locale, 'exploreDistricts')}</option>
         {game.districts.map((d) => (
           <option value={d.id} key={d.id}>
-            {d.name} · {d.unlocked ? `${Math.round(d.coverage * 100)}% coverage` : 'Locked'}
+            {d.name} · {d.unlocked ? coverage(d.coverage) : t(locale, 'locked')}
           </option>
         ))}
       </select>

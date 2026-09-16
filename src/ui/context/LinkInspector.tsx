@@ -8,6 +8,7 @@ import type { NetLink } from '../../game/types';
 import type { ContextModel } from './model';
 
 export default function LinkInspector({ cp, link }: { cp: ContextModel; link: NetLink }) {
+  const tr = cp.locale === 'tr';
   return (
     <div className="space-y-3">
       <div>
@@ -22,7 +23,7 @@ export default function LinkInspector({ cp, link }: { cp: ContextModel; link: Ne
       </div>
       <Bar
         value={linkUtil(link)}
-        label="Utilisation"
+        label={tr ? 'Kullanım' : 'Utilisation'}
         right={`${link.trafficGbps.toFixed(1)} / ${link.capacityGbps.toFixed(0)} Gbps`}
       />
       {!link.down && (
@@ -33,7 +34,9 @@ export default function LinkInspector({ cp, link }: { cp: ContextModel; link: Ne
           {t(cp.locale, 'testFibreCut')}
         </button>
       )}
-      <div className="text-[11px] text-white/45">Length {link.length.toFixed(1)} km</div>
+      <div className="text-[11px] text-white/45">
+        {tr ? `Uzunluk ${link.length.toFixed(1).replace('.', ',')} km` : `Length ${link.length.toFixed(1)} km`}
+      </div>
       {cp.nextLinkCapacity !== null && (
         <div className="flex items-center justify-between rounded-lg border border-neon-blue/15 bg-neon-blue/[0.045] px-3 py-2 text-[11px]">
           <span className="text-white/45">{t(cp.locale, 'afterOpticsUpgrade')}</span>
@@ -48,7 +51,8 @@ export default function LinkInspector({ cp, link }: { cp: ContextModel; link: Ne
           disabled={link.tier >= cp.mods.maxLinkTier}
           onClick={() => cp.upgradeLink(link.id)}
         >
-          Upgrade optics · {fmtMoneyExact(Math.round(link.length * FIBER_UPGRADE_COST_PER_UNIT * link.tier))}
+          {tr ? 'Optiği yükselt' : 'Upgrade optics'} ·{' '}
+          {fmtMoneyExact(Math.round(link.length * FIBER_UPGRADE_COST_PER_UNIT * link.tier))}
         </button>
         <button className="btn-danger" onClick={() => cp.sellLink(link.id)}>
           {t(cp.locale, 'remove')}

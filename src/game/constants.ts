@@ -25,6 +25,7 @@ export interface NodeSpec {
   powerKw: number;
   maintenance: number;
   description: string;
+  descriptionTr: string;
   requires?: string;
 }
 
@@ -41,6 +42,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     powerKw: 12,
     maintenance: 18000,
     description: 'The spine of your network. Everything ultimately routes through a core.',
+    descriptionTr: 'Şebekenin omurgası. Tüm trafik sonunda bir çekirdekten geçer.',
   },
   pop: {
     kind: 'pop',
@@ -54,6 +56,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     powerKw: 5,
     maintenance: 7600,
     description: 'A point of presence brings your network into a district and serves local customers.',
+    descriptionTr: 'POP şebekeni bir ilçeye taşır ve yerel müşterilere hizmet verir.',
   },
   access: {
     kind: 'access',
@@ -67,6 +70,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     powerKw: 2,
     maintenance: 2800,
     description: 'Street-level cabinet. Cheap way to push coverage deeper into a district.',
+    descriptionTr: 'Sokak kabini. Kapsamayı ilçenin içlerine ucuza taşır.',
   },
   datacenter: {
     kind: 'datacenter',
@@ -80,6 +84,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     powerKw: 90,
     maintenance: 104000,
     description: 'Hosting, caching and edge compute. Cuts transit costs and unlocks enterprise deals.',
+    descriptionTr: 'Barındırma, önbellek ve uç bilişim. Transit maliyetini düşürür, kurumsal anlaşmaların önünü açar.',
     requires: 'backbone100g',
   },
   tower: {
@@ -94,6 +99,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     powerKw: 8,
     maintenance: 14000,
     description: 'Radio site for mobile subscribers. Needs fiber backhaul to a POP or core.',
+    descriptionTr: 'Mobil aboneler için baz istasyonu. Bir POP veya çekirdeğe fiber bağlantı gerekir.',
     requires: 'mobile_4g',
   },
 };

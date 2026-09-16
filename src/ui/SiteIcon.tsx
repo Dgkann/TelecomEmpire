@@ -1,4 +1,5 @@
 import type { NodeKind } from '../game/types';
+import { useGame } from '../store/gameStore';
 
 export const SITE_SIZE: Record<NodeKind, number> = {
   core: 17,
@@ -8,12 +9,12 @@ export const SITE_SIZE: Record<NodeKind, number> = {
   access: 9,
 };
 
-export const SITE_VISUAL: Record<NodeKind, { accent: string; code: string; label: string }> = {
-  core: { accent: '#68a5ff', code: 'C', label: 'Core' },
-  pop: { accent: '#2dd4bf', code: 'P', label: 'POP' },
-  access: { accent: '#aebfd4', code: 'A', label: 'Access' },
-  tower: { accent: '#b295ff', code: 'T', label: 'Tower' },
-  datacenter: { accent: '#f3b843', code: 'DC', label: 'Data center' },
+export const SITE_VISUAL: Record<NodeKind, { accent: string; code: string; label: string; labelTr: string }> = {
+  core: { accent: '#68a5ff', code: 'C', label: 'Core', labelTr: 'Çekirdek' },
+  pop: { accent: '#2dd4bf', code: 'P', label: 'POP', labelTr: 'POP' },
+  access: { accent: '#aebfd4', code: 'A', label: 'Access', labelTr: 'Erişim' },
+  tower: { accent: '#b295ff', code: 'T', label: 'Tower', labelTr: 'Kule' },
+  datacenter: { accent: '#f3b843', code: 'DC', label: 'Data center', labelTr: 'Veri merkezi' },
 };
 
 export function TierBadge({
@@ -25,12 +26,13 @@ export function TierBadge({
   maxTier?: number;
   compact?: boolean;
 }) {
+  const tr = useGame((s) => s.locale) === 'tr';
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded border border-white/[0.12] bg-black/20 font-mono font-bold text-white/75 ${
         compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-1 text-[10px]'
       }`}
-      title={tier === 0 ? 'Mini · 10 Gbps' : `Tier ${tier} of ${maxTier}`}
+      title={tier === 0 ? 'Mini · 10 Gbps' : tr ? `Seviye ${tier} / ${maxTier}` : `Tier ${tier} of ${maxTier}`}
     >
       <span>{tier === 0 ? 'Mini' : `T${tier}`}</span>
       <span className="flex gap-0.5" aria-hidden="true">

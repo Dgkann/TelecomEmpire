@@ -404,7 +404,11 @@ export default function MapView() {
       <svg
         ref={svgRef}
         role="application"
-        aria-label="Interactive telecom network map. Use the site and fibre controls in the tab order, or the zoom buttons."
+        aria-label={
+          tr
+            ? 'Etkileşimli telekom şebeke haritası. Nokta ve fiber kontrollerine Tab ile ulaşabilir veya yakınlaştırma düğmelerini kullanabilirsin.'
+            : 'Interactive telecom network map. Use the site and fibre controls in the tab order, or the zoom buttons.'
+        }
         className={`map-surface relative h-full w-full ${drag.current ? 'dragging' : ''} ${tool ? 'building' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -500,7 +504,7 @@ export default function MapView() {
                     fill="#9ee8cf"
                     fontSize={8}
                   >
-                    +{newReach.homes} potential homes
+                    +{newReach.homes} {tr ? 'potansiyel hane' : 'potential homes'}
                   </text>
                   <text
                     x={isoX(hover.gx, hover.gy)}
@@ -542,7 +546,7 @@ export default function MapView() {
                 className="num"
               >
                 {placementIssue ??
-                  `${connectedQuote ? 'Site + fibre' : tr ? 'Hazır' : 'Ready'} · ${placementCost?.toLocaleString()}`}
+                  `${connectedQuote ? (tr ? 'Nokta + fiber' : 'Site + fibre') : tr ? 'Hazır' : 'Ready'} · ${placementCost?.toLocaleString(tr ? 'tr-TR' : 'en-US')}`}
               </text>
             </g>
           )}
@@ -597,7 +601,11 @@ export default function MapView() {
                 fill={fibreColor}
                 className="num"
               >
-                {hoveredNode ? (fibreIssue ?? `READY · ${fmtMoneyExact(fibreCost)}`) : 'CHOOSE A DESTINATION SITE'}
+                {hoveredNode
+                  ? (fibreIssue ?? `${tr ? 'HAZIR' : 'READY'} · ${fmtMoneyExact(fibreCost)}`)
+                  : tr
+                    ? 'HEDEF NOKTAYI SEÇ'
+                    : 'CHOOSE A DESTINATION SITE'}
               </text>
             </g>
           )}
@@ -618,6 +626,7 @@ export default function MapView() {
                 traced={selectedRoute?.links.has(l.id) ?? false}
                 bottleneck={selectedRoute?.bottleneck === l.id}
                 onSelect={handleLinkSelect}
+                tr={tr}
               />
             );
           })}
@@ -642,6 +651,7 @@ export default function MapView() {
                 }
                 hasIncident={!!incidentByTarget[n.id]}
                 onSelect={handleNodeSelect}
+                tr={tr}
               />
             ))}
 
@@ -686,12 +696,17 @@ export default function MapView() {
             const outage = outageDistrictIds.includes(d.id);
             const obligation = obligationDistrictIds.includes(d.id);
             const selected = selectedDistrictId === d.id;
+            const coverage = tr
+              ? `KAPSAMA %${Math.round(d.coverage * 100)}`
+              : `${Math.round(d.coverage * 100)}% COVERAGE`;
             const status = outage
-              ? 'OUTAGE'
+              ? tr
+                ? 'KESİNTİ'
+                : 'OUTAGE'
               : obligation
-                ? `OBLIGATION · ${Math.round(d.coverage * 100)}% COVERAGE`
+                ? `${tr ? 'YÜKÜMLÜLÜK' : 'OBLIGATION'} · ${coverage}`
                 : selected
-                  ? `${Math.round(d.coverage * 100)}% COVERAGE`
+                  ? coverage
                   : null;
             return (
               <g key={`lbl${d.id}`} style={{ pointerEvents: 'none' }}>
@@ -846,7 +861,7 @@ export default function MapView() {
       <div className="absolute bottom-24 right-4 flex flex-col gap-1">
         <details className="relative">
           <summary
-            aria-label="Map visual settings"
+            aria-label={tr ? 'Harita görsel ayarları' : 'Map visual settings'}
             className="panel flex h-8 w-8 cursor-pointer list-none items-center justify-center text-[10px]"
           >
             FX
@@ -866,8 +881,9 @@ export default function MapView() {
               <option value="performance">{t(locale, 'performanceMode')}</option>
             </select>
             <p className="mt-2 text-[11px] text-white/60">
-              {economical ? 'Reduced ambient effects are active.' : 'Full city effects are active.'} Network alerts stay
-              visible.
+              {tr
+                ? `${economical ? 'Azaltılmış ortam efektleri etkin.' : 'Tüm şehir efektleri etkin.'} Şebeke alarmları görünür kalır.`
+                : `${economical ? 'Reduced ambient effects are active.' : 'Full city effects are active.'} Network alerts stay visible.`}
             </p>
           </div>
         </details>
@@ -888,7 +904,7 @@ export default function MapView() {
         <button
           className="panel h-8 w-8 text-[10px] leading-none hover:bg-white/10"
           onClick={fitCamera}
-          title="Fit city inside the usable map area"
+          title={tr ? 'Şehri kullanılabilir harita alanına sığdır' : 'Fit city inside the usable map area'}
           aria-label={tr ? 'Şehri ekrana sığdır' : 'Fit city'}
         >
           fit

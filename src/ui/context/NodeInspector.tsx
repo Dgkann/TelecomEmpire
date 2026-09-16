@@ -5,7 +5,7 @@ import { fmtMoneyExact } from '../../game/economy';
 import { nodeUtil } from '../../game/network';
 import { MAINTENANCE_CONFIG, maintenanceCost } from '../../game/strategy';
 import type { MaintenanceMode } from '../../game/types';
-import { t } from '../i18n';
+import { t, type TranslationKey } from '../i18n';
 import SiteIcon, { TierBadge } from '../SiteIcon';
 import InvestmentPreview from '../InvestmentPreview';
 import DataCenterFinance from '../DataCenterFinance';
@@ -13,9 +13,21 @@ import { Bar } from './Bar';
 import type { NetNode } from '../../game/types';
 import type { ContextModel } from './model';
 
+const KIND_KEY: Record<NetNode['kind'], TranslationKey> = {
+  core: 'core',
+  pop: 'pop',
+  access: 'access',
+  tower: 'tower',
+  datacenter: 'dataCentre',
+};
+
+const MAINTENANCE_STATUS_TR = { scheduled: 'PLANLANDI', active: 'SÜRÜYOR', completed: 'TAMAMLANDI' } as const;
+
 export default function NodeInspector({ cp, node }: { cp: ContextModel; node: NetNode }) {
   // Destructured so TypeScript can narrow it inside the conditional below.
   const { nodeMaintenance } = cp;
+  const tr = cp.locale === 'tr';
+  const kindLabel = tr ? t('tr', KIND_KEY[node.kind]) : NODE_SPECS[node.kind].label;
   const expansionBlocked = node.kind === 'datacenter' && dataCenterExpansionBlocker(cp.game, node);
   return (
     <div className="space-y-3">
@@ -29,12 +41,12 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
               ? cp.locale === 'tr'
                 ? 'Küçük veri merkezi'
                 : 'Small data centre'
-              : `${NODE_SPECS[node.kind].label}, Tier ${node.tier}`
+              : `${kindLabel}, ${tr ? 'Seviye' : 'Tier'} ${node.tier}`
           }
         />
         <div className="min-w-0">
           <div className="mb-1 flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-widest text-white/40">{NODE_SPECS[node.kind].label}</span>
+            <span className="text-[10px] uppercase tracking-widest text-white/40">{kindLabel}</span>
             <TierBadge tier={node.tier} maxTier={cp.nodeMaxTier} compact />
           </div>
           <div className="truncate text-lg font-semibold leading-tight">{node.name}</div>
@@ -44,7 +56,7 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
 
       <Bar
         value={nodeUtil(node)}
-        label="Capacity"
+        label={t(cp.locale, 'capacity')}
         right={`${node.trafficGbps.toFixed(1)} / ${node.capacityGbps.toFixed(0)} Gbps`}
       />
       {node.kind === 'datacenter' && node.tier === 0 && (
@@ -64,17 +76,33 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
           </p>
         </section>
       )}
-      <Bar value={1 - node.health / 100} label="Wear" right={`${Math.round(node.health)}% health`} />
+      <Bar
+        value={1 - node.health / 100}
+        label={tr ? 'Yıpranma' : 'Wear'}
+        right={tr ? `%${Math.round(node.health)} sağlık` : `${Math.round(node.health)}% health`}
+      />
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="chip">
           <div className="stat-label">{t(cp.locale, 'pathToCore')}</div>
-          <div className={cp.connected ? 'text-neon-lime' : 'text-neon-red'}>{cp.connected ? 'Live' : 'Isolated'}</div>
+          <div className={cp.connected ? 'text-neon-lime' : 'text-neon-red'}>
+            {cp.connected ? (tr ? 'Canlı' : 'Live') : tr ? 'Bağlantısız' : 'Isolated'}
+          </div>
         </div>
         <div className="chip">
           <div className="stat-label">{t(cp.locale, 'redundancy')}</div>
           <div className={cp.redundant ? 'text-neon-lime' : 'text-neon-amber'}>
-            {node.kind === 'core' ? 'n/a' : cp.redundant ? 'Protected' : 'Single path'}
+            {node.kind === 'core'
+              ? tr
+                ? 'Geçerli değil'
+                : 'n/a'
+              : cp.redundant
+                ? tr
+                  ? 'Korumalı'
+                  : 'Protected'
+                : tr
+                  ? 'Tek yol'
+                  : 'Single path'}
           </div>
         </div>
       </div>
@@ -91,14 +119,16 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
         <div className="rounded-md border border-teal-300/25 bg-teal-300/5 p-3">
           <div className="text-xs font-semibold text-teal-200">{t(cp.locale, 'protectAgainstCut')}</div>
           <p className="my-2 text-[11px] text-white/60">
-            Independent path via {cp.backup.node.name}. Validated against every cut on the current route.
+            {tr
+              ? `${cp.backup.node.name} üzerinden bağımsız yol. Mevcut rotadaki her kesintiye karşı doğrulandı.`
+              : `Independent path via ${cp.backup.node.name}. Validated against every cut on the current route.`}
           </p>
           <button
             className="btn-primary w-full text-xs"
             disabled={cp.game.money < cp.backup.cost}
             onClick={() => cp.addBackupRoute(node.id)}
           >
-            Build backup fibre · {fmtMoneyExact(cp.backup.cost)}
+            {tr ? 'Yedek fiber kur' : 'Build backup fibre'} · {fmtMoneyExact(cp.backup.cost)}
           </button>
         </div>
       )}
@@ -111,7 +141,9 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
           <div className="mb-2 flex items-center justify-between">
             <div className="stat-label">{t(cp.locale, 'upgradePreview')}</div>
             <div className="num text-[10px] font-semibold text-neon-lime">
-              +{Math.round((cp.nextNodeCapacity / Math.max(0.01, node.capacityGbps) - 1) * 100)}% capacity
+              {tr
+                ? `+%${Math.round((cp.nextNodeCapacity / Math.max(0.01, node.capacityGbps) - 1) * 100)} kapasite`
+                : `+${Math.round((cp.nextNodeCapacity / Math.max(0.01, node.capacityGbps) - 1) * 100)}% capacity`}
             </div>
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -138,21 +170,27 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
           <div className="flex items-center justify-between">
             <span className="stat-label text-neon-amber">{t(cp.locale, 'plannedWork')}</span>
             <span className="chip border-neon-amber/30 text-[9px] text-neon-amber">
-              {nodeMaintenance.status.toUpperCase()}
+              {tr ? MAINTENANCE_STATUS_TR[nodeMaintenance.status] : nodeMaintenance.status.toUpperCase()}
             </span>
           </div>
           <div className="mt-1 text-[11px] text-white/55">
-            {MAINTENANCE_CONFIG[nodeMaintenance.mode].label} ·{' '}
+            {tr ? MAINTENANCE_CONFIG[nodeMaintenance.mode].labelTr : MAINTENANCE_CONFIG[nodeMaintenance.mode].label} ·{' '}
             {nodeMaintenance.status === 'active'
-              ? `${Math.ceil(nodeMaintenance.minutesLeft)} ${plural(Math.ceil(nodeMaintenance.minutesLeft), 'minute')} left`
-              : 'waiting for its window and a free crew'}
+              ? tr
+                ? `${Math.ceil(nodeMaintenance.minutesLeft)} dakika kaldı`
+                : `${Math.ceil(nodeMaintenance.minutesLeft)} ${plural(Math.ceil(nodeMaintenance.minutesLeft), 'minute')} left`
+              : tr
+                ? 'bakım penceresini ve boş bir ekibi bekliyor'
+                : 'waiting for its window and a free crew'}
           </div>
           {nodeMaintenance.status === 'scheduled' && (
             <button
               className="btn mt-2 w-full py-1 text-[11px]"
               onClick={() => cp.cancelMaintenance(nodeMaintenance.id)}
             >
-              Call it off and refund {fmtMoneyExact(nodeMaintenance.cost)}
+              {tr
+                ? `İptal et ve ${fmtMoneyExact(nodeMaintenance.cost)} iade al`
+                : `Call it off and refund ${fmtMoneyExact(nodeMaintenance.cost)}`}
             </button>
           )}
         </div>
@@ -163,8 +201,12 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
             className={`mb-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${cp.maintenanceCover.safe ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}
           >
             {cp.maintenanceCover.safe
-              ? `${cp.maintenanceCover.others} other site${cp.maintenanceCover.others > 1 ? 's' : ''} can carry the district while this one is off.`
-              : 'Nothing else serves this district, so the work will black it out.'}
+              ? tr
+                ? `Bu nokta kapalıyken ${cp.maintenanceCover.others} başka nokta ilçeyi taşıyabilir.`
+                : `${cp.maintenanceCover.others} other site${cp.maintenanceCover.others > 1 ? 's' : ''} can carry the district while this one is off.`
+              : tr
+                ? 'Bu ilçeye başka nokta hizmet vermiyor; bakım ilçeyi karartır.'
+                : 'Nothing else serves this district, so the work will black it out.'}
           </div>
           <div className="grid grid-cols-3 gap-2">
             {(['urgent', 'overnight', 'defer'] as MaintenanceMode[]).map((mode) => (
@@ -173,16 +215,24 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
                 className="rounded-lg border border-white/10 bg-white/[0.03] p-2 text-left hover:border-neon-amber/35 hover:bg-neon-amber/[0.06]"
                 onClick={() => cp.scheduleMaintenance(node.id, mode)}
               >
-                <span className="block text-[11px] font-semibold">{MAINTENANCE_CONFIG[mode].label}</span>
+                <span className="block text-[11px] font-semibold">
+                  {tr ? MAINTENANCE_CONFIG[mode].labelTr : MAINTENANCE_CONFIG[mode].label}
+                </span>
                 <span className="num mt-0.5 block text-[10px] text-neon-amber">
-                  {mode === 'defer' ? 'Free' : fmtMoneyExact(maintenanceCost(node, mode))}
+                  {mode === 'defer' ? (tr ? 'Ücretsiz' : 'Free') : fmtMoneyExact(maintenanceCost(node, mode))}
                 </span>
                 <span className="mt-1 block text-[9px] leading-snug text-white/35">
                   {mode === 'urgent'
-                    ? 'Now · short outage'
+                    ? tr
+                      ? 'Hemen · kısa kesinti'
+                      : 'Now · short outage'
                     : mode === 'overnight'
-                      ? '02:00 · lower cost'
-                      : `Health ${Math.round(node.health)}% and falling`}
+                      ? tr
+                        ? '02:00 · daha ucuz'
+                        : '02:00 · lower cost'
+                      : tr
+                        ? `Sağlık %${Math.round(node.health)} ve düşüyor`
+                        : `Health ${Math.round(node.health)}% and falling`}
                 </span>
               </button>
             ))}
@@ -201,8 +251,10 @@ export default function NodeInspector({ cp, node }: { cp: ContextModel; node: Ne
               ? cp.locale === 'tr'
                 ? 'Edge araştırması gerekiyor'
                 : 'Edge research required'
-              : 'Max tier'
-            : `${node.kind === 'datacenter' && node.tier === 0 ? (cp.locale === 'tr' ? 'Tam merkeze genişlet' : 'Expand to full centre') : 'Upgrade'} · ${fmtMoneyExact(nodeUpgradeCost(node.kind, node.tier))}`}
+              : tr
+                ? 'En yüksek seviye'
+                : 'Max tier'
+            : `${node.kind === 'datacenter' && node.tier === 0 ? (tr ? 'Tam merkeze genişlet' : 'Expand to full centre') : tr ? 'Yükselt' : 'Upgrade'} · ${fmtMoneyExact(nodeUpgradeCost(node.kind, node.tier))}`}
         </button>
         <button
           className="btn"

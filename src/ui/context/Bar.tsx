@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { utilColor } from '../../game/constants';
 
-export const fmtMins = (m: number) => (m < 120 ? `${Math.round(m)} min` : `${Math.round(m / 60)}h`);
+export const fmtMins = (m: number, tr = false) =>
+  m < 120 ? `${Math.round(m)} ${tr ? 'dk' : 'min'}` : `${Math.round(m / 60)}${tr ? ' sa' : 'h'}`;
 
 export function Bar({ value, label, right }: { value: number; label: string; right?: string }) {
   const pct = Math.min(1, value);

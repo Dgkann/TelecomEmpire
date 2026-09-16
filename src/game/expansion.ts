@@ -31,7 +31,9 @@ export function expansionQuote(
   districtId: string,
   kind: ExpansionKind,
   routes = computeRoutes(state),
+  locale: 'en' | 'tr' = 'en',
 ) {
+  const tr = locale === 'tr';
   const district = state.districts.find((d) => d.id === districtId);
   if (!district || (kind !== 'access' && kind !== 'pop')) return null;
   const existing = state.nodes.some((n) => n.districtId === districtId && (n.kind === 'pop' || n.kind === 'access'));
@@ -50,13 +52,21 @@ export function expansionQuote(
   const fibreCost = placement ? Math.round(placement.distance * FIBER_COST_PER_UNIT) : 0;
   const total = licenceCost + siteCost + fibreCost;
   let issue = state.gameOver
-    ? 'This company has closed.'
+    ? tr
+      ? 'Bu şirket kapandı.'
+      : 'This company has closed.'
     : existing
-      ? 'A fixed network already exists here. Expand or repair it from the map.'
+      ? tr
+        ? 'Burada zaten sabit şebeke var. Haritadan genişlet veya onar.'
+        : 'A fixed network already exists here. Expand or repair it from the map.'
       : !live.length
-        ? 'Connect a live core before expanding.'
+        ? tr
+          ? 'Genişlemeden önce canlı bir çekirdeğe bağlan.'
+          : 'Connect a live core before expanding.'
         : !placement
-          ? 'No free tile is available in this district.'
+          ? tr
+            ? 'Bu ilçede boş kare yok.'
+            : 'No free tile is available in this district.'
           : null;
   const steps: BuildStep[] = [];
   let monthlyCost = 0,
@@ -79,9 +89,12 @@ export function expansionQuote(
         districts: state.districts.map((d) => (d.id === districtId ? { ...d, unlocked: true } : d)),
       },
       steps,
+      locale,
     );
     if (projection.error || projection.disconnected)
-      issue = projection.error ?? 'The starter site cannot reach a live core.';
+      issue =
+        projection.error ??
+        (tr ? 'Başlangıç noktası canlı bir çekirdeğe ulaşamıyor.' : 'The starter site cannot reach a live core.');
     else {
       monthlyCost = projection.addedMonthlyCost;
       homes = networkReachGain(state, projection.state);
@@ -89,7 +102,8 @@ export function expansionQuote(
   }
   const arpu = averagePrice(state.packages);
   const fundingGap = Math.max(0, total - state.money);
-  if (!issue && fundingGap > 0) issue = 'Insufficient cash for the complete launch.';
+  if (!issue && fundingGap > 0)
+    issue = tr ? 'Açılışın tamamı için nakit yetersiz.' : 'Insufficient cash for the complete launch.';
   return {
     district,
     kind,

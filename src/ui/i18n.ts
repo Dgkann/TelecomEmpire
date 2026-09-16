@@ -786,6 +786,8 @@ const en: Record<TranslationKey, string> = {
   onsiteGenerationBlurb: 'Fit panels at a site to cut what it draws from the grid, permanently.',
   onsiteGenerationLocked: 'Finish the On-site Generation research to fit your own supply.',
 };
+export const INCOME_LEVEL_TR = { low: 'Düşük', medium: 'Orta', high: 'Yüksek' } as const;
+
 export function t(locale: Locale, key: TranslationKey) {
   return locale === 'tr' ? tr[key] : en[key];
 }

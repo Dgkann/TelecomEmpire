@@ -42,7 +42,11 @@ export default function BlueprintBar() {
           <b className={preview.disconnected ? 'text-neon-amber' : 'text-neon-cyan'}>{preview.disconnected}</b>
         </div>
       </div>
-      <p className="mb-2 text-xs text-teal-200">+{homes.toLocaleString()} potential homes after commissioning</p>
+      <p className="mb-2 text-xs text-teal-200">
+        {tr
+          ? `Kurulumdan sonra +${homes.toLocaleString('tr-TR')} potansiyel hane`
+          : `+${homes.toLocaleString()} potential homes after commissioning`}
+      </p>
       <p className="mb-2 text-[11px] text-white/65">
         {preview.error ??
           (tr

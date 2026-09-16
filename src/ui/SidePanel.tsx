@@ -37,7 +37,7 @@ export default function SidePanel() {
           <button
             className="btn px-2 py-1 text-xs"
             onClick={() => setMobileOpen(false)}
-            aria-label="Close action center"
+            aria-label={tr ? 'Operasyon merkezini kapat' : 'Close action center'}
           >
             ✕
           </button>
@@ -49,7 +49,11 @@ export default function SidePanel() {
               {priorityCount} {tr ? 'gündem' : 'active'}
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-1" role="tablist" aria-label="Action center sections">
+          <div
+            className="grid grid-cols-5 gap-1"
+            role="tablist"
+            aria-label={tr ? 'Operasyon merkezi bölümleri' : 'Action center sections'}
+          >
             {sections.map((section) => {
               const selected = section.id === activeSection;
               return (

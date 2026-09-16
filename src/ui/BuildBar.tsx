@@ -153,7 +153,7 @@ export default function BuildBar() {
               <b className="font-normal text-neon-cyan">{activeNodeCapacity.toFixed(1)}G</b>
               <span className="font-semibold text-white/60">T1</span>
               <span>{activeNodeTool.powerKw} kW</span>
-              <span>{`${fmtMoneyExact(activeNodeTool.maintenance)}/mo`}</span>
+              <span>{`${fmtMoneyExact(activeNodeTool.maintenance)}${tr ? '/ay' : '/mo'}`}</span>
             </span>
           )}
           <span className="text-white/25">•</span>
@@ -210,10 +210,16 @@ export default function BuildBar() {
                   onClick={() => setTool(t.id)}
                   title={
                     locked
-                      ? 'Unlock with research'
+                      ? tr
+                        ? 'Araştırmayla açılır'
+                        : 'Unlock with research'
                       : t.id === 'fiber'
-                        ? 'Connect two sites with a fibre span'
-                        : NODE_SPECS[t.id as NodeKind].description
+                        ? tr
+                          ? 'İki noktayı fiber hatla bağla'
+                          : 'Connect two sites with a fibre span'
+                        : tr
+                          ? NODE_SPECS[t.id as NodeKind].descriptionTr
+                          : NODE_SPECS[t.id as NodeKind].description
                   }
                   className={`relative flex h-[54px] min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-md border px-1 transition-all sm:h-[58px] sm:min-w-[72px] sm:px-2 ${
                     active

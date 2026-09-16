@@ -5,30 +5,37 @@ import { computeRoutes } from '../game/network';
 import { strongestRival } from '../game/competitors';
 import { fmtMoneyExact, fmtNum } from '../game/economy';
 import { useGame } from '../store/gameStore';
-import { t } from './i18n';
+import { INCOME_LEVEL_TR, t } from './i18n';
 
 export function DistrictLaunchProgress({ districtId }: { districtId: string }) {
   const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const progress = useMemo(() => expansionProgress(game, districtId), [game, districtId]);
   if (!progress.sites.length) return null;
+  const tr = locale === 'tr';
   return (
-    <section className="rounded border border-white/10 bg-black/10 p-3" aria-label="District launch checklist">
+    <section
+      className="rounded border border-white/10 bg-black/10 p-3"
+      aria-label={tr ? 'İlçe açılış kontrol listesi' : 'District launch checklist'}
+    >
       <h3 className="text-sm font-semibold">{t(locale, 'establishYourDistrict')}</h3>
       <ul className="mt-2 space-y-2 text-xs">
         {[
-          { done: progress.connected, text: 'Connect a fixed access site' },
+          { done: progress.connected, text: tr ? 'Sabit erişim noktasını bağla' : 'Connect a fixed access site' },
           {
             done: progress.customers >= 100,
-            text: 'Win 100 fixed customers',
+            text: tr ? '100 sabit müşteri kazan' : 'Win 100 fixed customers',
             detail: `${Math.min(100, progress.customers)} / 100`,
           },
-          { done: progress.protected, text: 'Protect a site with independent fibre paths' },
+          {
+            done: progress.protected,
+            text: tr ? 'Bir noktayı bağımsız fiber yollarla koru' : 'Protect a site with independent fibre paths',
+          },
         ].map((item) => (
           <li key={item.text} className="flex items-start gap-2">
             <span
               className={item.done ? 'text-neon-cyan' : 'text-white/40'}
-              aria-label={item.done ? 'Complete' : 'Pending'}
+              aria-label={item.done ? (tr ? 'Tamamlandı' : 'Complete') : tr ? 'Bekliyor' : 'Pending'}
             >
               {item.done ? '✓' : '○'}
             </span>
@@ -38,8 +45,9 @@ export function DistrictLaunchProgress({ districtId }: { districtId: string }) {
         ))}
       </ul>
       <p className="mt-2 text-[11px] leading-relaxed text-white/45">
-        Grow coverage and offer competitive packages to attract subscribers. Select a site on the map to add backup
-        fibre.
+        {tr
+          ? 'Abone çekmek için kapsamayı büyüt ve rekabetçi paketler sun. Yedek fiber eklemek için haritada bir nokta seç.'
+          : 'Grow coverage and offer competitive packages to attract subscribers. Select a site on the map to add backup fibre.'}
       </p>
     </section>
   );
@@ -53,6 +61,7 @@ export default function ExpansionPlanner() {
   const select = useGame((s) => s.select);
   const focus = useGame((s) => s.focus);
   const setTool = useGame((s) => s.setTool);
+  const tr = locale === 'tr';
   const [kind, setKind] = useState<ExpansionKind>('access');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const rows = useMemo(() => {
@@ -62,14 +71,14 @@ export default function ExpansionPlanner() {
       return {
         district: d,
         established,
-        quote: established ? null : expansionQuote(game, d.id, kind, routes),
+        quote: established ? null : expansionQuote(game, d.id, kind, routes, locale),
         homes: game.buildings
           .filter((b) => b.districtId === d.id && b.segment === 'residential')
           .reduce((sum, b) => sum + b.households, 0),
         rival: strongestRival(game, d.id),
       };
     });
-  }, [game, kind]);
+  }, [game, kind, locale]);
   const selected = rows.find((r) => r.district.id === selectedId) ?? rows.find((r) => !r.established) ?? rows[0];
   if (!selected) return null;
   const { district, quote } = selected;
@@ -80,11 +89,12 @@ export default function ExpansionPlanner() {
     focus(district.center.gx, district.center.gy);
   };
   return (
-    <section className="mt-4" aria-label="Expansion planner">
+    <section className="mt-4" aria-label={tr ? 'Genişleme planlayıcı' : 'Expansion planner'}>
       <h3 className="text-lg font-semibold">{t(locale, 'whereWillYouBuildNext')}</h3>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-white/60">
-        Compare local markets, choose your first site, and commission a connected network. A smaller launch preserves
-        cash; a POP reaches more homes.
+        {tr
+          ? 'Yerel pazarları karşılaştır, ilk noktanı seç ve bağlı bir şebeke kur. Küçük açılış nakdi korur; POP daha çok haneye ulaşır.'
+          : 'Compare local markets, choose your first site, and commission a connected network. A smaller launch preserves cash; a POP reaches more homes.'}
       </p>
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
         <fieldset className="min-w-0">
@@ -108,22 +118,33 @@ export default function ExpansionPlanner() {
                     <strong>{row.district.name}</strong>
                     <span className={row.established ? 'text-white/50' : 'text-neon-amber'}>
                       {row.established
-                        ? 'Network established'
+                        ? tr
+                          ? 'Şebeke kurulu'
+                          : 'Network established'
                         : row.quote?.steps.length
                           ? fmtMoneyExact(row.quote.total)
-                          : 'Launch unavailable'}
+                          : tr
+                            ? 'Açılış yapılamıyor'
+                            : 'Launch unavailable'}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-white/60">
-                    {fmtNum(row.homes)} homes · {row.district.incomeLevel} income ·{' '}
-                    {Math.round(row.district.demandFactor * 100)}% bandwidth appetite
+                    {tr
+                      ? `${fmtNum(row.homes)} hane · gelir ${INCOME_LEVEL_TR[row.district.incomeLevel].toLocaleLowerCase('tr-TR')} · bant genişliği talebi %${Math.round(row.district.demandFactor * 100)}`
+                      : `${fmtNum(row.homes)} homes · ${row.district.incomeLevel} income · ${Math.round(row.district.demandFactor * 100)}% bandwidth appetite`}
                   </div>
                   <div className="mt-1 text-[11px] text-white/45">
                     {row.rival
-                      ? `${row.rival.name} holds ${Math.round((row.rival.share[row.district.id] ?? 0) * 100)}% market share`
-                      : 'No established rival'}
+                      ? tr
+                        ? `${row.rival.name}: pazar payı %${Math.round((row.rival.share[row.district.id] ?? 0) * 100)}`
+                        : `${row.rival.name} holds ${Math.round((row.rival.share[row.district.id] ?? 0) * 100)}% market share`
+                      : tr
+                        ? 'Yerleşik rakip yok'
+                        : 'No established rival'}
                     {!row.established && row.quote?.steps.length
-                      ? ` · +${fmtNum(row.quote.homes)} reachable homes`
+                      ? tr
+                        ? ` · +${fmtNum(row.quote.homes)} erişilebilir hane`
+                        : ` · +${fmtNum(row.quote.homes)} reachable homes`
                       : ''}
                   </div>
                 </div>
@@ -132,7 +153,10 @@ export default function ExpansionPlanner() {
           </div>
           <p className="mt-2 text-[11px] text-white/45">{t(locale, 'launchTotalsBlurb')}</p>
         </fieldset>
-        <div className="min-w-0 space-y-3 rounded border border-white/10 bg-black/10 p-4" aria-label="Launch quote">
+        <div
+          className="min-w-0 space-y-3 rounded border border-white/10 bg-black/10 p-4"
+          aria-label={tr ? 'Açılış teklifi' : 'Launch quote'}
+        >
           <h4 className="font-semibold">{district.name}</h4>
           {selected.established ? (
             <DistrictLaunchProgress districtId={district.id} />
@@ -150,15 +174,21 @@ export default function ExpansionPlanner() {
                         <input
                           type="radio"
                           name="launch-kind"
-                          aria-label={option === 'access' ? 'Access node' : 'POP'}
+                          aria-label={option === 'access' ? (tr ? 'Erişim noktası' : 'Access node') : 'POP'}
                           checked={kind === option}
                           onChange={() => setKind(option)}
                           className="accent-[#62c7bd]"
                         />
-                        {option === 'access' ? 'Access node' : 'POP'}
+                        {option === 'access' ? (tr ? 'Erişim noktası' : 'Access node') : 'POP'}
                       </div>
                       <p className="mt-2 text-[11px] text-white/60">
-                        {option === 'access' ? 'Lower cost, smaller reach' : 'Higher cost, wider reach'}
+                        {option === 'access'
+                          ? tr
+                            ? 'Daha ucuz, daha dar kapsama'
+                            : 'Lower cost, smaller reach'
+                          : tr
+                            ? 'Daha pahalı, daha geniş kapsama'
+                            : 'Higher cost, wider reach'}
                       </p>
                     </label>
                   ))}
@@ -169,12 +199,16 @@ export default function ExpansionPlanner() {
                   <dl className="space-y-2 text-xs">
                     {[
                       [
-                        'District licence',
-                        quote.licenceCost === 0 ? 'Already licensed' : fmtMoneyExact(quote.licenceCost),
+                        tr ? 'İlçe lisansı' : 'District licence',
+                        quote.licenceCost === 0
+                          ? tr
+                            ? 'Zaten lisanslı'
+                            : 'Already licensed'
+                          : fmtMoneyExact(quote.licenceCost),
                       ],
-                      ['Starter site', fmtMoneyExact(quote.siteCost)],
-                      ['Fibre connection', fmtMoneyExact(quote.fibreCost)],
-                      ['Additional monthly upkeep', fmtMoneyExact(quote.monthlyCost)],
+                      [tr ? 'Başlangıç noktası' : 'Starter site', fmtMoneyExact(quote.siteCost)],
+                      [tr ? 'Fiber bağlantı' : 'Fibre connection', fmtMoneyExact(quote.fibreCost)],
+                      [tr ? 'Ek aylık bakım gideri' : 'Additional monthly upkeep', fmtMoneyExact(quote.monthlyCost)],
                     ].map(([label, value]) => (
                       <div className="flex justify-between gap-2" key={label}>
                         <dt className="text-white/55">{label}</dt>
@@ -193,18 +227,26 @@ export default function ExpansionPlanner() {
                     </div>
                   </dl>
                   <div className="border-l-2 border-neon-cyan pl-3">
-                    <strong className="text-neon-cyan">+{fmtNum(quote.homes)} reachable homes</strong>
+                    <strong className="text-neon-cyan">
+                      +{fmtNum(quote.homes)} {tr ? 'erişilebilir hane' : 'reachable homes'}
+                    </strong>
                     <p className="mt-1 text-xs leading-relaxed text-white/60">
                       {quote.breakEvenCustomers !== null
-                        ? `About ${quote.breakEvenCustomers} ${plural(quote.breakEvenCustomers, 'subscriber')} at your current package mix ${quote.breakEvenCustomers === 1 ? 'covers' : 'cover'} this network's added upkeep.`
-                        : 'Activate a residential package to earn subscription revenue.'}{' '}
-                      Customer sign-ups take time; reach is not a sales forecast. This excludes the initial investment
-                      and any future transit upgrades.
+                        ? tr
+                          ? `Mevcut paket dağılımınla yaklaşık ${quote.breakEvenCustomers} abone bu şebekenin ek bakım giderini karşılar.`
+                          : `About ${quote.breakEvenCustomers} ${plural(quote.breakEvenCustomers, 'subscriber')} at your current package mix ${quote.breakEvenCustomers === 1 ? 'covers' : 'cover'} this network's added upkeep.`
+                        : tr
+                          ? 'Abonelik geliri için bir konut paketini etkinleştir.'
+                          : 'Activate a residential package to earn subscription revenue.'}{' '}
+                      {tr
+                        ? 'Abonelikler zaman alır; kapsama bir satış tahmini değildir. İlk yatırım ve gelecekteki transit yükseltmeleri hariçtir.'
+                        : 'Customer sign-ups take time; reach is not a sales forecast. This excludes the initial investment and any future transit upgrades.'}
                     </p>
                   </div>
                   <p className="text-[11px] text-white/50">
-                    Fibre joins {game.nodes.find((n) => n.id === quote.placement?.peerId)?.name}. The launch uses one
-                    path; add backup fibre after commissioning.
+                    {tr
+                      ? `Fiber ${game.nodes.find((n) => n.id === quote.placement?.peerId)?.name} noktasına bağlanır. Açılış tek yol kullanır; kurulumdan sonra yedek fiber ekle.`
+                      : `Fibre joins ${game.nodes.find((n) => n.id === quote.placement?.peerId)?.name}. The launch uses one path; add backup fibre after commissioning.`}
                   </p>
                 </>
               )}
@@ -212,7 +254,9 @@ export default function ExpansionPlanner() {
                 <p className="text-xs text-neon-amber">
                   {quote.issue}
                   {quote.fundingGap > 0 && quote.steps.length > 0
-                    ? ` Need ${fmtMoneyExact(quote.fundingGap)} more.`
+                    ? tr
+                      ? ` ${fmtMoneyExact(quote.fundingGap)} daha gerekiyor.`
+                      : ` Need ${fmtMoneyExact(quote.fundingGap)} more.`
                     : ''}
                 </p>
               )}
@@ -221,7 +265,8 @@ export default function ExpansionPlanner() {
                 disabled={!quote || !!quote.issue}
                 onClick={() => launch(district.id, kind)}
               >
-                Commission starter network{quote?.steps.length ? ` · ${fmtMoneyExact(quote.total)}` : ''}
+                {tr ? 'Başlangıç şebekesini kur' : 'Commission starter network'}
+                {quote?.steps.length ? ` · ${fmtMoneyExact(quote.total)}` : ''}
               </button>
             </>
           )}

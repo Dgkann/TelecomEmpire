@@ -8,7 +8,10 @@ export function FailureFootprint({ game, report }: { game: GameState; report: Fa
   const locale = useGame((s) => s.locale);
   const affected = report.districts.filter((d) => d.loss > 0.001 || d.disconnectedSites > 0);
   return (
-    <g aria-label="Simulated failure footprint" style={{ pointerEvents: 'none' }}>
+    <g
+      aria-label={locale === 'tr' ? 'Simüle edilen arıza izi' : 'Simulated failure footprint'}
+      style={{ pointerEvents: 'none' }}
+    >
       {affected.map((d) => (
         <g key={d.id}>
           {game.districts
@@ -59,13 +62,18 @@ export default function FailureDrillPanel({ report }: { report: FailureReport })
   const locale = useGame((s) => s.locale);
   const game = useGame((s) => s.game)!;
   const end = useGame((s) => s.endFailureDrill);
+  const tr = locale === 'tr';
   const target =
-    report.target.type === 'node' ? game.nodes.find((n) => n.id === report.target.id)?.name : 'Selected fibre span';
+    report.target.type === 'node'
+      ? game.nodes.find((n) => n.id === report.target.id)?.name
+      : tr
+        ? 'Seçili fiber hat'
+        : 'Selected fibre span';
   const affected = report.districts.filter((d) => d.loss > 0.001 || d.disconnectedSites > 0);
   const ratio = (v: number) => (report.before.demand ? Math.round((v / report.before.demand) * 100) : 100);
   return (
     <section
-      aria-label="Failure drill"
+      aria-label={t(locale, 'failureDrill')}
       className="panel absolute bottom-3 left-3 right-3 z-30 border-orange-300/40 p-4 lg:bottom-auto lg:right-auto lg:top-3 lg:w-[280px]"
     >
       <div className="flex justify-between gap-2">
@@ -85,16 +93,22 @@ export default function FailureDrillPanel({ report }: { report: FailureReport })
         </div>
         <div className="text-right">
           <strong className="text-xl">{report.lostSites.length}</strong>
-          <div className="text-[10px] text-white/50">sites disconnected</div>
+          <div className="text-[10px] text-white/50">{tr ? 'bağlantısı kopan nokta' : 'sites disconnected'}</div>
         </div>
       </div>
       <p className="text-xs text-white/65">
         {report.lostGbps > 0.001
-          ? `${report.lostGbps.toFixed(2)} Gbps of additional demand would go unserved.`
-          : 'No additional residential demand is lost in this test.'}
+          ? tr
+            ? `${report.lostGbps.toFixed(2).replace('.', ',')} Gbps ek talep karşılanamaz.`
+            : `${report.lostGbps.toFixed(2)} Gbps of additional demand would go unserved.`
+          : tr
+            ? 'Bu testte ek konut talebi kaybolmuyor.'
+            : 'No additional residential demand is lost in this test.'}
       </p>
       <details className="mt-2 text-xs" open={affected.length > 0}>
-        <summary className="cursor-pointer text-orange-200">Affected districts · {affected.length}</summary>
+        <summary className="cursor-pointer text-orange-200">
+          {tr ? 'Etkilenen ilçeler' : 'Affected districts'} · {affected.length}
+        </summary>
         <div className="mt-2 max-h-28 space-y-2 overflow-auto">
           {affected.map((d) => (
             <div key={d.id}>
@@ -112,8 +126,9 @@ export default function FailureDrillPanel({ report }: { report: FailureReport })
         </div>
       </details>
       <p className="mt-3 text-[10px] leading-relaxed text-white/45">
-        Current residential customers at peak. Excludes transit, caches, mobile and business demand. Orange marks show
-        the simulated impact; the real network is unchanged.
+        {tr
+          ? 'Yoğun saatteki mevcut konut müşterileri. Transit, önbellek, mobil ve ticari talep hariç. Turuncu işaretler simüle edilen etkiyi gösterir; gerçek şebeke değişmez.'
+          : 'Current residential customers at peak. Excludes transit, caches, mobile and business demand. Orange marks show the simulated impact; the real network is unchanged.'}
       </p>
       <button className="btn-primary mt-3 w-full text-xs" onClick={end}>
         {t(locale, 'endDrill')}

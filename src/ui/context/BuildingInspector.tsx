@@ -6,18 +6,31 @@ import type { Building } from '../../game/types';
 import { fmtMins } from './Bar';
 import type { ContextModel } from './model';
 
+const BUILDING_KIND_TR: Record<Building['kind'], string> = {
+  house: 'müstakil ev',
+  apartment: 'apartman',
+  office: 'ofis',
+  shop: 'dükkân',
+  industrial: 'sanayi',
+  hospital: 'hastane',
+  university: 'üniversite',
+  park: 'park',
+};
+
 export default function BuildingInspector({ cp, building }: { cp: ContextModel; building: Building }) {
+  const tr = cp.locale === 'tr';
   return (
     <div className="space-y-3">
       <div>
         <div className="text-[10px] uppercase tracking-widest text-white/40">
-          {cp.buildingContract ? 'Enterprise client' : 'Building'}
+          {cp.buildingContract ? (tr ? 'Kurumsal müşteri' : 'Enterprise client') : tr ? 'Bina' : 'Building'}
         </div>
         <div className="text-lg font-semibold leading-tight">
           {cp.buildingContract?.clientName ?? cp.game.districts.find((d) => d.id === building.districtId)?.name}
         </div>
         <div className="text-[11px] text-white/40">
-          {cp.game.districts.find((d) => d.id === building.districtId)?.name} · {building.kind}
+          {cp.game.districts.find((d) => d.id === building.districtId)?.name} ·{' '}
+          {tr ? BUILDING_KIND_TR[building.kind] : building.kind}
         </div>
       </div>
 
@@ -44,22 +57,32 @@ export default function BuildingInspector({ cp, building }: { cp: ContextModel; 
 
           <Bar
             value={cp.buildingRisk.usage}
-            label="Downtime allowance used"
-            right={`${fmtMins(cp.buildingContract.downtimeMinutes)} / ${fmtMins(cp.buildingRisk.allowance)}`}
+            label={tr ? 'Kullanılan kesinti payı' : 'Downtime allowance used'}
+            right={`${fmtMins(cp.buildingContract.downtimeMinutes, tr)} / ${fmtMins(cp.buildingRisk.allowance, tr)}`}
           />
 
           <div className="text-[10px] text-white/35">
-            Penalties are capped at {fmtMoneyExact(cp.buildingContract.monthlyRevenue * SLA_PENALTY_CAP)} a month.
+            {tr
+              ? `Cezalar ayda en fazla ${fmtMoneyExact(cp.buildingContract.monthlyRevenue * SLA_PENALTY_CAP)}.`
+              : `Penalties are capped at ${fmtMoneyExact(cp.buildingContract.monthlyRevenue * SLA_PENALTY_CAP)} a month.`}
           </div>
 
           <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2.5 text-[11px] leading-snug text-white/55">
             {cp.buildingRisk.districtOut
-              ? 'This district is down right now, and the allowance is burning.'
+              ? tr
+                ? 'Bu ilçede şu an kesinti var ve kesinti payı tükeniyor.'
+                : 'This district is down right now, and the allowance is burning.'
               : cp.buildingRisk.fragile
-                ? 'Every path to this client runs through one span. A single cut breaches the SLA.'
+                ? tr
+                  ? 'Bu müşteriye giden her yol tek bir hattan geçiyor. Tek bir kesinti SLA ihlali demek.'
+                  : 'Every path to this client runs through one span. A single cut breaches the SLA.'
                 : cp.buildingRisk.usage >= 1
-                  ? 'The allowance is spent. Further downtime is charged as a penalty.'
-                  : 'Service is within the agreed allowance.'}
+                  ? tr
+                    ? 'Kesinti payı tükendi. Bundan sonraki kesintiler ceza olarak yansır.'
+                    : 'The allowance is spent. Further downtime is charged as a penalty.'
+                  : tr
+                    ? 'Hizmet anlaşılan kesinti payı içinde.'
+                    : 'Service is within the agreed allowance.'}
           </div>
         </>
       ) : (

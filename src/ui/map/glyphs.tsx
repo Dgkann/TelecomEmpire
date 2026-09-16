@@ -16,6 +16,7 @@ export const LinkGlyph = memo(function LinkGlyph({
   traced,
   bottleneck,
   ghost,
+  tr,
 }: {
   link: NetLink;
   a: NetNode;
@@ -26,6 +27,7 @@ export const LinkGlyph = memo(function LinkGlyph({
   traced: boolean;
   bottleneck: boolean;
   ghost: boolean;
+  tr: boolean;
 }) {
   const x1 = isoX(a.gx, a.gy);
   const y1 = isoY(a.gx, a.gy) - 6;
@@ -43,7 +45,11 @@ export const LinkGlyph = memo(function LinkGlyph({
       data-map-placement-blocker="true"
       role="button"
       tabIndex={0}
-      aria-label={`${a.name} to ${b.name} fibre, tier ${link.tier}, ${Math.round(util * 100)} percent load${link.down ? ', down' : ''}`}
+      aria-label={
+        tr
+          ? `${a.name} – ${b.name} fiber hattı, seviye ${link.tier}, yüzde ${Math.round(util * 100)} yük${link.down ? ', kesik' : ''}`
+          : `${a.name} to ${b.name} fibre, tier ${link.tier}, ${Math.round(util * 100)} percent load${link.down ? ', down' : ''}`
+      }
       onClick={(e) => (e.stopPropagation(), onSelect(link.id))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -114,7 +120,7 @@ export const LinkGlyph = memo(function LinkGlyph({
         <g transform={`translate(${(x1 + x2) / 2} ${(y1 + y2) / 2 - 9})`}>
           <rect x={-24} y={-10} width={48} height={18} rx={5} fill="#10222d" stroke={color} strokeOpacity={0.7} />
           <text y={2} textAnchor="middle" fill={color} fontSize={10} fontWeight={700}>
-            {link.down ? 'DOWN' : `${Math.round(util * 100)}%`}
+            {link.down ? (tr ? 'KESİK' : 'DOWN') : `${Math.round(util * 100)}%`}
           </text>
         </g>
       )}
@@ -143,6 +149,7 @@ export const NodeGlyph = memo(function NodeGlyph({
   fiberState,
   ghost,
   isolated,
+  tr,
 }: {
   node: NetNode;
   selected: boolean;
@@ -151,12 +158,14 @@ export const NodeGlyph = memo(function NodeGlyph({
   fiberState: 'source' | 'eligible' | 'blocked' | null;
   isolated: boolean;
   ghost: boolean;
+  tr: boolean;
 }) {
   const cx = isoX(node.gx, node.gy);
   const cy = isoY(node.gx, node.gy);
   const util = Math.min(1, nodeUtil(node));
   const statusColor = node.down ? '#ff6577' : isolated ? '#ffc857' : utilColor(util);
   const visual = SITE_VISUAL[node.kind];
+  const kindLabel = tr ? visual.labelTr : visual.label;
   const linking = fiberState === 'source';
 
   // Capacity is the whole point of a tier, so the site simply gets bigger.
@@ -174,7 +183,11 @@ export const NodeGlyph = memo(function NodeGlyph({
       data-map-placement-blocker="true"
       role="button"
       tabIndex={0}
-      aria-label={`${node.name}, ${visual.label}, tier ${node.tier}, ${Math.round(util * 100)} percent load${node.down ? ', down' : ''}`}
+      aria-label={
+        tr
+          ? `${node.name}, ${kindLabel}, seviye ${node.tier}, yüzde ${Math.round(util * 100)} yük${node.down ? ', devre dışı' : ''}`
+          : `${node.name}, ${kindLabel}, tier ${node.tier}, ${Math.round(util * 100)} percent load${node.down ? ', down' : ''}`
+      }
       onClick={(e) => (e.stopPropagation(), onSelect(node.id))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -185,7 +198,11 @@ export const NodeGlyph = memo(function NodeGlyph({
       }}
       style={{ cursor: 'pointer' }}
     >
-      <title>{`${node.name} · ${visual.label} · Tier ${node.tier} · ${Math.round(util * 100)}% load`}</title>
+      <title>
+        {tr
+          ? `${node.name} · ${kindLabel} · Seviye ${node.tier} · %${Math.round(util * 100)} yük`
+          : `${node.name} · ${kindLabel} · Tier ${node.tier} · ${Math.round(util * 100)}% load`}
+      </title>
       <g className="map-focus-ring" aria-hidden="true">
         <SitePlate kind={node.kind} cx={cx} cy={my} size={r + 10} fill="none" stroke="#f4f8ff" strokeWidth={2.2} />
       </g>
@@ -202,7 +219,7 @@ export const NodeGlyph = memo(function NodeGlyph({
         <g transform={`translate(${cx} ${my - r - 20})`}>
           <rect x={-39} y={-10} width={78} height={17} rx={4} fill="#121f2b" stroke={statusColor} />
           <text textAnchor="middle" y={2} fontSize={8} fontWeight={700} fill={statusColor}>
-            {node.down ? 'OFFLINE' : 'NO BACKHAUL'}
+            {node.down ? (tr ? 'DEVRE DIŞI' : 'OFFLINE') : tr ? 'BAĞLANTI YOK' : 'NO BACKHAUL'}
           </text>
         </g>
       )}
@@ -315,7 +332,7 @@ export const NodeGlyph = memo(function NodeGlyph({
               letterSpacing={0.5}
               fill="#e8eef7"
             >
-              {visual.label.toUpperCase()} · T{node.tier}
+              {kindLabel.toLocaleUpperCase(tr ? 'tr-TR' : 'en-US')} · T{node.tier}
             </text>
           </g>
         </>

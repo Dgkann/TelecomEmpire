@@ -4,6 +4,7 @@ import NodeInspector from './context/NodeInspector';
 import LinkInspector from './context/LinkInspector';
 import BuildingInspector from './context/BuildingInspector';
 import DistrictInspector from './context/DistrictInspector';
+import { t } from './i18n';
 
 export default function ContextPanel() {
   const cp = useContextModel();
@@ -24,7 +25,7 @@ export default function ContextPanel() {
           <button
             className="absolute right-3 top-3 text-white/40 hover:text-white"
             onClick={() => select(null)}
-            aria-label="Close"
+            aria-label={t(cp.locale, 'close')}
           >
             ✕
           </button>

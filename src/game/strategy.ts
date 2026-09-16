@@ -14,32 +14,48 @@ import type {
 
 export const CAMPAIGN_CONFIG: Record<
   CampaignKind,
-  { label: string; description: string; cost: number; durationDays: number; color: string }
+  {
+    label: string;
+    labelTr: string;
+    description: string;
+    descriptionTr: string;
+    cost: number;
+    durationDays: number;
+    color: string;
+  }
 > = {
   acquisition: {
     label: 'Acquisition drive',
+    labelTr: 'Büyüme kampanyası',
     description: '45% faster fixed-line growth in this district.',
+    descriptionTr: 'Bu ilçede sabit hat büyümesi %45 daha hızlı.',
     cost: 360000,
     durationDays: 30,
     color: '#3ee6d6',
   },
   retention: {
     label: 'Retention care',
+    labelTr: 'Sadakat kampanyası',
     description: '40% less churn and a local satisfaction lift.',
+    descriptionTr: 'Ayrılmalar %40 azalır ve yerel memnuniyet artar.',
     cost: 320000,
     durationDays: 30,
     color: '#a3e635',
   },
   business: {
     label: 'Business outreach',
+    labelTr: 'Kurumsal kampanya',
     description: '75% more enterprise leads from this district.',
+    descriptionTr: 'Bu ilçeden %75 daha fazla kurumsal müşteri fırsatı.',
     cost: 440000,
     durationDays: 30,
     color: '#a78bfa',
   },
   mobile: {
     label: 'Mobile launch',
+    labelTr: 'Mobil lansman',
     description: '50% faster mobile subscriber growth.',
+    descriptionTr: 'Mobil abone büyümesi %50 daha hızlı.',
     cost: 480000,
     durationDays: 30,
     color: '#f59e0b',
@@ -170,23 +186,36 @@ export function dataCenterModeChangeCost(node: Pick<NetNode, 'tier' | 'capacityG
 
 export const MAINTENANCE_CONFIG: Record<
   MaintenanceMode,
-  { label: string; description: string; costMultiplier: number; durationMinutes: number }
+  {
+    label: string;
+    labelTr: string;
+    description: string;
+    descriptionTr: string;
+    costMultiplier: number;
+    durationMinutes: number;
+  }
 > = {
   urgent: {
     label: 'Urgent service',
+    labelTr: 'Acil servis',
     description: 'Dispatch immediately. Expensive, but the shortest intervention.',
+    descriptionTr: 'Ekibi hemen gönder. Pahalı ama en kısa müdahale.',
     costMultiplier: 1.55,
     durationMinutes: 90,
   },
   overnight: {
     label: 'Overnight window',
+    labelTr: 'Gece penceresi',
     description: 'Queue for 02:00. Lower cost, with a longer planned interruption.',
+    descriptionTr: '02:00 için sıraya alınır. Daha ucuz ama planlı kesinti daha uzun.',
     costMultiplier: 0.8,
     durationMinutes: 150,
   },
   defer: {
     label: 'Keep it running',
+    labelTr: 'Çalışmaya devam et',
     description: 'Spend nothing and accept the rising odds of an unplanned failure.',
+    descriptionTr: 'Hiç harcama yapma ve plansız arıza olasılığının artmasını kabul et.',
     costMultiplier: 0,
     durationMinutes: 0,
   },
