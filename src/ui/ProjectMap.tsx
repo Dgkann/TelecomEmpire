@@ -67,7 +67,9 @@ export function DistrictProjectCard({ districtId }: { districtId: string }) {
             ? 'Teslim ettiğin şehir projesi'
             : 'Your city delivery project'}
       </p>
-      <h3 className="mt-1 text-sm font-semibold">{TENDER_PROGRAMMES[tender.kind].title}</h3>
+      <h3 className="mt-1 text-sm font-semibold">
+        {tr ? TENDER_PROGRAMMES[tender.kind].titleTr : TENDER_PROGRAMMES[tender.kind].title}
+      </h3>
       {tender.status === 'delivery' && (
         <>
           <p className="mt-2 text-xs text-white/60">

@@ -8,7 +8,9 @@ import type { GameState, CityTender, ProcurementState } from './types';
 export const TENDER_PROGRAMMES = {
   schools: {
     title: 'School fibre programme',
+    titleTr: 'Okul fiber programı',
     brief: 'Bring dependable fixed access to the district learning network.',
+    briefTr: 'İlçenin eğitim ağına güvenilir sabit erişim getir.',
     budget: 1300000,
     reach: 0.4,
     sites: 2,
@@ -18,7 +20,9 @@ export const TENDER_PROGRAMMES = {
   },
   emergency: {
     title: 'Emergency services ring',
+    titleTr: 'Acil hizmetler halkası',
     brief: 'Build independent fibre paths so local services can withstand a cut.',
+    briefTr: 'Yerel hizmetlerin bir kesintiye dayanabilmesi için bağımsız fiber yollar kur.',
     budget: 2200000,
     reach: 0.55,
     sites: 2,
@@ -28,7 +32,9 @@ export const TENDER_PROGRAMMES = {
   },
   gigabit: {
     title: 'District fibre rollout',
+    titleTr: 'İlçe fiber yaygınlaştırması',
     brief: 'Deliver broad fixed access with protected service hubs across the district.',
+    briefTr: 'İlçe genelinde korumalı hizmet merkezleriyle geniş sabit erişim sağla.',
     budget: 3300000,
     reach: 0.7,
     sites: 3,
@@ -59,11 +65,41 @@ export function tenderProgress(state: GameState, tender: CityTender) {
   const coverage = fixedCoverageTarget(state, tender.districtId, routes);
   const health = sites.length ? Math.min(...sites.map((n) => n.health)) : 0;
   const requirements = [
-    { id: 'licence', label: 'District licensed', current: district?.unlocked ? 1 : 0, target: 1 },
-    { id: 'reach', label: 'Fixed network reach', current: coverage, target: spec.reach },
-    { id: 'sites', label: 'Connected access sites', current: sites.length, target: spec.sites },
-    { id: 'protection', label: 'Independently protected sites', current: protectedSites, target: spec.protectedSites },
-    { id: 'health', label: 'Minimum live-site condition', current: health, target: 80 },
+    {
+      id: 'licence',
+      label: 'District licensed',
+      labelTr: 'İlçe lisanslı',
+      current: district?.unlocked ? 1 : 0,
+      target: 1,
+    },
+    {
+      id: 'reach',
+      label: 'Fixed network reach',
+      labelTr: 'Sabit şebeke kapsaması',
+      current: coverage,
+      target: spec.reach,
+    },
+    {
+      id: 'sites',
+      label: 'Connected access sites',
+      labelTr: 'Bağlı erişim noktaları',
+      current: sites.length,
+      target: spec.sites,
+    },
+    {
+      id: 'protection',
+      label: 'Independently protected sites',
+      labelTr: 'Bağımsız yollarla korunan noktalar',
+      current: protectedSites,
+      target: spec.protectedSites,
+    },
+    {
+      id: 'health',
+      label: 'Minimum live-site condition',
+      labelTr: 'Canlı noktaların asgari durumu',
+      current: health,
+      target: 80,
+    },
   ];
   return {
     requirements,

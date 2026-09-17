@@ -15,18 +15,27 @@ import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
 import { SignalTrainingCard } from '../SignalTraining';
 
-const timeLeft = (until: number, now: number) => {
+const timeLeft = (until: number, now: number, tr: boolean) => {
   const hours = Math.max(0, Math.ceil((until - now) / 60));
-  return hours >= 24 ? `${Math.floor(hours / 24)}d ${hours % 24}h` : `${hours}h`;
+  const [d, h] = tr ? [' g', ' sa'] : ['d', 'h'];
+  return hours >= 24 ? `${Math.floor(hours / 24)}${d} ${hours % 24}${h}` : `${hours}${h}`;
 };
 
-function DistrictDiagram({ game, tender }: { game: GameState; tender: CityTender }) {
+const STATUS_TR: Record<CityTender['status'], string> = {
+  open: 'açık',
+  delivery: 'teslimde',
+  completed: 'tamamlandı',
+  failed: 'başarısız',
+  lost: 'kaybedildi',
+};
+
+function DistrictDiagram({ game, tender, tr }: { game: GameState; tender: CityTender; tr: boolean }) {
   const scale = 8;
   return (
     <svg
       viewBox={`0 0 ${game.gridSize * scale + 8} ${game.gridSize * scale + 8}`}
       role="img"
-      aria-label="Project district footprint"
+      aria-label={tr ? 'Proje ilçesi haritası' : 'Project district footprint'}
       className="h-20 w-20 shrink-0 rounded bg-[#10232e] p-1 sm:h-40 sm:w-40 sm:p-2"
     >
       {game.districts.flatMap((d) =>
@@ -70,6 +79,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
   const district = game.districts.find((d) => d.id === tender.districtId)!;
   const progress = useMemo(() => tenderProgress(game, tender), [game, tender]);
   const issue = tenderBidIssue(game, tender, price, locale);
+  const tr = locale === 'tr';
   const phase = tender.status === 'open' ? 0 : tender.status === 'delivery' ? 1 : 2;
   const inspect = () => {
     focus(district.center.gx, district.center.gy);
@@ -84,24 +94,28 @@ function TenderDetail({ tender }: { tender: CityTender }) {
   return (
     <article
       className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-[#142b36]"
-      aria-label="Infrastructure tender"
+      aria-label={tr ? 'Altyapı ihalesi' : 'Infrastructure tender'}
     >
       <div className="border-b border-white/10 bg-[#1b3440] p-5 sm:p-6">
-        <div className="mb-4 flex gap-1" aria-label="Project stages">
-          {['Sealed bidding', 'Build & prove', 'Settlement'].map((label, i) => (
-            <div
-              key={label}
-              className={`flex-1 border-t-2 pt-2 text-[11px] ${phase === i ? 'border-neon-amber text-neon-amber' : phase > i ? 'border-neon-cyan text-neon-cyan' : 'border-white/15 text-white/35'}`}
-            >
-              {label}
-            </div>
-          ))}
+        <div className="mb-4 flex gap-1" aria-label={tr ? 'Proje aşamaları' : 'Project stages'}>
+          {(tr ? ['Kapalı teklif', 'Kur ve kanıtla', 'Sonuç'] : ['Sealed bidding', 'Build & prove', 'Settlement']).map(
+            (label, i) => (
+              <div
+                key={i}
+                className={`flex-1 border-t-2 pt-2 text-[11px] ${phase === i ? 'border-neon-amber text-neon-amber' : phase > i ? 'border-neon-cyan text-neon-cyan' : 'border-white/15 text-white/35'}`}
+              >
+                {label}
+              </div>
+            ),
+          )}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-neon-amber">City authority · {district.name}</p>
-            <h2 className="project-title mt-2 font-semibold">{spec.title}</h2>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/60">{spec.brief}</p>
+            <p className="text-xs text-neon-amber">
+              {tr ? 'Şehir yönetimi' : 'City authority'} · {district.name}
+            </p>
+            <h2 className="project-title mt-2 font-semibold">{tr ? spec.titleTr : spec.title}</h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/60">{tr ? spec.briefTr : spec.brief}</p>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
               <span>
                 {t(locale, 'budget')}{' '}
@@ -109,29 +123,38 @@ function TenderDetail({ tender }: { tender: CityTender }) {
               </span>
               <span>
                 {tender.status === 'open'
-                  ? 'Bidding closes in'
+                  ? tr
+                    ? 'Teklifler kapanıyor'
+                    : 'Bidding closes in'
                   : tender.status === 'delivery'
-                    ? 'Delivery deadline in'
-                    : 'Outcome'}
+                    ? tr
+                      ? 'Teslim süresi'
+                      : 'Delivery deadline in'
+                    : tr
+                      ? 'Sonuç'
+                      : 'Outcome'}
                 <strong className="block text-lg capitalize text-neon-amber">
                   {tender.status === 'open'
-                    ? timeLeft(tender.closesAt, game.minutes)
+                    ? timeLeft(tender.closesAt, game.minutes, tr)
                     : tender.status === 'delivery'
-                      ? timeLeft(tender.dueAt!, game.minutes)
-                      : tender.status}
+                      ? timeLeft(tender.dueAt!, game.minutes, tr)
+                      : tr
+                        ? STATUS_TR[tender.status]
+                        : tender.status}
                 </strong>
               </span>
             </div>
           </div>
-          <DistrictDiagram game={game} tender={tender} />
+          <DistrictDiagram game={game} tender={tender} tr={tr} />
         </div>
       </div>
       <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
         <section>
           <h3 className="font-semibold">{t(locale, 'deliverySpecification')}</h3>
           <p className="mt-1 text-xs leading-relaxed text-white/50">
-            Build within {spec.days} {plural(spec.days, 'day')} of award. Hold every condition for six consecutive game
-            hours. Losing a condition restarts the acceptance test.
+            {tr
+              ? `İhaleyi kazandıktan sonra ${spec.days} gün içinde kur. Tüm koşulları art arda altı oyun saati koru. Bir koşul bozulursa kabul testi yeniden başlar.`
+              : `Build within ${spec.days} ${plural(spec.days, 'day')} of award. Hold every condition for six consecutive game hours. Losing a condition restarts the acceptance test.`}
           </p>
           <ul className="mt-3 divide-y divide-white/10">
             {progress.requirements
@@ -139,16 +162,24 @@ function TenderDetail({ tender }: { tender: CityTender }) {
               .map((r) => {
                 const ready = r.current + 1e-9 >= r.target;
                 const format = (n: number) =>
-                  r.id === 'reach' ? Math.round(n * 100) + '%' : r.id === 'health' ? Math.round(n) + '%' : String(n);
+                  r.id === 'reach' || r.id === 'health'
+                    ? tr
+                      ? '%' + Math.round(r.id === 'reach' ? n * 100 : n)
+                      : Math.round(r.id === 'reach' ? n * 100 : n) + '%'
+                    : String(n);
                 return (
                   <li className="py-2.5" key={r.id}>
                     <div className="flex justify-between gap-2 text-xs">
-                      <span className="text-white/70">{r.label}</span>
+                      <span className="text-white/70">{tr ? r.labelTr : r.label}</span>
                       <strong className={ready ? 'text-neon-cyan' : 'text-neon-amber'}>
                         {r.id === 'licence'
                           ? ready
-                            ? 'Licensed'
-                            : 'Licence needed'
+                            ? tr
+                              ? 'Lisanslı'
+                              : 'Licensed'
+                            : tr
+                              ? 'Lisans gerekli'
+                              : 'Licence needed'
                           : `${format(r.current)} / ${format(r.target)}`}
                       </strong>
                     </div>
@@ -180,8 +211,9 @@ function TenderDetail({ tender }: { tender: CityTender }) {
             )}
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-            The programme pays for commissioned infrastructure. It does not grant subscribers. Existing sites may
-            qualify; only sites routed to a live core count.
+            {tr
+              ? 'Program kurulan altyapı için ödeme yapar, abone kazandırmaz. Mevcut noktalar sayılabilir; yalnızca canlı bir çekirdeğe rotalanan noktalar geçerlidir.'
+              : 'The programme pays for commissioned infrastructure. It does not grant subscribers. Existing sites may qualify; only sites routed to a live core count.'}
           </p>
         </section>
         <section className="min-w-0 rounded border border-white/10 bg-black/15 p-4">
@@ -191,15 +223,20 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 e.preventDefault();
                 setMessage(
                   bid(tender.id, price)
-                    ? 'Sealed bid submitted. Your performance bond is held until settlement.'
-                    : 'Bid unavailable. Review the deadline and available cash.',
+                    ? tr
+                      ? 'Kapalı teklif verildi. Teminatın sonuçlanana kadar tutulur.'
+                      : 'Sealed bid submitted. Your performance bond is held until settlement.'
+                    : tr
+                      ? 'Teklif verilemiyor. Süreyi ve nakdini kontrol et.'
+                      : 'Bid unavailable. Review the deadline and available cash.',
                 );
               }}
             >
               <h3 className="font-semibold">{t(locale, 'yourSealedBid')}</h3>
               <p className="mt-1 text-xs leading-relaxed text-white/55">
-                Offer the payment you require for the complete job. Lowest cost contributes 70 points; reputation
-                contributes 30.
+                {tr
+                  ? 'İşin tamamı için istediğin ödemeyi teklif et. En düşük maliyet 70 puan, itibar 30 puan getirir.'
+                  : 'Offer the payment you require for the complete job. Lowest cost contributes 70 points; reputation contributes 30.'}
               </p>
               <label className="mt-4 block text-xs text-white/60">
                 {t(locale, 'requestedPayment')}
@@ -217,7 +254,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 />
               </label>
               <input
-                aria-label="Requested payment slider"
+                aria-label={tr ? 'Talep edilen ödeme kaydırıcısı' : 'Requested payment slider'}
                 type="range"
                 min={Math.ceil(tender.budget * 0.65)}
                 max={tender.budget}
@@ -230,8 +267,12 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 className="mt-3 w-full accent-[#d2a657]"
               />
               <div className="flex justify-between text-[10px] text-white/45">
-                <span>{fmtMoneyExact(Math.ceil(tender.budget * 0.65))} · aggressive</span>
-                <span>{fmtMoneyExact(tender.budget)} · full budget</span>
+                <span>
+                  {fmtMoneyExact(Math.ceil(tender.budget * 0.65))} · {tr ? 'agresif' : 'aggressive'}
+                </span>
+                <span>
+                  {fmtMoneyExact(tender.budget)} · {tr ? 'tam bütçe' : 'full budget'}
+                </span>
               </div>
               <dl className="mt-4 space-y-2 text-xs">
                 <div className="flex justify-between">
@@ -241,7 +282,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>10% performance bond</dt>
+                  <dt>{tr ? '%10 teminat' : '10% performance bond'}</dt>
                   <dd>{Number.isFinite(price) ? fmtMoneyExact(bidBond(price)) : '—'}</dd>
                 </div>
                 <div className="flex justify-between">
@@ -255,9 +296,9 @@ function TenderDetail({ tender }: { tender: CityTender }) {
               </dl>
               {tender.playerBid && (
                 <p className="mt-3 rounded border border-neon-cyan/20 p-2 text-xs text-neon-cyan">
-                  Submitted: {fmtMoneyExact(tender.playerBid.price)} · score{' '}
-                  {bidScore(tender.budget, tender.playerBid.price, tender.playerBid.quality).toFixed(1)}. Reputation is
-                  captured when you submit.
+                  {tr
+                    ? `Verilen teklif: ${fmtMoneyExact(tender.playerBid.price)} · puan ${bidScore(tender.budget, tender.playerBid.price, tender.playerBid.quality).toFixed(1)}. İtibarın teklif anında kaydedilir.`
+                    : `Submitted: ${fmtMoneyExact(tender.playerBid.price)} · score ${bidScore(tender.budget, tender.playerBid.price, tender.playerBid.quality).toFixed(1)}. Reputation is captured when you submit.`}
                 </p>
               )}
               {issue && (
@@ -266,7 +307,13 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 </p>
               )}
               <button className="btn-primary mt-4 w-full" disabled={!!issue}>
-                {tender.playerBid ? 'Update sealed bid' : 'Submit sealed bid'}
+                {tender.playerBid
+                  ? tr
+                    ? 'Kapalı teklifi güncelle'
+                    : 'Update sealed bid'
+                  : tr
+                    ? 'Kapalı teklif ver'
+                    : 'Submit sealed bid'}
               </button>
               {tender.playerBid && (
                 <button
@@ -275,8 +322,12 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                   onClick={() =>
                     setMessage(
                       withdraw(tender.id)
-                        ? 'Bid withdrawn. Your full bond was returned.'
-                        : 'Bidding has already closed.',
+                        ? tr
+                          ? 'Teklif çekildi. Teminatının tamamı iade edildi.'
+                          : 'Bid withdrawn. Your full bond was returned.'
+                        : tr
+                          ? 'Teklif süresi zaten kapandı.'
+                          : 'Bidding has already closed.',
                     )
                   }
                 >
@@ -287,26 +338,33 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 {message}
               </p>
               <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-                Losing bids recover their bond. Winners must finance construction; payment arrives after acceptance.
-                Missing the deadline forfeits the bond and costs 5 reputation.
+                {tr
+                  ? 'Kaybeden teklifler teminatını geri alır. Kazanan inşaatı kendisi finanse eder; ödeme kabulden sonra gelir. Süre kaçırılırsa teminat yanar ve 5 itibar kaybedilir.'
+                  : 'Losing bids recover their bond. Winners must finance construction; payment arrives after acceptance. Missing the deadline forfeits the bond and costs 5 reputation.'}
               </p>
             </form>
           ) : tender.status === 'delivery' ? (
             <>
-              <p className="text-xs text-neon-cyan">Awarded to {game.companyName}</p>
+              <p className="text-xs text-neon-cyan">
+                {tr ? `İhaleyi ${game.companyName} kazandı` : `Awarded to ${game.companyName}`}
+              </p>
               <h3 className="mt-2 text-xl font-semibold">{t(locale, 'proveTheNetwork')}</h3>
               <p className="mt-2 text-sm text-white/60">
                 {progress.ready
-                  ? 'All conditions met. Keep service healthy while the clock runs.'
-                  : 'Complete the missing conditions to start the six-hour acceptance test.'}
+                  ? tr
+                    ? 'Tüm koşullar sağlandı. Süre işlerken hizmeti sağlıklı tut.'
+                    : 'All conditions met. Keep service healthy while the clock runs.'
+                  : tr
+                    ? 'Altı saatlik kabul testini başlatmak için eksik koşulları tamamla.'
+                    : 'Complete the missing conditions to start the six-hour acceptance test.'}
               </p>
               <div className="mt-5 text-4xl font-semibold text-neon-amber">
                 {(tender.qualifyingMinutes / 60).toFixed(1)}
-                <span className="text-base text-white/40"> / 6h</span>
+                <span className="text-base text-white/40"> / {tr ? '6 sa' : '6h'}</span>
               </div>
               <div
                 role="progressbar"
-                aria-label="Continuous service acceptance"
+                aria-label={tr ? 'Kesintisiz hizmet kabulü' : 'Continuous service acceptance'}
                 aria-valuemin={0}
                 aria-valuemax={360}
                 aria-valuenow={tender.qualifyingMinutes}
@@ -328,31 +386,46 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                 </div>
                 <div className="flex justify-between">
                   <dt>{t(locale, 'completionReward')}</dt>
-                  <dd>+5 reputation · {spec.reward} RP</dd>
+                  <dd>{tr ? `+5 itibar · ${spec.reward} AP` : `+5 reputation · ${spec.reward} RP`}</dd>
                 </div>
               </dl>
               <p className="mt-4 text-xs leading-relaxed text-white/50">
-                Resume the simulation to run the acceptance test. Repairs, maintenance and independent paths help you
-                keep the network operational.
+                {tr
+                  ? 'Kabul testini çalıştırmak için simülasyonu devam ettir. Onarım, bakım ve bağımsız yollar şebekeyi çalışır tutmana yardım eder.'
+                  : 'Resume the simulation to run the acceptance test. Repairs, maintenance and independent paths help you keep the network operational.'}
               </p>
             </>
           ) : (
             <>
               <h3 className="text-xl font-semibold">
                 {tender.status === 'completed'
-                  ? 'Infrastructure accepted'
+                  ? tr
+                    ? 'Altyapı kabul edildi'
+                    : 'Infrastructure accepted'
                   : tender.status === 'failed'
-                    ? 'Deadline missed'
-                    : 'Tender awarded'}
+                    ? tr
+                      ? 'Süre kaçırıldı'
+                      : 'Deadline missed'
+                    : tr
+                      ? 'İhale sonuçlandı'
+                      : 'Tender awarded'}
               </h3>
               <p className="mt-3 text-sm leading-relaxed text-white/65">
                 {tender.status === 'completed'
-                  ? `${fmtMoneyExact(tender.playerBid!.price)} paid, bond returned, +5 reputation and ${spec.reward} research points earned.`
+                  ? tr
+                    ? `${fmtMoneyExact(tender.playerBid!.price)} ödendi, teminat iade edildi, +5 itibar ve ${spec.reward} araştırma puanı kazanıldı.`
+                    : `${fmtMoneyExact(tender.playerBid!.price)} paid, bond returned, +5 reputation and ${spec.reward} research points earned.`
                   : tender.status === 'failed'
-                    ? 'Your performance bond was forfeited and reputation fell by 5. The built network remains yours.'
+                    ? tr
+                      ? 'Teminatın yandı ve itibarın 5 düştü. Kurduğun şebeke sende kalıyor.'
+                      : 'Your performance bond was forfeited and reputation fell by 5. The built network remains yours.'
                     : tender.winnerId
-                      ? `${tender.rivals.find((r) => r.id === tender.winnerId)?.name ?? 'Another operator'} won. Any player bond was returned in full.`
-                      : 'No eligible bids were received.'}
+                      ? tr
+                        ? `${tender.rivals.find((r) => r.id === tender.winnerId)?.name ?? 'Başka bir operatör'} kazandı. Varsa oyuncu teminatının tamamı iade edildi.`
+                        : `${tender.rivals.find((r) => r.id === tender.winnerId)?.name ?? 'Another operator'} won. Any player bond was returned in full.`
+                      : tr
+                        ? 'Geçerli teklif gelmedi.'
+                        : 'No eligible bids were received.'}
               </p>
             </>
           )}
@@ -378,7 +451,7 @@ function TenderDetail({ tender }: { tender: CityTender }) {
                     >
                       <td className="py-3 pr-3">
                         {r.name}
-                        {r.id === tender.winnerId ? ' · Winner' : ''}
+                        {r.id === tender.winnerId ? (tr ? ' · Kazanan' : ' · Winner') : ''}
                       </td>
                       <td className="text-right">{fmtMoneyExact(r.price)}</td>
                       <td className="text-right">{r.quality.toFixed(0)}</td>
@@ -404,6 +477,8 @@ export default function ProjectsScreen() {
     game.procurement.tenders.find((t) => t.status === 'open' || t.status === 'delivery') ??
     game.procurement.tenders[0];
   const completed = game.procurement.tenders.filter((t) => t.status === 'completed').length;
+  const tr = locale === 'tr';
+  const nextDays = Math.ceil((game.procurement.nextTenderAt - game.minutes) / MINUTES_PER_DAY);
   return (
     <div className="screen-shell">
       <div className="mx-auto max-w-[1280px] space-y-5">
@@ -413,12 +488,14 @@ export default function ProjectsScreen() {
             <p className="text-xs text-neon-amber">{t(locale, 'municipalProcurementOffice')}</p>
             <h1 className="mt-2 text-3xl font-semibold">{t(locale, 'cityInfrastructure')}</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/55">
-              Compete for funded network projects. Price the job, secure the award, then deliver a network the city can
-              trust.
+              {tr
+                ? 'Fonlanmış şebeke projeleri için yarış. İşi fiyatla, ihaleyi kazan, sonra şehrin güvenebileceği bir şebeke teslim et.'
+                : 'Compete for funded network projects. Price the job, secure the award, then deliver a network the city can trust.'}
             </p>
           </div>
           <div className="text-right text-xs text-white/50">
-            <strong className="block text-2xl text-neon-cyan">{completed}</strong>accepted projects in recent history
+            <strong className="block text-2xl text-neon-cyan">{completed}</strong>
+            {tr ? 'son dönemde kabul edilen proje' : 'accepted projects in recent history'}
           </div>
         </header>
         <div className="grid items-start gap-4 xl:grid-cols-[240px_1fr]">
@@ -434,12 +511,20 @@ export default function ProjectsScreen() {
                 >
                   <span className="text-[10px] capitalize text-neon-amber">
                     {t.status === 'open'
-                      ? 'Bidding open'
+                      ? tr
+                        ? 'Teklifler açık'
+                        : 'Bidding open'
                       : t.status === 'delivery'
-                        ? 'Your delivery project'
-                        : t.status}
+                        ? tr
+                          ? 'Teslim projen'
+                          : 'Your delivery project'
+                        : tr
+                          ? STATUS_TR[t.status]
+                          : t.status}
                   </span>
-                  <strong className="mt-1 block text-sm">{TENDER_PROGRAMMES[t.kind].title}</strong>
+                  <strong className="mt-1 block text-sm">
+                    {tr ? TENDER_PROGRAMMES[t.kind].titleTr : TENDER_PROGRAMMES[t.kind].title}
+                  </strong>
                   <span className="mt-1 block text-xs text-white/50">
                     {game.districts.find((d) => d.id === t.districtId)?.name}
                   </span>
@@ -447,8 +532,9 @@ export default function ProjectsScreen() {
               ))}
             </div>
             <p className="text-[11px] leading-relaxed text-white/45">
-              One live procurement at a time. A new call opens five days after settlement. The register keeps the last
-              12 projects.
+              {tr
+                ? 'Aynı anda tek ihale yürür. Sonuçlandıktan beş gün sonra yeni çağrı açılır. Kayıt son 12 projeyi tutar.'
+                : 'One live procurement at a time. A new call opens five days after settlement. The register keeps the last 12 projects.'}
             </p>
           </aside>
           {tender ? (
@@ -458,8 +544,12 @@ export default function ProjectsScreen() {
               <h2 className="text-xl font-semibold">{t(locale, 'nextCityCallPreparing')}</h2>
               <p className="mt-2 text-sm text-white/60">
                 {game.procurement.nextTenderAt <= game.minutes
-                  ? 'Resume the city clock to publish the first tender.'
-                  : `Next opportunity in ${Math.ceil((game.procurement.nextTenderAt - game.minutes) / MINUTES_PER_DAY)} days.`}
+                  ? tr
+                    ? 'İlk ihalenin yayınlanması için şehir saatini devam ettir.'
+                    : 'Resume the city clock to publish the first tender.'
+                  : tr
+                    ? `Sonraki fırsat ${nextDays} gün sonra.`
+                    : `Next opportunity in ${nextDays} ${plural(nextDays, 'day')}.`}
               </p>
             </div>
           )}
