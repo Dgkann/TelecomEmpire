@@ -33,6 +33,7 @@ export default function AuctionModal() {
   const result = auction.result;
   const won = result?.winnerId === 'player';
   const hoursLeft = Math.max(0, Math.round((auction.closesAt - game.minutes) / 60));
+  const tr = locale === 'tr';
   return (
     <AnimatePresence>
       <motion.div
@@ -45,7 +46,7 @@ export default function AuctionModal() {
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label="Spectrum auction"
+          aria-label={t(locale, 'spectrumAuction')}
           tabIndex={-1}
           className="panel max-h-[calc(100dvh-2rem)] w-[470px] max-w-[calc(100%-2rem)] overflow-y-auto"
           initial={{ scale: 0.94, y: 14 }}
@@ -57,15 +58,21 @@ export default function AuctionModal() {
               {t(locale, 'spectrumAuction')}
             </div>
             <div className="text-xl font-bold">
-              {spec.label} · {auction.blocks} block{auction.blocks > 1 ? 's' : ''}
+              {spec.label} · {auction.blocks} {tr ? 'blok' : `block${auction.blocks > 1 ? 's' : ''}`}
             </div>
             <div className="num mt-1 text-[11px] text-white/50">
-              {result ? 'Lot closed' : `Bids close in ${hoursLeft}h`}
+              {result
+                ? tr
+                  ? 'Lot kapandı'
+                  : 'Lot closed'
+                : tr
+                  ? `Teklifler ${hoursLeft} sa içinde kapanıyor`
+                  : `Bids close in ${hoursLeft}h`}
             </div>
           </div>
 
           <div className="space-y-4 p-5">
-            <p className="text-sm leading-relaxed text-white/70">{spec.note}</p>
+            <p className="text-sm leading-relaxed text-white/70">{tr ? spec.noteTr : spec.note}</p>
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="chip py-2">
@@ -92,7 +99,7 @@ export default function AuctionModal() {
                     </div>
                     <input
                       type="range"
-                      aria-label="Spectrum auction bid"
+                      aria-label={tr ? 'Spektrum ihalesi teklifi' : 'Spectrum auction bid'}
                       min={auction.reserve}
                       max={Math.max(auction.reserve * 4, 100000)}
                       step={5000}
@@ -101,8 +108,12 @@ export default function AuctionModal() {
                       className="mt-2 w-full"
                     />
                     <div className="num mt-1 flex justify-between text-[10px] text-white/35">
-                      <span>reserve {fmtMoney(auction.reserve)}</span>
-                      <span>cash {fmtMoney(game.money)}</span>
+                      <span>
+                        {tr ? 'taban' : 'reserve'} {fmtMoney(auction.reserve)}
+                      </span>
+                      <span>
+                        {tr ? 'nakit' : 'cash'} {fmtMoney(game.money)}
+                      </span>
                     </div>
                     <p className="mt-2 text-[11px] leading-snug text-white/45">{t(locale, 'auctionBidBlurb')}</p>
                     <div className="mt-3 flex gap-2">
@@ -117,14 +128,20 @@ export default function AuctionModal() {
                           setOpen(false);
                         }}
                       >
-                        {bid > game.money ? 'More than you have' : 'Submit bid'}
+                        {bid > game.money
+                          ? tr
+                            ? 'Nakdinden fazla'
+                            : 'More than you have'
+                          : tr
+                            ? 'Teklif ver'
+                            : 'Submit bid'}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
                     {t(locale, 'bidOf')} <span className="num text-neon-cyan">{fmtMoneyExact(auction.playerBid)}</span>{' '}
-                    is in.
+                    {tr ? 'verildi.' : 'is in.'}
                     <button className="btn mt-3 w-full" onClick={() => setOpen(false)}>
                       {t(locale, 'close')}
                     </button>
@@ -138,13 +155,21 @@ export default function AuctionModal() {
                 >
                   <div className={`text-sm font-semibold ${won ? 'text-neon-lime' : 'text-white/80'}`}>
                     {won
-                      ? 'You won the lot'
+                      ? tr
+                        ? 'Lotu kazandın'
+                        : 'You won the lot'
                       : result.winnerId === 'none'
-                        ? 'No bids met the reserve'
-                        : `${result.winnerName} won the lot`}
+                        ? tr
+                          ? 'Hiçbir teklif taban fiyata ulaşmadı'
+                          : 'No bids met the reserve'
+                        : tr
+                          ? `Lotu ${result.winnerName} kazandı`
+                          : `${result.winnerName} won the lot`}
                   </div>
                   {result.winnerId !== 'none' && (
-                    <div className="num mt-0.5 text-xs text-white/50">Hammer price {fmtMoneyExact(result.price)}</div>
+                    <div className="num mt-0.5 text-xs text-white/50">
+                      {tr ? 'Kapanış fiyatı' : 'Hammer price'} {fmtMoneyExact(result.price)}
+                    </div>
                   )}
                 </div>
 

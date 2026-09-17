@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   crewTravelMinutes,
   dispatchCandidates,
+  incidentCopy,
   pendingIncidents,
   repairCost,
   type RepairMode,
@@ -14,11 +15,10 @@ import { useGame } from '../store/gameStore';
 import { t } from './i18n';
 import { useDialogAccessibility } from './useDialogAccessibility';
 
-const duration = (minutes: number) => {
+const duration = (minutes: number, tr = false) => {
   const rounded = Math.ceil(minutes);
-  return rounded < 60
-    ? rounded + 'm'
-    : Math.floor(rounded / 60) + 'h' + (rounded % 60 ? ' ' + (rounded % 60) + 'm' : '');
+  const [m, h] = tr ? [' dk', ' sa'] : ['m', 'h'];
+  return rounded < 60 ? rounded + m : Math.floor(rounded / 60) + h + (rounded % 60 ? ' ' + (rounded % 60) + m : '');
 };
 
 export default function IncidentModal() {
@@ -47,6 +47,9 @@ export default function IncidentModal() {
   const workLeft = Math.ceil((incident?.repairMinutesLeft ?? 0) / MINUTES_PER_STEP) * MINUTES_PER_STEP;
   const affordable = mode === 'normal' || game.money >= cost;
   const dialogRef = useDialogAccessibility(Boolean(incident), () => close(null));
+  const tr = locale === 'tr';
+  const copy = incident ? incidentCopy(incident, game, tr) : null;
+  const time = (minutes: number) => duration(minutes, tr);
 
   return (
     <AnimatePresence>
@@ -62,7 +65,7 @@ export default function IncidentModal() {
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Network incident"
+            aria-label={tr ? 'Şebeke arızası' : 'Network incident'}
             tabIndex={-1}
             className="panel max-h-full w-full min-w-0 max-w-[480px] overflow-y-auto"
             initial={{ scale: 0.96, y: 12 }}
@@ -72,42 +75,48 @@ export default function IncidentModal() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-neon-red/25 bg-neon-red/10 px-5 py-4">
-              <div className="text-xl font-bold">{incident.title}</div>
+              <div className="text-xl font-bold">{copy?.title}</div>
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/60">
                 <span>{district?.name}</span>
                 <span>
-                  {incident.affected.toLocaleString()} {plural(incident.affected, 'customer')} at incident start
+                  {tr
+                    ? `Arıza başladığında ${incident.affected.toLocaleString('tr-TR')} müşteri`
+                    : `${incident.affected.toLocaleString()} ${plural(incident.affected, 'customer')} at incident start`}
                 </span>
               </div>
             </div>
             <div className="space-y-4 p-5">
-              <p className="text-sm leading-relaxed text-white/70">{incident.description}</p>
+              <p className="text-sm leading-relaxed text-white/70">{copy?.description}</p>
               {incident.repairMinutesLeft !== null ? (
                 <div
                   className="space-y-3 border-l-2 border-neon-cyan bg-white/5 p-3 text-sm"
-                  aria-label="Repair progress"
+                  aria-label={tr ? 'Onarım ilerlemesi' : 'Repair progress'}
                 >
                   <div className="font-semibold text-neon-cyan">
-                    {assigned?.name ?? 'A crew'} is {assigned?.state === 'driving' ? 'on the way' : 'working on it'}
+                    {tr
+                      ? `${assigned?.name ?? 'Bir ekip'} ${assigned?.state === 'driving' ? 'yolda' : 'onarım yapıyor'}`
+                      : `${assigned?.name ?? 'A crew'} is ${assigned?.state === 'driving' ? 'on the way' : 'working on it'}`}
                   </div>
                   <div className="flex justify-between text-xs text-white/60">
                     <span>{t(locale, 'travelRemaining')}</span>
-                    <span>{duration(travelLeft)}</span>
+                    <span>{time(travelLeft)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-white/60">
                     <span>{t(locale, 'repairRemaining')}</span>
-                    <span>{duration(workLeft)}</span>
+                    <span>{time(workLeft)}</span>
                   </div>
                   <div className="flex justify-between border-t border-white/10 pt-2 font-semibold">
                     <span>{t(locale, 'estimatedRestoration')}</span>
-                    <span>~{duration(travelLeft + workLeft)}</span>
+                    <span>~{time(travelLeft + workLeft)}</span>
                   </div>
                 </div>
               ) : (
                 <>
                   {queue.length > 1 && (
                     <p className="text-xs text-neon-amber">
-                      Response priority {queueRank} of {queue.length} · ranked by recorded customer impact, then age.
+                      {tr
+                        ? `Müdahale önceliği ${queueRank}/${queue.length} · önce kayıtlı müşteri etkisine, sonra arızanın yaşına göre.`
+                        : `Response priority ${queueRank} of ${queue.length} · ranked by recorded customer impact, then age.`}
                     </p>
                   )}
                   <fieldset className="min-w-0">
@@ -126,11 +135,17 @@ export default function IncidentModal() {
                               onChange={() => setChoice({ incidentId: openId, mode: pace, techId: selectedId })}
                               className="accent-[#62c7bd]"
                             />
-                            {pace === 'normal' ? 'Scheduled' : 'Emergency'}
+                            {pace === 'normal' ? (tr ? 'Planlı' : 'Scheduled') : tr ? 'Acil' : 'Emergency'}
                           </div>
                           <div className="mt-2 font-semibold">{fmtMoneyExact(repairCost(incident, pace))}</div>
                           <div className="mt-1 text-[11px] text-white/55">
-                            {pace === 'normal' ? 'Standard repair work' : 'Faster work, same travel'}
+                            {pace === 'normal'
+                              ? tr
+                                ? 'Standart onarım'
+                                : 'Standard repair work'
+                              : tr
+                                ? 'Daha hızlı iş, aynı yol süresi'
+                                : 'Faster work, same travel'}
                           </div>
                         </label>
                       ))}
@@ -155,12 +170,15 @@ export default function IncidentModal() {
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap justify-between gap-x-2 text-sm">
                               <span>{c.technician.name}</span>
-                              <span className="font-semibold">~{duration(c.totalMinutes)}</span>
+                              <span className="font-semibold">~{time(c.totalMinutes)}</span>
                             </div>
                             <div className="mt-1 text-[11px] text-white/60">
-                              Skill {c.technician.skill} · {duration(c.travelMinutes)} travel +{' '}
-                              {duration(c.workMinutes)} repair
-                              {index === 0 && <span className="text-neon-cyan"> · Fastest</span>}
+                              {tr
+                                ? `Yetkinlik ${c.technician.skill} · ${time(c.travelMinutes)} yol + ${time(c.workMinutes)} onarım`
+                                : `Skill ${c.technician.skill} · ${time(c.travelMinutes)} travel + ${time(c.workMinutes)} repair`}
+                              {index === 0 && (
+                                <span className="text-neon-cyan">{tr ? ' · En hızlı' : ' · Fastest'}</span>
+                              )}
                             </div>
                           </div>
                         </label>
@@ -168,8 +186,9 @@ export default function IncidentModal() {
                     </div>
                     {!candidates.length && (
                       <p className="text-xs text-neon-amber">
-                        Every field crew is already out. Hire another from the Company screen or wait for a crew to
-                        return.
+                        {tr
+                          ? 'Tüm saha ekipleri sahada. Şirket ekranından yeni ekip al veya bir ekibin dönmesini bekle.'
+                          : 'Every field crew is already out. Hire another from the Company screen or wait for a crew to return.'}
                       </p>
                     )}
                     {candidates.length > 0 && !selected && (
@@ -180,7 +199,7 @@ export default function IncidentModal() {
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
                         <span className="text-white/60">{t(locale, 'travelPlusRepair')}</span>
-                        <strong>~{duration(selected.totalMinutes)}</strong>
+                        <strong>~{time(selected.totalMinutes)}</strong>
                       </div>
                       <div className="flex h-2 overflow-hidden rounded-full bg-white/5" aria-hidden="true">
                         <span
@@ -190,20 +209,27 @@ export default function IncidentModal() {
                         <span className="flex-1 bg-neon-cyan" />
                       </div>
                       <div className="flex justify-between text-[11px]">
-                        <span className="text-neon-amber">Travel {duration(selected.travelMinutes)}</span>
-                        <span className="text-neon-cyan">Repair {duration(selected.workMinutes)}</span>
+                        <span className="text-neon-amber">
+                          {tr ? 'Yol' : 'Travel'} {time(selected.travelMinutes)}
+                        </span>
+                        <span className="text-neon-cyan">
+                          {tr ? 'Onarım' : 'Repair'} {time(selected.workMinutes)}
+                        </span>
                       </div>
                     </div>
                   )}
                   {!affordable && (
                     <p className="text-xs text-neon-amber">
-                      Emergency repair needs {fmtMoneyExact(cost - game.money)} more cash.
+                      {tr
+                        ? `Acil onarım için ${fmtMoneyExact(cost - game.money)} daha nakit gerekiyor.`
+                        : `Emergency repair needs ${fmtMoneyExact(cost - game.money)} more cash.`}
                     </p>
                   )}
                   {mode === 'normal' && game.money < cost && (
                     <p className="text-xs text-neon-amber">
-                      Scheduled repairs can proceed with negative cash: balance will fall to{' '}
-                      {fmtMoneyExact(game.money - cost)}.
+                      {tr
+                        ? `Planlı onarım eksi bakiyeyle de yapılabilir: bakiye ${fmtMoneyExact(game.money - cost)} olur.`
+                        : `Scheduled repairs can proceed with negative cash: balance will fall to ${fmtMoneyExact(game.money - cost)}.`}
                     </p>
                   )}
                   <button
@@ -211,7 +237,7 @@ export default function IncidentModal() {
                     disabled={!selected || !affordable}
                     onClick={() => selected && dispatchTech(incident.id, mode, selected.technician.id)}
                   >
-                    Dispatch crew · {fmtMoneyExact(cost)}
+                    {tr ? 'Ekip gönder' : 'Dispatch crew'} · {fmtMoneyExact(cost)}
                   </button>
                   <p className="text-[11px] text-white/45">{t(locale, 'estimatesUseGameTime')}</p>
                 </>

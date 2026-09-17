@@ -158,6 +158,7 @@ export interface BandSpec {
   blockValue: number;
   requires?: string;
   note: string;
+  noteTr: string;
 }
 
 export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
@@ -168,6 +169,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     capacity: 0.5,
     blockValue: 4200000,
     note: 'Reaches across a district and through walls. Not much room in it.',
+    noteTr: 'Bir ilçeyi boydan boya ve duvarların içinden kapsar. Kapasitesi dar.',
   },
   '1800': {
     id: '1800',
@@ -176,6 +178,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     capacity: 1,
     blockValue: 3600000,
     note: 'The workhorse. Decent reach, decent capacity, nothing spectacular.',
+    noteTr: 'Yükü taşıyan bant. Makul menzil, makul kapasite, şaşırtıcı bir yanı yok.',
   },
   '2600': {
     id: '2600',
@@ -184,6 +187,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     capacity: 1.8,
     blockValue: 4800000,
     note: 'Good capacity if you are willing to build more sites.',
+    noteTr: 'Daha çok nokta kurmaya razıysan iyi kapasite sunar.',
   },
   '3500': {
     id: '3500',
@@ -193,6 +197,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     blockValue: 8400000,
     requires: 'mobile_5g',
     note: 'The 5G mid band. Heavy capacity, and you will feel every metre of range you lost.',
+    noteTr: '5G orta bandı. Yüksek kapasite; kaybettiğin her metre menzili hissedeceksin.',
   },
   '26000': {
     id: '26000',
@@ -202,6 +207,7 @@ export const SPECTRUM_BANDS: Record<BandId, BandSpec> = {
     blockValue: 11200000,
     requires: 'mobile_5g',
     note: 'Enormous capacity over a couple of streets. Stadiums and city centres only.',
+    noteTr: 'Birkaç sokak boyunca devasa kapasite. Yalnızca stadyumlar ve şehir merkezleri için.',
   },
 };
 

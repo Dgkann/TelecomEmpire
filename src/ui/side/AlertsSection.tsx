@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { incidentCopy } from '../../game/incidents';
 import { incidentLocation } from '../../game/simulation';
 import { t } from '../i18n';
 import type { SideModel } from './model';
@@ -18,7 +19,7 @@ export default function AlertsSection({ sp }: { sp: SideModel }) {
             >
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[10px] uppercase tracking-widest text-neon-red">
-                  {mods.hasNoc ? 'NOC · Alerts' : 'Alerts'}
+                  {mods.hasNoc ? `NOC · ${t(locale, 'alerts')}` : t(locale, 'alerts')}
                 </div>
                 <div className="num text-[11px] text-white/40">{active.length}</div>
               </div>
@@ -37,13 +38,17 @@ export default function AlertsSection({ sp }: { sp: SideModel }) {
                       className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:bg-white/10"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-neon-red">{i.title}</span>
+                        <span className="text-xs font-semibold text-neon-red">{incidentCopy(i, game, tr).title}</span>
                         <span className="num text-[10px] text-white/35">{d?.name}</span>
                       </div>
                       <div className="num mt-0.5 text-[10px] text-white/45">
                         {working
-                          ? `Crew on it · ${Math.round((i.repairMinutesLeft ?? 0) / 60)}h left`
-                          : `Unassigned · ${i.affected.toLocaleString()} affected`}
+                          ? tr
+                            ? `Ekip çalışıyor · ${Math.round((i.repairMinutesLeft ?? 0) / 60)} sa kaldı`
+                            : `Crew on it · ${Math.round((i.repairMinutesLeft ?? 0) / 60)}h left`
+                          : tr
+                            ? `Atanmadı · ${i.affected.toLocaleString('tr-TR')} etkilenen`
+                            : `Unassigned · ${i.affected.toLocaleString()} affected`}
                       </div>
                     </button>
                   );
@@ -60,7 +65,9 @@ export default function AlertsSection({ sp }: { sp: SideModel }) {
                       }}
                       className="alert-blink rounded-lg border border-neon-red/40 bg-neon-red/10 px-2.5 py-2 text-left"
                     >
-                      <div className="text-xs font-semibold text-neon-red">{d.name}: NO SERVICE</div>
+                      <div className="text-xs font-semibold text-neon-red">
+                        {d.name}: {tr ? 'HİZMET YOK' : 'NO SERVICE'}
+                      </div>
                       <div className="text-[10px] text-white/50">{t(locale, 'noLivePathBackToCore')}</div>
                     </button>
                   );

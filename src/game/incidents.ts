@@ -7,6 +7,7 @@ export type RepairMode = 'emergency' | 'normal';
 interface IncidentTemplate {
   kind: IncidentKind;
   title: string;
+  titleTr: string;
   target: 'node' | 'link' | 'any';
   nodeKinds?: Array<GameState['nodes'][number]['kind']>;
   // Base repair time in game minutes at normal pace.
@@ -14,71 +15,86 @@ interface IncidentTemplate {
   weight: number;
   degrade: boolean;
   text: (place: string) => string;
+  textTr: (place: string) => string;
 }
 
 const TEMPLATES: IncidentTemplate[] = [
   {
     kind: 'fiber_cut',
     title: 'Fibre Cut',
+    titleTr: 'Fiber kesintisi',
     target: 'link',
     minutes: 480,
     weight: 22,
     degrade: false,
     text: (p) => `A digger went through the duct near ${p}. The span is dark until a splice team gets there.`,
+    textTr: (p) => `${p} yakınında bir kepçe kablo kanalını kesti. Ek ekibi gelene kadar hat karanlık.`,
   },
   {
     kind: 'router_failure',
     title: 'Router Failure',
+    titleTr: 'Yönlendirici arızası',
     target: 'node',
     nodeKinds: ['core', 'pop'],
     minutes: 300,
     weight: 14,
     degrade: false,
     text: (p) => `The routing engine at ${p} has stopped forwarding. Line cards are showing hardware faults.`,
+    textTr: (p) =>
+      `${p} noktasındaki yönlendirme motoru trafik iletmeyi bıraktı. Hat kartları donanım hatası gösteriyor.`,
   },
   {
     kind: 'switch_failure',
     title: 'Switch Failure',
+    titleTr: 'Anahtar arızası',
     target: 'node',
     nodeKinds: ['access', 'pop'],
     minutes: 200,
     weight: 14,
     degrade: false,
     text: (p) => `An aggregation switch at ${p} dropped its uplinks and will not come back cleanly.`,
+    textTr: (p) => `${p} noktasındaki bir toplama anahtarı üst bağlantılarını kaybetti ve düzgün geri gelmiyor.`,
   },
   {
     kind: 'ddos',
     title: 'DDoS Attack',
+    titleTr: 'DDoS saldırısı',
     target: 'node',
     nodeKinds: ['core', 'pop'],
     minutes: 180,
     weight: 12,
     degrade: true,
     text: (p) => `Volumetric traffic is slamming ${p}. Capacity is being eaten by junk packets.`,
+    textTr: (p) => `${p} yoğun saldırı trafiğiyle dövülüyor. Kapasiteyi çöp paketler tüketiyor.`,
   },
   {
     kind: 'power_outage',
     title: 'Power Outage',
+    titleTr: 'Elektrik kesintisi',
     target: 'node',
     nodeKinds: ['pop', 'access', 'tower', 'datacenter'],
     minutes: 240,
     weight: 12,
     degrade: false,
     text: (p) => `Grid power is out at ${p} and the batteries are draining fast.`,
+    textTr: (p) => `${p} noktasında şebeke elektriği kesildi ve bataryalar hızla tükeniyor.`,
   },
   {
     kind: 'cooling_failure',
     title: 'Cooling Failure',
+    titleTr: 'Soğutma arızası',
     target: 'node',
     nodeKinds: ['datacenter', 'core'],
     minutes: 260,
     weight: 6,
     degrade: true,
     text: (p) => `Chillers are down at ${p}. Equipment is throttling to stay alive.`,
+    textTr: (p) => `${p} noktasında soğutucular durdu. Ekipman ayakta kalmak için performansını düşürüyor.`,
   },
   {
     kind: 'dns_failure',
     title: 'DNS Resolver Failure',
+    titleTr: 'DNS çözümleyici arızası',
     target: 'node',
     nodeKinds: ['core'],
     minutes: 120,
@@ -86,38 +102,56 @@ const TEMPLATES: IncidentTemplate[] = [
     degrade: true,
     text: () =>
       `Your resolvers are timing out. Customers say "the internet is broken", and technically they are right.`,
+    textTr: () =>
+      'Çözümleyicilerin zaman aşımına uğruyor. Müşteriler "internet bozuk" diyor ve teknik olarak haklılar.',
   },
   {
     kind: 'bgp_leak',
     title: 'BGP Route Leak',
+    titleTr: 'BGP rota sızıntısı',
     target: 'node',
     nodeKinds: ['core'],
     minutes: 150,
     weight: 7,
     degrade: true,
     text: () => `An upstream leaked your prefixes. Traffic is taking a scenic route through another continent.`,
+    textTr: () => 'Bir üst sağlayıcı ön eklerini sızdırdı. Trafik başka bir kıtadan dolaşarak geliyor.',
   },
   {
     kind: 'bad_upgrade',
     title: 'Failed Software Upgrade',
+    titleTr: 'Başarısız yazılım güncellemesi',
     target: 'node',
     nodeKinds: ['core', 'pop', 'access'],
     minutes: 210,
     weight: 8,
     degrade: false,
     text: (p) => `A maintenance window at ${p} went wrong. The box is stuck in a boot loop.`,
+    textTr: (p) => `${p} noktasındaki bakım penceresi ters gitti. Cihaz yeniden başlatma döngüsünde kaldı.`,
   },
   {
     kind: 'overheating',
     title: 'Equipment Overheating',
+    titleTr: 'Ekipman aşırı ısınması',
     target: 'node',
     nodeKinds: ['pop', 'access', 'tower'],
     minutes: 160,
     weight: 9,
     degrade: true,
     text: (p) => `The cabinet at ${p} is running hot and shedding capacity to protect itself.`,
+    textTr: (p) => `${p} noktasındaki kabin fazla ısınıyor ve kendini korumak için kapasite düşürüyor.`,
   },
 ];
+
+// Incidents store English text; Turkish is rebuilt from the template and the same place name.
+export function incidentCopy(incident: Incident, state: GameState, tr: boolean) {
+  const template = TEMPLATES.find((t) => t.kind === incident.kind);
+  if (!tr || !template) return { title: incident.title, description: incident.description };
+  const district = state.districts.find((d) => d.id === incident.districtId)?.name ?? '';
+  const place =
+    incident.targetType === 'link' ? district : (state.nodes.find((n) => n.id === incident.targetId)?.name ?? district);
+  return { title: template.titleTr, description: template.textTr(place) };
+}
 
 export function rollIncident(
   state: GameState,
