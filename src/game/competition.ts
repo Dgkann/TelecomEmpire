@@ -7,28 +7,56 @@ import type { GameState, MarketOperation, CompetitionState, MarketTactic } from 
 export const MARKET_TACTICS = {
   switchers: {
     title: 'Switcher programme',
+    titleTr: 'Geçiş programı',
     cost: 140000,
     detail: '28% more local market appeal. Pays for switching assistance, not instant subscribers.',
+    detailTr: 'Yerel pazar cazibesi %28 artar. Anında abone değil, geçiş desteği için ödeme yaparsın.',
     tradeoff: 'More sign-ups also add traffic. Expand capacity before inviting demand.',
+    tradeoffTr: 'Daha çok abonelik daha çok trafik demektir. Talebi çağırmadan önce kapasiteyi genişlet.',
   },
   loyalty: {
     title: 'Loyalty desk',
+    titleTr: 'Sadakat masası',
     cost: 90000,
     detail: '45% less fixed-customer loss from dissatisfaction and competition; 6% more market appeal.',
+    detailTr: 'Memnuniyetsizlik ve rekabet kaynaklı sabit müşteri kaybı %45 azalır; pazar cazibesi %6 artar.',
     tradeoff: 'Protects your current base. It cannot restore an outage or expand your reach.',
+    tradeoffTr: 'Mevcut müşteri tabanını korur. Kesintiyi gideremez, kapsamayı genişletemez.',
   },
   service: {
     title: 'Service promise',
+    titleTr: 'Hizmet taahhüdü',
     cost: 120000,
     detail:
       '20% more local appeal while reach is at least 40%, satisfaction at least 70 and network health at least 90%.',
+    detailTr:
+      'Kapsama en az %40, memnuniyet en az 70 ve şebeke sağlığı en az %90 olduğu sürece yerel cazibe %20 artar.',
     tradeoff: 'Meet the standard for 80% of the fortnight: +3 reputation. Miss it or cancel early: −3 reputation.',
+    tradeoffTr: "İki haftanın %80'inde standardı tuttur: +3 itibar. Tutturamazsan veya erken bitirirsen: −3 itibar.",
   },
 } as const;
 export const RIVAL_MOVES = {
-  discount: { title: 'Local price offensive', detail: '15% lower effective local price for 10 days.', cost: 320000 },
-  publicity: { title: 'Brand campaign', detail: '25% more local market appeal for 10 days.', cost: 240000 },
-  rollout: { title: 'Fibre land grab', detail: 'Adds 8 percentage points of permanent fixed coverage.', cost: 480000 },
+  discount: {
+    title: 'Local price offensive',
+    titleTr: 'Yerel fiyat saldırısı',
+    detail: '15% lower effective local price for 10 days.',
+    detailTr: '10 gün boyunca yerel efektif fiyat %15 daha düşük.',
+    cost: 320000,
+  },
+  publicity: {
+    title: 'Brand campaign',
+    titleTr: 'Marka kampanyası',
+    detail: '25% more local market appeal for 10 days.',
+    detailTr: '10 gün boyunca yerel pazar cazibesi %25 daha yüksek.',
+    cost: 240000,
+  },
+  rollout: {
+    title: 'Fibre land grab',
+    titleTr: 'Fiber yayılma atağı',
+    detail: 'Adds 8 percentage points of permanent fixed coverage.',
+    detailTr: 'Kalıcı sabit kapsamaya 8 yüzde puanı ekler.',
+    cost: 480000,
+  },
 } as const;
 export const OPERATION_MINUTES = 14 * MINUTES_PER_DAY;
 export function initialCompetition(minutes: number): CompetitionState {

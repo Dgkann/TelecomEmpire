@@ -1,4 +1,4 @@
-import { marketEffects, rivalMarketEffects } from './competition';
+import { RIVAL_MOVES, marketEffects, rivalMarketEffects } from './competition';
 import { BASELINE_ARPU, spectrumCapacityFactor, spectrumRadiusFactor } from './constants';
 import { priceIndex } from './economy';
 import { clamp } from './util';
@@ -145,6 +145,10 @@ export function rivalPosture(s: GameState, c: Competitor) {
 // Rival moves are stored as English phrases; this keeps their Turkish wording next to the source.
 export function rivalMoveCopy(move: string, tr: boolean) {
   if (!tr) return move;
+  for (const offensive of Object.values(RIVAL_MOVES)) {
+    if (move.startsWith(`${offensive.title} in `))
+      return `${move.slice(offensive.title.length + 4)}: ${offensive.titleTr.toLocaleLowerCase('tr-TR')}`;
+  }
   return move
     .replace(/^reinforcing (.+)$/, '$1 ilçesini güçlendiriyor')
     .replace(/^building in (.+)$/, '$1 ilçesinde kurulum yapıyor')
