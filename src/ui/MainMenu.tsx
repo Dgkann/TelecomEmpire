@@ -16,8 +16,10 @@ const LOGOS = COMPANY_EMBLEMS.map((e) => e.symbol);
 type SaveMeta = NonNullable<ReturnType<typeof listSaveMeta>[number]>;
 type ImportStatus = { tone: 'good' | 'bad' | 'info'; text: string };
 
-function saveContext(slot: number, meta: SaveMeta) {
-  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+function saveContext(slot: number, meta: SaveMeta, tr: boolean) {
+  return tr
+    ? `Yuva ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString('tr-TR')} müşteri\nKaydedildi: ${new Date(meta.savedAt).toLocaleString('tr-TR')}`
+    : `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
 }
 
 const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) => a?.savedAt === b?.savedAt && a?.company === b?.company;
@@ -45,18 +47,31 @@ export default function MainMenu() {
     return empty < 0 ? 0 : empty;
   });
   const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
+  const tr = locale === 'tr';
+  const unreadable = tr
+    ? 'Kayıt dosyası okunamadı. Hiçbir kayıt değişmedi.'
+    : 'That save file could not be read. No save was changed.';
 
   const deleteSlot = (slot: number, meta: SaveMeta) => {
-    if (!window.confirm(`Delete this saved network?\n\n${saveContext(slot, meta)}\n\nThis cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        tr
+          ? `Kayıtlı şebeke silinsin mi?\n\n${saveContext(slot, meta, tr)}\n\nBu işlem geri alınamaz.`
+          : `Delete this saved network?\n\n${saveContext(slot, meta, tr)}\n\nThis cannot be undone.`,
+      )
+    )
+      return;
     if (!clearSave(slot)) {
       setImportStatus({
         tone: 'bad',
-        text: `Slot ${slot + 1} could not be deleted. Check browser storage and try again.`,
+        text: tr
+          ? `Yuva ${slot + 1} silinemedi. Tarayıcı depolamasını kontrol edip tekrar dene.`
+          : `Slot ${slot + 1} could not be deleted. Check browser storage and try again.`,
       });
       return;
     }
     setMetas(listSaveMeta());
-    setImportStatus({ tone: 'good', text: `Slot ${slot + 1} was deleted.` });
+    setImportStatus({ tone: 'good', text: tr ? `Yuva ${slot + 1} silindi.` : `Slot ${slot + 1} was deleted.` });
   };
 
   const startNewGame = () => {
@@ -64,7 +79,9 @@ export default function MainMenu() {
     if (
       existing &&
       !window.confirm(
-        `Start a new network and overwrite this save?\n\n${saveContext(newSlot, existing)}\n\nThis cannot be undone.`,
+        tr
+          ? `Yeni şebeke kurulsun ve bu kaydın üzerine yazılsın mı?\n\n${saveContext(newSlot, existing, tr)}\n\nBu işlem geri alınamaz.`
+          : `Start a new network and overwrite this save?\n\n${saveContext(newSlot, existing, tr)}\n\nThis cannot be undone.`,
       )
     )
       return;
@@ -145,7 +162,9 @@ export default function MainMenu() {
                         setMetas(listSaveMeta());
                         setImportStatus({
                           tone: 'bad',
-                          text: `Slot ${slot + 1} is no longer readable. It may have changed in another tab.`,
+                          text: tr
+                            ? `Yuva ${slot + 1} artık okunamıyor. Başka bir sekmede değişmiş olabilir.`
+                            : `Slot ${slot + 1} is no longer readable. It may have changed in another tab.`,
                         });
                       }}
                     >
@@ -154,12 +173,17 @@ export default function MainMenu() {
                       </div>
                       <div className="num truncate text-[10px] text-white/45">
                         {meta.company} · {meta.city} · {meta.customers.toLocaleString()}{' '}
-                        {plural(meta.customers, 'customer')} · {new Date(meta.savedAt).toLocaleString()}
+                        {tr ? 'müşteri' : plural(meta.customers, 'customer')} ·{' '}
+                        {new Date(meta.savedAt).toLocaleString(tr ? 'tr-TR' : undefined)}
                       </div>
                     </button>
                     <button
                       className="icon-button text-neon-red"
-                      aria-label={`Delete ${meta.company} from slot ${slot + 1}`}
+                      aria-label={
+                        tr
+                          ? `Yuva ${slot + 1}: ${meta.company} kaydını sil`
+                          : `Delete ${meta.company} from slot ${slot + 1}`
+                      }
                       onClick={() => deleteSlot(slot, meta)}
                     >
                       ×
@@ -186,7 +210,7 @@ export default function MainMenu() {
                 >
                   {Array.from({ length: SAVE_SLOT_COUNT }, (_, slot) => (
                     <option key={slot} value={slot}>
-                      Slot {slot + 1} — {metas[slot]?.company ?? 'empty'}
+                      {tr ? 'Yuva' : 'Slot'} {slot + 1} — {metas[slot]?.company ?? (tr ? 'boş' : 'empty')}
                     </option>
                   ))}
                 </select>
@@ -205,10 +229,7 @@ export default function MainMenu() {
                       try {
                         raw = await file.text();
                       } catch {
-                        setImportStatus({
-                          tone: 'bad',
-                          text: 'That save file could not be read. No save was changed.',
-                        });
+                        setImportStatus({ tone: 'bad', text: unreadable });
                         e.target.value = '';
                         return;
                       }
@@ -223,10 +244,17 @@ export default function MainMenu() {
                       if (
                         existing &&
                         !window.confirm(
-                          `Import and overwrite this save?\n\n${saveContext(destination, existing)}\n\nThis cannot be undone.`,
+                          tr
+                            ? `Kayıt içe aktarılsın ve bu kaydın üzerine yazılsın mı?\n\n${saveContext(destination, existing, tr)}\n\nBu işlem geri alınamaz.`
+                            : `Import and overwrite this save?\n\n${saveContext(destination, existing, tr)}\n\nThis cannot be undone.`,
                         )
                       ) {
-                        setImportStatus({ tone: 'info', text: 'Import cancelled; no save was changed.' });
+                        setImportStatus({
+                          tone: 'info',
+                          text: tr
+                            ? 'İçe aktarma iptal edildi; hiçbir kayıt değişmedi.'
+                            : 'Import cancelled; no save was changed.',
+                        });
                         e.target.value = '';
                         return;
                       }
@@ -235,7 +263,9 @@ export default function MainMenu() {
                         setMetas(listSaveMeta());
                         setImportStatus({
                           tone: 'bad',
-                          text: `Slot ${destination + 1} changed while the file was being checked. Review it and try again.`,
+                          text: tr
+                            ? `Dosya kontrol edilirken Yuva ${destination + 1} değişti. Gözden geçirip tekrar dene.`
+                            : `Slot ${destination + 1} changed while the file was being checked. Review it and try again.`,
                         });
                         e.target.value = '';
                         return;
@@ -245,14 +275,16 @@ export default function MainMenu() {
                         setMetas(listSaveMeta());
                         setImportStatus(
                           state
-                            ? { tone: 'good', text: `${state.companyName} imported into slot ${destination + 1}.` }
-                            : { tone: 'bad', text: 'That save file could not be read. No save was changed.' },
+                            ? {
+                                tone: 'good',
+                                text: tr
+                                  ? `${state.companyName}, Yuva ${destination + 1} içine aktarıldı.`
+                                  : `${state.companyName} imported into slot ${destination + 1}.`,
+                              }
+                            : { tone: 'bad', text: unreadable },
                         );
                       } catch {
-                        setImportStatus({
-                          tone: 'bad',
-                          text: 'That save file could not be read. No save was changed.',
-                        });
+                        setImportStatus({ tone: 'bad', text: unreadable });
                       } finally {
                         e.target.value = '';
                       }
@@ -277,7 +309,7 @@ export default function MainMenu() {
                 <div className="section-title">{t(locale, 'operatorProfile')}</div>
                 <div className="text-[11px] text-white/40">{t(locale, 'startingConditions')}</div>
               </div>
-              <div className="font-mono text-[10px] text-neon-cyan/60">NEW / 01</div>
+              <div className="font-mono text-[10px] text-neon-cyan/60">{tr ? 'YENİ / 01' : 'NEW / 01'}</div>
             </div>
             <div className="mt-4">
               <div className="stat-label mb-1.5">{t(locale, 'saveSlot')}</div>

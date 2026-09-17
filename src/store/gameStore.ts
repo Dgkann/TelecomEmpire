@@ -270,12 +270,17 @@ export const useGame = create<Store>((set, get) => ({
 
   newGame: (opts, slot = 0) => {
     if (!isSaveSlot(slot)) {
-      set({ persistenceError: 'Choose a valid save slot.' });
+      set({ persistenceError: get().locale === 'tr' ? 'Geçerli bir kayıt yuvası seç.' : 'Choose a valid save slot.' });
       return false;
     }
     const game = createNewGame(opts);
     if (!saveGame(game, slot)) {
-      set({ persistenceError: 'The new game could not be saved. Check browser storage and try again.' });
+      set({
+        persistenceError:
+          get().locale === 'tr'
+            ? 'Yeni oyun kaydedilemedi. Tarayıcı depolamasını kontrol edip tekrar dene.'
+            : 'The new game could not be saved. Check browser storage and try again.',
+      });
       return false;
     }
     set({ ...initialUi, locale: get().locale, activeSaveSlot: slot, game, started: true });
@@ -311,13 +316,16 @@ export const useGame = create<Store>((set, get) => ({
     const g = get().game;
     if (!g) return false;
     if (!saveGame(g, get().activeSaveSlot)) {
-      const message = 'Saving failed. Progress is still in memory; do not close this tab.';
+      const message =
+        get().locale === 'tr'
+          ? 'Kayıt başarısız. İlerleme hâlâ bellekte; bu sekmeyi kapatma.'
+          : 'Saving failed. Progress is still in memory; do not close this tab.';
       set({ persistenceError: message });
       get().toast(message, 'bad');
       return false;
     }
     set({ persistenceError: null });
-    get().toast('Game saved.', 'good');
+    get().toast(get().locale === 'tr' ? 'Oyun kaydedildi.' : 'Game saved.', 'good');
     return true;
   },
 
@@ -364,7 +372,10 @@ export const useGame = create<Store>((set, get) => ({
     next.researchActive = current.researchActive ? { ...current.researchActive } : null;
     if (next.researchDone.includes('mobile_4g')) grantStarterSpectrum(next);
     if (!saveGame(next, s.activeSaveSlot)) {
-      set({ persistenceError: 'The next campaign city could not be saved.' });
+      set({
+        persistenceError:
+          s.locale === 'tr' ? 'Sonraki kampanya şehri kaydedilemedi.' : 'The next campaign city could not be saved.',
+      });
       return false;
     }
     set({
@@ -454,7 +465,13 @@ export const useGame = create<Store>((set, get) => ({
     if (g.minutes - g.autosaveAt > MINUTES_PER_DAY) {
       g = { ...g, autosaveAt: g.minutes };
       const saved = saveGame(g, s.activeSaveSlot);
-      set({ persistenceError: saved ? null : 'Autosave failed. Progress is only being kept in this tab.' });
+      set({
+        persistenceError: saved
+          ? null
+          : s.locale === 'tr'
+            ? 'Otomatik kayıt başarısız. İlerleme yalnızca bu sekmede tutuluyor.'
+            : 'Autosave failed. Progress is only being kept in this tab.',
+      });
     }
     set({ game: g, smartPauseNotice: notice });
   },

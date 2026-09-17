@@ -7,8 +7,10 @@ import { useDialogAccessibility } from './useDialogAccessibility';
 type SaveMeta = NonNullable<ReturnType<typeof listSaveMeta>[number]>;
 type ManagerStatus = { tone: 'good' | 'bad' | 'info'; text: string };
 
-function saveContext(slot: number, meta: SaveMeta) {
-  return `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+function saveContext(slot: number, meta: SaveMeta, tr: boolean) {
+  return tr
+    ? `Yuva ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString('tr-TR')} müşteri\nKaydedildi: ${new Date(meta.savedAt).toLocaleString('tr-TR')}`
+    : `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
 }
 
 const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) => a?.savedAt === b?.savedAt && a?.company === b?.company;
@@ -50,6 +52,9 @@ export default function SaveManager() {
   }, [active, importSlot]);
   if (!open) return null;
   const refresh = () => setMetas(listSaveMeta());
+  const unreadable = isTr
+    ? 'Kayıt dosyası okunamadı. Hiçbir kayıt değişmedi.'
+    : 'That save file could not be read. No snapshot was changed.';
 
   const saveHere = (slot: number) => {
     const latestMetas = listSaveMeta();
@@ -58,18 +63,33 @@ export default function SaveManager() {
     if (
       meta &&
       !window.confirm(
-        `Overwrite this save with the running network?\n\n${saveContext(slot, meta)}\n\nThis cannot be undone.`,
+        isTr
+          ? `Çalışan şebeke bu kaydın üzerine yazılsın mı?\n\n${saveContext(slot, meta, isTr)}\n\nBu işlem geri alınamaz.`
+          : `Overwrite this save with the running network?\n\n${saveContext(slot, meta, isTr)}\n\nThis cannot be undone.`,
       )
     ) {
-      setStatus({ tone: 'info', text: 'Save cancelled; no snapshot was changed.' });
+      setStatus({
+        tone: 'info',
+        text: isTr ? 'Kaydetme iptal edildi; hiçbir kayıt değişmedi.' : 'Save cancelled; no snapshot was changed.',
+      });
       return;
     }
     const saved = saveToSlot(slot);
     refresh();
     setStatus(
       saved
-        ? { tone: 'good', text: `Running network saved to slot ${slot + 1}; autosave now follows that slot.` }
-        : { tone: 'bad', text: `Slot ${slot + 1} could not be saved. No snapshot was changed.` },
+        ? {
+            tone: 'good',
+            text: isTr
+              ? `Çalışan şebeke Yuva ${slot + 1} içine kaydedildi; otomatik kayıt artık bu yuvayı kullanıyor.`
+              : `Running network saved to slot ${slot + 1}; autosave now follows that slot.`,
+          }
+        : {
+            tone: 'bad',
+            text: isTr
+              ? `Yuva ${slot + 1} kaydedilemedi. Hiçbir kayıt değişmedi.`
+              : `Slot ${slot + 1} could not be saved. No snapshot was changed.`,
+          },
     );
   };
 
@@ -77,30 +97,52 @@ export default function SaveManager() {
     const latest = listSaveMeta()[slot];
     if (!latest) {
       refresh();
-      setStatus({ tone: 'bad', text: `Slot ${slot + 1} is no longer available.` });
+      setStatus({
+        tone: 'bad',
+        text: isTr ? `Yuva ${slot + 1} artık mevcut değil.` : `Slot ${slot + 1} is no longer available.`,
+      });
       return;
     }
-    if (!window.confirm(`Delete this saved network?\n\n${saveContext(slot, latest)}\n\nThis cannot be undone.`)) {
-      setStatus({ tone: 'info', text: 'Delete cancelled; no snapshot was changed.' });
+    if (
+      !window.confirm(
+        isTr
+          ? `Kayıtlı şebeke silinsin mi?\n\n${saveContext(slot, latest, isTr)}\n\nBu işlem geri alınamaz.`
+          : `Delete this saved network?\n\n${saveContext(slot, latest, isTr)}\n\nThis cannot be undone.`,
+      )
+    ) {
+      setStatus({
+        tone: 'info',
+        text: isTr ? 'Silme iptal edildi; hiçbir kayıt değişmedi.' : 'Delete cancelled; no snapshot was changed.',
+      });
       return;
     }
     if (!clearSave(slot)) {
-      setStatus({ tone: 'bad', text: `Slot ${slot + 1} could not be deleted. No snapshot was changed.` });
+      setStatus({
+        tone: 'bad',
+        text: isTr
+          ? `Yuva ${slot + 1} silinemedi. Hiçbir kayıt değişmedi.`
+          : `Slot ${slot + 1} could not be deleted. No snapshot was changed.`,
+      });
       return;
     }
     refresh();
-    setStatus({ tone: 'good', text: `Slot ${slot + 1} was cleared.` });
+    setStatus({ tone: 'good', text: isTr ? `Yuva ${slot + 1} temizlendi.` : `Slot ${slot + 1} was cleared.` });
   };
 
   const exportSlot = (slot: number) => {
     const raw = exportSave(slot);
     if (!raw) {
       refresh();
-      setStatus({ tone: 'bad', text: `Slot ${slot + 1} could not be exported. It may have changed in another tab.` });
+      setStatus({
+        tone: 'bad',
+        text: isTr
+          ? `Yuva ${slot + 1} dışa aktarılamadı. Başka bir sekmede değişmiş olabilir.`
+          : `Slot ${slot + 1} could not be exported. It may have changed in another tab.`,
+      });
       return;
     }
     downloadSave(raw, slot);
-    setStatus({ tone: 'good', text: `Slot ${slot + 1} was exported.` });
+    setStatus({ tone: 'good', text: isTr ? `Yuva ${slot + 1} dışa aktarıldı.` : `Slot ${slot + 1} was exported.` });
   };
 
   return (
@@ -158,7 +200,7 @@ export default function SaveManager() {
                     </div>
                     <div className="num text-[10px] text-white/[0.38]">
                       {meta
-                        ? `${meta.city} · ${meta.customers.toLocaleString()} ${isTr ? 'müşteri' : 'customers'} · ${new Date(meta.savedAt).toLocaleString()}`
+                        ? `${meta.city} · ${meta.customers.toLocaleString(isTr ? 'tr-TR' : undefined)} ${isTr ? 'müşteri' : plural(meta.customers, 'customer')} · ${new Date(meta.savedAt).toLocaleString(isTr ? 'tr-TR' : undefined)}`
                         : isTr
                           ? 'Yeni kayıt için hazır'
                           : 'Ready for a new snapshot'}
@@ -175,7 +217,11 @@ export default function SaveManager() {
                   {meta && slot !== active && (
                     <button
                       className="btn py-1.5 text-[11px] text-neon-red"
-                      aria-label={`Delete ${meta.company} from slot ${slot + 1}`}
+                      aria-label={
+                        isTr
+                          ? `Yuva ${slot + 1}: ${meta.company} kaydını sil`
+                          : `Delete ${meta.company} from slot ${slot + 1}`
+                      }
                       onClick={() => deleteSlot(slot)}
                     >
                       {isTr ? 'Sil' : 'Delete'}
@@ -202,7 +248,7 @@ export default function SaveManager() {
                 try {
                   raw = await file.text();
                 } catch {
-                  setStatus({ tone: 'bad', text: 'That save file could not be read. No snapshot was changed.' });
+                  setStatus({ tone: 'bad', text: unreadable });
                   e.target.value = '';
                   return;
                 }
@@ -211,7 +257,9 @@ export default function SaveManager() {
                   if (current.started) {
                     setStatus({
                       tone: 'bad',
-                      text: `Slot ${current.activeSaveSlot + 1} is running and cannot be imported over. Choose another slot.`,
+                      text: isTr
+                        ? `Yuva ${current.activeSaveSlot + 1} çalışan oyun olduğu için üzerine içe aktarılamaz. Başka bir yuva seç.`
+                        : `Slot ${current.activeSaveSlot + 1} is running and cannot be imported over. Choose another slot.`,
                     });
                     setImportSlot(firstInactiveSlot(current.activeSaveSlot));
                   }
@@ -224,10 +272,17 @@ export default function SaveManager() {
                 if (
                   existing &&
                   !window.confirm(
-                    `Import and overwrite this save?\n\n${saveContext(destination, existing)}\n\nThis cannot be undone.`,
+                    isTr
+                      ? `Kayıt içe aktarılsın ve bu kaydın üzerine yazılsın mı?\n\n${saveContext(destination, existing, isTr)}\n\nBu işlem geri alınamaz.`
+                      : `Import and overwrite this save?\n\n${saveContext(destination, existing, isTr)}\n\nThis cannot be undone.`,
                   )
                 ) {
-                  setStatus({ tone: 'info', text: 'Import cancelled; no snapshot was changed.' });
+                  setStatus({
+                    tone: 'info',
+                    text: isTr
+                      ? 'İçe aktarma iptal edildi; hiçbir kayıt değişmedi.'
+                      : 'Import cancelled; no snapshot was changed.',
+                  });
                   e.target.value = '';
                   return;
                 }
@@ -241,7 +296,9 @@ export default function SaveManager() {
                   refresh();
                   setStatus({
                     tone: 'bad',
-                    text: `Slot ${destination + 1} changed while the file was being checked. Review it and try again.`,
+                    text: isTr
+                      ? `Dosya kontrol edilirken Yuva ${destination + 1} değişti. Gözden geçirip tekrar dene.`
+                      : `Slot ${destination + 1} changed while the file was being checked. Review it and try again.`,
                   });
                   setImportSlot(firstInactiveSlot(finalState.activeSaveSlot));
                   e.target.value = '';
@@ -252,11 +309,16 @@ export default function SaveManager() {
                   refresh();
                   setStatus(
                     state
-                      ? { tone: 'good', text: `${state.companyName} imported into slot ${destination + 1}.` }
-                      : { tone: 'bad', text: 'That save file could not be read. No snapshot was changed.' },
+                      ? {
+                          tone: 'good',
+                          text: isTr
+                            ? `${state.companyName}, Yuva ${destination + 1} içine aktarıldı.`
+                            : `${state.companyName} imported into slot ${destination + 1}.`,
+                        }
+                      : { tone: 'bad', text: unreadable },
                   );
                 } catch {
-                  setStatus({ tone: 'bad', text: 'That save file could not be read. No snapshot was changed.' });
+                  setStatus({ tone: 'bad', text: unreadable });
                 } finally {
                   e.target.value = '';
                 }
@@ -289,7 +351,9 @@ export default function SaveManager() {
             <button className="btn" onClick={() => input.current?.click()}>
               {isTr ? 'Kayıt dosyası seç' : 'Choose save file'}
             </button>
-            <span className="ml-auto num text-[10px] text-white/30">FORMAT / JSON · VERSIONED</span>
+            <span className="ml-auto num text-[10px] text-white/30">
+              {isTr ? 'BİÇİM / JSON · SÜRÜMLÜ' : 'FORMAT / JSON · VERSIONED'}
+            </span>
           </div>
           <p id="active-import-note" className="mt-2 text-[11px] text-white/45">
             {isTr
