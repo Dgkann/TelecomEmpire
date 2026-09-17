@@ -131,19 +131,99 @@ export function makePost(rng: Rng, company: string, mood: 'good' | 'bad' | 'meh'
 }
 
 export const CITY_EVENTS = [
-  { name: 'Championship Final', mul: 2.8, hours: 5, blurb: 'Every screen in the city is on the same match.' },
-  { name: 'Arena Concert', mul: 2.0, hours: 4, blurb: 'Fifty thousand people all uploading the same song.' },
-  { name: 'Public Holiday', mul: 1.5, hours: 14, blurb: 'Nobody is at work. Everybody is streaming.' },
-  { name: 'Major Game Release', mul: 2.2, hours: 8, blurb: 'A 140 GB download landed at midnight.' },
+  {
+    name: 'Championship Final',
+    nameTr: 'Şampiyonluk finali',
+    mul: 2.8,
+    hours: 5,
+    blurb: 'Every screen in the city is on the same match.',
+    blurbTr: 'Şehirdeki her ekran aynı maçı gösteriyor.',
+  },
+  {
+    name: 'Arena Concert',
+    nameTr: 'Arena konseri',
+    mul: 2.0,
+    hours: 4,
+    blurb: 'Fifty thousand people all uploading the same song.',
+    blurbTr: 'Elli bin kişi aynı şarkıyı yüklüyor.',
+  },
+  {
+    name: 'Public Holiday',
+    nameTr: 'Resmî tatil',
+    mul: 1.5,
+    hours: 14,
+    blurb: 'Nobody is at work. Everybody is streaming.',
+    blurbTr: 'Kimse işte değil. Herkes yayın izliyor.',
+  },
+  {
+    name: 'Major Game Release',
+    nameTr: 'Büyük oyun çıkışı',
+    mul: 2.2,
+    hours: 8,
+    blurb: 'A 140 GB download landed at midnight.',
+    blurbTr: "Gece yarısı 140 GB'lık bir indirme yayınlandı.",
+  },
   {
     name: 'Storm Warning',
+    nameTr: 'Fırtına uyarısı',
     mul: 1.3,
     hours: 10,
     blurb: 'The city is indoors and the weather is rough on infrastructure.',
+    blurbTr: 'Şehir evde kalıyor ve hava koşulları altyapıyı zorluyor.',
   },
-  { name: 'E-sports Tournament', mul: 2.4, hours: 7, blurb: 'Thousands of low-latency streams are live at once.' },
-  { name: 'University Results Day', mul: 1.8, hours: 6, blurb: 'Every student is refreshing the same portal.' },
-  { name: 'Cloud Migration Weekend', mul: 2.1, hours: 12, blurb: 'Businesses are moving years of data before Monday.' },
-  { name: 'Heatwave', mul: 1.6, hours: 16, blurb: 'Cooling systems and home streaming are both under pressure.' },
-  { name: 'City Marathon', mul: 1.7, hours: 8, blurb: 'Live video follows runners through every district.' },
+  {
+    name: 'E-sports Tournament',
+    nameTr: 'E-spor turnuvası',
+    mul: 2.4,
+    hours: 7,
+    blurb: 'Thousands of low-latency streams are live at once.',
+    blurbTr: 'Binlerce düşük gecikmeli yayın aynı anda canlı.',
+  },
+  {
+    name: 'University Results Day',
+    nameTr: 'Üniversite sonuç günü',
+    mul: 1.8,
+    hours: 6,
+    blurb: 'Every student is refreshing the same portal.',
+    blurbTr: 'Her öğrenci aynı portalı yeniliyor.',
+  },
+  {
+    name: 'Cloud Migration Weekend',
+    nameTr: 'Bulut taşıma hafta sonu',
+    mul: 2.1,
+    hours: 12,
+    blurb: 'Businesses are moving years of data before Monday.',
+    blurbTr: 'İşletmeler pazartesiden önce yılların verisini taşıyor.',
+  },
+  {
+    name: 'Heatwave',
+    nameTr: 'Sıcak hava dalgası',
+    mul: 1.6,
+    hours: 16,
+    blurb: 'Cooling systems and home streaming are both under pressure.',
+    blurbTr: 'Soğutma sistemleri ve evlerdeki yayınlar aynı anda baskı altında.',
+  },
+  {
+    name: 'City Marathon',
+    nameTr: 'Şehir maratonu',
+    mul: 1.7,
+    hours: 8,
+    blurb: 'Live video follows runners through every district.',
+    blurbTr: 'Canlı yayın koşucuları her ilçede takip ediyor.',
+  },
 ];
+
+// Active events store English text; the sponsored festival comes from the strategy board.
+const EVENT_COPY = [
+  ...CITY_EVENTS,
+  {
+    name: 'Connected city festival',
+    nameTr: 'Bağlantılı şehir festivali',
+    blurbTr: 'Sponsorluğun üç gün boyunca yoğun yayın getiriyor.',
+  },
+];
+
+export function cityEventCopy(event: { name: string; blurb: string }, tr: boolean) {
+  const copy = tr ? EVENT_COPY.find((entry) => entry.name === event.name) : undefined;
+  return copy ? { name: copy.nameTr, blurb: copy.blurbTr } : { name: event.name, blurb: event.blurb };
+}

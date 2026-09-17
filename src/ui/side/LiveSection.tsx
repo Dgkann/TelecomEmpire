@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { cityEventCopy } from '../../game/names';
 import { fmtClock } from '../../game/simulation';
 import { t } from '../i18n';
 import DevelopmentGoals from '../DevelopmentGoals';
@@ -48,10 +49,14 @@ export default function LiveSection({ sp }: { sp: SideModel }) {
                 <div className="text-[10px] uppercase tracking-widest text-neon-violet">
                   {tr ? 'Şehir etkinliği' : 'City event'}
                 </div>
-                <div className="text-sm font-semibold">{game.activeEvent.name}</div>
-                <div className="mt-0.5 text-[11px] leading-snug text-white/50">{game.activeEvent.blurb}</div>
+                <div className="text-sm font-semibold">{cityEventCopy(game.activeEvent, tr).name}</div>
+                <div className="mt-0.5 text-[11px] leading-snug text-white/50">
+                  {cityEventCopy(game.activeEvent, tr).blurb}
+                </div>
                 <div className="num mt-1.5 text-[11px] text-neon-violet">
-                  +{Math.round((game.activeEvent.mul - 1) * 100)}% traffic · until {fmtClock(game.activeEvent.endsAt)}
+                  {tr
+                    ? `+%${Math.round((game.activeEvent.mul - 1) * 100)} trafik · ${fmtClock(game.activeEvent.endsAt)} saatine kadar`
+                    : `+${Math.round((game.activeEvent.mul - 1) * 100)}% traffic · until ${fmtClock(game.activeEvent.endsAt)}`}
                 </div>
               </motion.div>
             )}

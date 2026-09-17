@@ -13,6 +13,7 @@ export interface NegotiationResult {
 
 export interface ContractProfile {
   label: string;
+  labelTr: string;
   bandwidthMul: number;
   revenueMul: number;
   slaFloor: number;
@@ -22,6 +23,7 @@ export interface ContractProfile {
 const PROFILES: Record<BuildingKind, ContractProfile> = {
   house: {
     label: 'Managed property network',
+    labelTr: 'Yönetilen mülk ağı',
     bandwidthMul: 0.6,
     revenueMul: 0.85,
     slaFloor: 99,
@@ -29,14 +31,23 @@ const PROFILES: Record<BuildingKind, ContractProfile> = {
   },
   apartment: {
     label: 'Residential estate backhaul',
+    labelTr: 'Konut sitesi bağlantısı',
     bandwidthMul: 0.8,
     revenueMul: 0.9,
     slaFloor: 99,
     requiresRedundancy: false,
   },
-  office: { label: 'Cloud office WAN', bandwidthMul: 1, revenueMul: 1, slaFloor: 99.5, requiresRedundancy: false },
+  office: {
+    label: 'Cloud office WAN',
+    labelTr: 'Bulut ofis WAN',
+    bandwidthMul: 1,
+    revenueMul: 1,
+    slaFloor: 99.5,
+    requiresRedundancy: false,
+  },
   shop: {
     label: 'Retail payment network',
+    labelTr: 'Perakende ödeme ağı',
     bandwidthMul: 0.7,
     revenueMul: 1.1,
     slaFloor: 99.9,
@@ -44,6 +55,7 @@ const PROFILES: Record<BuildingKind, ContractProfile> = {
   },
   industrial: {
     label: 'Industrial telemetry link',
+    labelTr: 'Endüstriyel telemetri hattı',
     bandwidthMul: 1.45,
     revenueMul: 1.2,
     slaFloor: 99.9,
@@ -51,6 +63,7 @@ const PROFILES: Record<BuildingKind, ContractProfile> = {
   },
   hospital: {
     label: 'Critical care network',
+    labelTr: 'Kritik bakım ağı',
     bandwidthMul: 1.1,
     revenueMul: 1.4,
     slaFloor: 99.99,
@@ -58,12 +71,20 @@ const PROFILES: Record<BuildingKind, ContractProfile> = {
   },
   university: {
     label: 'Campus research backbone',
+    labelTr: 'Kampüs araştırma omurgası',
     bandwidthMul: 1.3,
     revenueMul: 1.15,
     slaFloor: 99.9,
     requiresRedundancy: true,
   },
-  park: { label: 'Public venue Wi-Fi', bandwidthMul: 0.5, revenueMul: 0.7, slaFloor: 99, requiresRedundancy: false },
+  park: {
+    label: 'Public venue Wi-Fi',
+    labelTr: 'Etkinlik alanı Wi-Fi',
+    bandwidthMul: 0.5,
+    revenueMul: 0.7,
+    slaFloor: 99,
+    requiresRedundancy: false,
+  },
 };
 
 export const contractProfile = (kind: BuildingKind) => PROFILES[kind];

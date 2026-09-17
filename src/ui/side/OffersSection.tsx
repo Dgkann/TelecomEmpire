@@ -33,20 +33,31 @@ export default function OffersSection({ sp }: { sp: SideModel }) {
                     className="pointer-events-auto panel border-neon-lime/30 p-3"
                   >
                     <div className="text-[10px] uppercase tracking-widest text-neon-lime">
-                      {o.segment === 'enterprise' ? 'Enterprise contract' : 'Business contract'}
+                      {o.segment === 'enterprise'
+                        ? tr
+                          ? 'Kurumsal sözleşme'
+                          : 'Enterprise contract'
+                        : tr
+                          ? 'Ticari sözleşme'
+                          : 'Business contract'}
                     </div>
                     <div className="text-sm font-semibold">{o.clientName}</div>
-                    {service && <div className="mt-0.5 text-[10px] text-neon-cyan/70">{service.label}</div>}
+                    {service && (
+                      <div className="mt-0.5 text-[10px] text-neon-cyan/70">{tr ? service.labelTr : service.label}</div>
+                    )}
                     <div className="num mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-white/55">
                       <span>{t(locale, 'bandwidth')}</span>
                       <span className="text-right text-white">{o.bandwidthGbps} Gbps</span>
                       <span>{t(locale, 'revenue')}</span>
-                      <span className="text-right text-neon-lime">{fmtMoney(o.monthlyRevenue)}/mo</span>
+                      <span className="text-right text-neon-lime">
+                        {fmtMoney(o.monthlyRevenue)}
+                        {tr ? '/ay' : '/mo'}
+                      </span>
                       <span>SLA</span>
                       <span className="text-right text-white">{o.slaPercent}%</span>
                       <span>{t(locale, 'term')}</span>
                       <span className="text-right text-white">
-                        {o.termMonths} {plural(o.termMonths, 'month')}
+                        {o.termMonths} {tr ? 'ay' : plural(o.termMonths, 'month')}
                       </span>
                       <span>{t(locale, 'signingBonus')}</span>
                       <span className="text-right text-white">{fmtMoney(o.signingBonus)}</span>
@@ -58,8 +69,12 @@ export default function OffersSection({ sp }: { sp: SideModel }) {
                         className={`mt-2 rounded-md px-2 py-1.5 text-[10px] leading-snug ${ready ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-red/10 text-neon-red'}`}
                       >
                         {ready
-                          ? 'Second path in place, this client will sign.'
-                          : `Every site in ${d?.name} needs a second path: ${cover?.done ?? 0} of ${cover?.total ?? 0} covered.`}
+                          ? tr
+                            ? 'İkinci yol hazır; bu müşteri imzalar.'
+                            : 'Second path in place, this client will sign.'
+                          : tr
+                            ? `${d?.name} ilçesindeki her noktanın ikinci bir yolu olmalı: ${cover?.total ?? 0} noktanın ${cover?.done ?? 0} tanesi korumalı.`
+                            : `Every site in ${d?.name} needs a second path: ${cover?.done ?? 0} of ${cover?.total ?? 0} covered.`}
                       </div>
                     )}
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -67,16 +82,23 @@ export default function OffersSection({ sp }: { sp: SideModel }) {
                         className="btn-primary py-1.5 text-left"
                         disabled={!ready}
                         onClick={() => acceptOffer(o.id, 'standard')}
-                        title="Sign the contract exactly as offered."
+                        title={tr ? 'Sözleşmeyi teklif edildiği gibi imzala.' : 'Sign the contract exactly as offered.'}
                       >
                         <span className="block text-[10px] font-semibold">{t(locale, 'standard')}</span>
-                        <span className="num block text-[9px] opacity-70">{fmtMoney(o.monthlyRevenue)}/mo</span>
+                        <span className="num block text-[9px] opacity-70">
+                          {fmtMoney(o.monthlyRevenue)}
+                          {tr ? '/ay' : '/mo'}
+                        </span>
                       </button>
                       <button
                         className="btn py-1.5 text-left"
                         disabled={!ready}
                         onClick={() => acceptOffer(o.id, 'flexible')}
-                        title="Take 15% less revenue in exchange for twice the monthly downtime allowance."
+                        title={
+                          tr
+                            ? 'İki kat aylık kesinti payı karşılığında %15 daha az gelir kabul et.'
+                            : 'Take 15% less revenue in exchange for twice the monthly downtime allowance.'
+                        }
                       >
                         <span className="block text-[10px] font-semibold">{t(locale, 'flexibleSla')}</span>
                         <span className="num block text-[9px] text-white/45">
@@ -87,7 +109,11 @@ export default function OffersSection({ sp }: { sp: SideModel }) {
                         className="btn border-neon-amber/30 py-1.5 text-left"
                         disabled={!ready}
                         onClick={() => acceptOffer(o.id, 'premium')}
-                        title="Ask for 20% more monthly revenue. Rejection loses the deal."
+                        title={
+                          tr
+                            ? '%20 daha fazla aylık gelir iste. Reddedilirse anlaşma kaybedilir.'
+                            : 'Ask for 20% more monthly revenue. Rejection loses the deal.'
+                        }
                       >
                         <span className="block text-[10px] font-semibold text-neon-amber">
                           {t(locale, 'premiumCounter')}
@@ -101,8 +127,9 @@ export default function OffersSection({ sp }: { sp: SideModel }) {
                       </button>
                     </div>
                     <div className="mt-1.5 text-[10px] leading-snug text-white/35">
-                      Flexible doubles the outage allowance for 15% less income. Premium asks 20% more, halves the
-                      bonus, and can lose the offer.
+                      {tr
+                        ? 'Esnek seçenek kesinti payını ikiye katlar ve geliri %15 azaltır. Primli teklif %20 fazla ister, imza primini yarıya indirir ve teklifi kaybettirebilir.'
+                        : 'Flexible doubles the outage allowance for 15% less income. Premium asks 20% more, halves the bonus, and can lose the offer.'}
                     </div>
                   </motion.div>
                 );

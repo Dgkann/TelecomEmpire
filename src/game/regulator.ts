@@ -65,6 +65,27 @@ export function makeRegulation(s: GameState, rng: Rng, customers: number): Regul
   };
 }
 
+// Regulations store English text; Turkish is rebuilt from the same kind and target.
+export function regulationCopy(r: Regulation, s: GameState, tr: boolean) {
+  if (!tr) return { title: r.title, detail: r.detail };
+  if (r.kind === 'coverage') {
+    const district = s.districts.find((d) => d.id === r.districtId)?.name ?? '';
+    return {
+      title: 'Kapsama yükümlülüğü',
+      detail: `${district} ilçesinde kapsamayı %${Math.round(r.target * 100)} seviyesine çıkar ya da açık cezasını öde.`,
+    };
+  }
+  if (r.kind === 'resilience')
+    return {
+      title: 'Dayanıklılık denetimi',
+      detail: `Müşteriye hizmet veren noktaların %${Math.round(r.target * 100)} kadarını ikinci bir fiber yolla koru.`,
+    };
+  return {
+    title: 'Fiyat incelemesi',
+    detail: `Ortalama fiyatı referans tarifenin en fazla ${r.target.toFixed(2)} katında tut.`,
+  };
+}
+
 export interface RegulationOutcome {
   regulation: Regulation;
   met: boolean;

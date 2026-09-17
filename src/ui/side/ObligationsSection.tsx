@@ -1,5 +1,5 @@
 import { fmtMoney, priceIndex } from '../../game/economy';
-import { networkResilience, regulationProgress } from '../../game/regulator';
+import { networkResilience, regulationCopy, regulationProgress } from '../../game/regulator';
 import { t } from '../i18n';
 import type { SideModel } from './model';
 
@@ -19,10 +19,23 @@ export default function ObligationsSection({ sp }: { sp: SideModel }) {
                 : r.kind === 'price_cap'
                   ? priceIndex(game)
                   : networkResilience(game);
+            const copy = regulationCopy(r, game, tr);
             const targetText =
-              r.kind === 'price_cap' ? `${r.target.toFixed(2)}× max` : `${Math.round(r.target * 100)}%`;
+              r.kind === 'price_cap'
+                ? tr
+                  ? `en fazla ${r.target.toFixed(2)}×`
+                  : `${r.target.toFixed(2)}× max`
+                : tr
+                  ? `%${Math.round(r.target * 100)}`
+                  : `${Math.round(r.target * 100)}%`;
             const currentText =
-              r.kind === 'price_cap' ? `${current.toFixed(2)}× now` : `${Math.round(current * 100)}% now`;
+              r.kind === 'price_cap'
+                ? tr
+                  ? `şu an ${current.toFixed(2)}×`
+                  : `${current.toFixed(2)}× now`
+                : tr
+                  ? `şu an %${Math.round(current * 100)}`
+                  : `${Math.round(current * 100)}% now`;
             const urgent = daysLeft <= 7 && progress < 1;
             return (
               <div
@@ -34,13 +47,14 @@ export default function ObligationsSection({ sp }: { sp: SideModel }) {
                   <div
                     className={`text-[10px] font-semibold uppercase tracking-widest ${urgent ? 'text-neon-red' : 'text-neon-amber'}`}
                   >
-                    {r.title}
+                    {copy.title}
                   </div>
                   <div className={`num text-[10px] ${urgent ? 'text-neon-red' : 'text-white/55'}`}>
-                    {daysLeft}d left
+                    {daysLeft}
+                    {tr ? ' gün kaldı' : 'd left'}
                   </div>
                 </div>
-                <div className="mt-1 text-[11px] leading-snug text-white/65">{r.detail}</div>
+                <div className="mt-1 text-[11px] leading-snug text-white/65">{copy.detail}</div>
                 <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
                   <div className="rounded-sm bg-black/20 px-2 py-1.5">
                     <div className="text-white/40">{t(locale, 'current')}</div>
@@ -64,12 +78,18 @@ export default function ObligationsSection({ sp }: { sp: SideModel }) {
                   className={`mt-2 rounded-sm border px-2 py-1.5 ${progress >= 1 ? 'border-neon-lime/25 bg-neon-lime/[0.06]' : 'border-neon-red/25 bg-neon-red/[0.07]'}`}
                 >
                   <div className="text-[9px] uppercase tracking-wider text-white/45">
-                    {progress >= 1 ? 'Status' : 'Deadline risk'}
+                    {progress >= 1 ? (tr ? 'Durum' : 'Status') : tr ? 'Süre riski' : 'Deadline risk'}
                   </div>
                   <div
                     className={`num text-[11px] font-semibold ${progress >= 1 ? 'text-neon-lime' : 'text-neon-red'}`}
                   >
-                    {progress >= 1 ? 'On track · +4 reputation' : `${fmtMoney(r.fine)} fine · −8 reputation`}
+                    {progress >= 1
+                      ? tr
+                        ? 'Yolunda · +4 itibar'
+                        : 'On track · +4 reputation'
+                      : tr
+                        ? `${fmtMoney(r.fine)} ceza · −8 itibar`
+                        : `${fmtMoney(r.fine)} fine · −8 reputation`}
                   </div>
                 </div>
                 {district && (
@@ -81,7 +101,7 @@ export default function ObligationsSection({ sp }: { sp: SideModel }) {
                       setMobileOpen(false);
                     }}
                   >
-                    Open {district.name} on map →
+                    {tr ? `${district.name} ilçesini haritada aç →` : `Open ${district.name} on map →`}
                   </button>
                 )}
               </div>
