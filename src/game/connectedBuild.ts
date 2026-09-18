@@ -35,12 +35,22 @@ export function connectedSiteEstimate(
   return { backhaul, siteCost, total, error };
 }
 
-export function buildConnectedSite(state: GameState, kind: NodeKind, gx: number, gy: number) {
-  const quote = connectedSiteEstimate(state, kind, gx, gy);
+export function buildConnectedSite(
+  state: GameState,
+  kind: NodeKind,
+  gx: number,
+  gy: number,
+  locale: 'en' | 'tr' = 'en',
+) {
+  const quote = connectedSiteEstimate(state, kind, gx, gy, computeRoutes(state), locale);
   if (quote.error) return { state, error: quote.error };
   const id = uid('site');
-  return projectBlueprint(state, [
-    { type: 'node', id, kind, gx, gy },
-    ...(quote.backhaul ? [{ type: 'link' as const, id: uid('fibre'), aId: quote.backhaul.node.id, bId: id }] : []),
-  ]);
+  return projectBlueprint(
+    state,
+    [
+      { type: 'node', id, kind, gx, gy },
+      ...(quote.backhaul ? [{ type: 'link' as const, id: uid('fibre'), aId: quote.backhaul.node.id, bId: id }] : []),
+    ],
+    locale,
+  );
 }

@@ -1,7 +1,7 @@
 import { startMarketOperation, cancelMarketOperation } from '../game/competition';
 import { initialNodeTier, nodeCapitalCost } from '../game/constants';
 import { commissionCapacityPlan, type CapacityUpgrade } from '../game/capacityLab';
-import type { MarketTactic } from '../game/types';
+import type { MarketTactic, PackageSegment } from '../game/types';
 import { submitTenderBid, withdrawTenderBid } from '../game/procurement';
 import {
   SMART_PAUSE_KEY,
@@ -83,6 +83,7 @@ import type {
   TrafficPolicy,
 } from '../game/types';
 import type { Locale } from '../ui/i18n';
+import { researchCopy } from '../ui/researchCopy';
 
 export type BuildTool = NodeKind | 'fiber' | null;
 
@@ -228,6 +229,16 @@ function initialLocale(): Locale {
   }
 }
 
+// Toasts and banners disappear with the session, so they are phrased in the current language on the spot.
+const say = (locale: Locale, en: string, tr: string) => (locale === 'tr' ? tr : en);
+
+const SEGMENT_TR: Record<PackageSegment, string> = {
+  residential: 'konut',
+  business: 'kurumsal',
+  enterprise: 'büyük kurumsal',
+  mobile: 'mobil',
+};
+
 const initialUi: UiState = {
   inspectedOfferId: null,
   smartPauseNotice: null,
@@ -304,7 +315,7 @@ export const useGame = create<Store>((set, get) => ({
 
   resetSave: () => {
     if (!clearSave(get().activeSaveSlot)) {
-      const message = 'The active save could not be deleted.';
+      const message = say(get().locale, 'The active save could not be deleted.', 'Etkin kayıt silinemedi.');
       set({ persistenceError: message });
       get().toast(message, 'bad');
       return;
@@ -316,32 +327,39 @@ export const useGame = create<Store>((set, get) => ({
     const g = get().game;
     if (!g) return false;
     if (!saveGame(g, get().activeSaveSlot)) {
-      const message =
-        get().locale === 'tr'
-          ? 'Kayıt başarısız. İlerleme hâlâ bellekte; bu sekmeyi kapatma.'
-          : 'Saving failed. Progress is still in memory; do not close this tab.';
+      const message = say(
+        get().locale,
+        'Saving failed. Progress is still in memory; do not close this tab.',
+        'Kayıt başarısız. İlerleme hâlâ bellekte; bu sekmeyi kapatma.',
+      );
       set({ persistenceError: message });
       get().toast(message, 'bad');
       return false;
     }
     set({ persistenceError: null });
-    get().toast(get().locale === 'tr' ? 'Oyun kaydedildi.' : 'Game saved.', 'good');
+    get().toast(say(get().locale, 'Game saved.', 'Oyun kaydedildi.'), 'good');
     return true;
   },
 
   quitToMenu: () => {
     if (get().planning) {
       get().toast(
-        get().locale === 'tr'
-          ? 'Çıkmadan önce ağ taslağını kur veya sil.'
-          : 'Build or discard your network plan before exiting.',
+        say(
+          get().locale,
+          'Build or discard your network plan before exiting.',
+          'Çıkmadan önce ağ taslağını kur veya sil.',
+        ),
         'info',
       );
       return false;
     }
     const g = get().game;
     if (g && !saveGame(g, get().activeSaveSlot)) {
-      const message = 'Exit cancelled because the game could not be saved.';
+      const message = say(
+        get().locale,
+        'Exit cancelled because the game could not be saved.',
+        'Oyun kaydedilemediği için çıkış iptal edildi.',
+      );
       set({ persistenceError: message });
       get().toast(message, 'bad');
       return false;
@@ -517,9 +535,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     if (result.disconnected) {
       s.toast(
-        s.locale === 'tr'
-          ? 'Önce plandaki tüm noktaları çekirdeğe bağla.'
-          : 'Connect every planned site to a core first.',
+        say(s.locale, 'Connect every planned site to a core first.', 'Önce plandaki tüm noktaları çekirdeğe bağla.'),
         'bad',
       );
       return;
@@ -537,7 +553,7 @@ export const useGame = create<Store>((set, get) => ({
       linkFrom: null,
       selection: null,
     });
-    s.toast(s.locale === 'tr' ? 'Ağ planı kuruldu.' : 'Network plan commissioned.', 'good');
+    s.toast(say(s.locale, 'Network plan commissioned.', 'Ağ planı kuruldu.'), 'good');
   },
 
   resolveBoardDecision: (id, option) => {
@@ -598,7 +614,7 @@ export const useGame = create<Store>((set, get) => ({
   setScreen: (screen) => {
     if (get().planning && screen !== 'map') {
       get().toast(
-        get().locale === 'tr' ? 'Önce ağ taslağını kur veya sil.' : 'Build or discard your network plan first.',
+        say(get().locale, 'Build or discard your network plan first.', 'Önce ağ taslağını kur veya sil.'),
         'info',
       );
       return;
@@ -633,17 +649,17 @@ export const useGame = create<Store>((set, get) => ({
     const g = get().game;
     if (!g) return false;
     if (!isSaveSlot(slot)) {
-      const message = 'Choose a valid save slot.';
+      const message = say(get().locale, 'Choose a valid save slot.', 'Geçerli bir kayıt yuvası seç.');
       set({ persistenceError: message });
       get().toast(message, 'bad');
       return false;
     }
     if (saveGame(g, slot)) {
       set({ activeSaveSlot: slot, persistenceError: null });
-      get().toast(`Saved to slot ${slot + 1}.`, 'good');
+      get().toast(say(get().locale, `Saved to slot ${slot + 1}.`, `${slot + 1}. yuvaya kaydedildi.`), 'good');
       return true;
     }
-    const message = `Slot ${slot + 1} could not be saved.`;
+    const message = say(get().locale, `Slot ${slot + 1} could not be saved.`, `${slot + 1}. yuva kaydedilemedi.`);
     set({ persistenceError: message });
     get().toast(message, 'bad');
     return false;
@@ -654,11 +670,25 @@ export const useGame = create<Store>((set, get) => ({
     if (!s.game || s.planning || s.drillTarget) return false;
     const next = commissionCapacityPlan(s.game, items);
     if (!next) {
-      s.toast('Order could not be commissioned. Refresh the lab and check cash, faults and research.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Order could not be commissioned. Refresh the lab and check cash, faults and research.',
+          'Sipariş verilemedi. Laboratuvarı yenile; nakit, arıza ve araştırma durumunu gözden geçir.',
+        ),
+        'bad',
+      );
       return false;
     }
     set({ game: next });
-    s.toast(items.length + ' capacity upgrades commissioned', 'good');
+    s.toast(
+      say(
+        s.locale,
+        `${items.length} ${plural(items.length, 'capacity upgrade')} commissioned`,
+        `${items.length} kapasite yükseltmesi sipariş edildi`,
+      ),
+      'good',
+    );
     return true;
   },
 
@@ -667,11 +697,17 @@ export const useGame = create<Store>((set, get) => ({
     if (!s.game || s.planning) return;
     const game = buildBackupRoute(s.game, nodeId);
     if (!game) {
-      s.toast('No affordable independent route is available.', 'bad');
+      s.toast(
+        say(s.locale, 'No affordable independent route is available.', 'Bütçeye uygun bağımsız bir rota yok.'),
+        'bad',
+      );
       return;
     }
     set({ game });
-    s.toast('Backup fibre live · single-cut protection', 'good');
+    s.toast(
+      say(s.locale, 'Backup fibre live · single-cut protection', 'Yedek fiber devrede · tek kesintiye karşı koruma'),
+      'good',
+    );
   },
   setAutoConnect: (autoConnect) => set({ autoConnect }),
   placeNode: (kind, gx, gy) => {
@@ -686,13 +722,13 @@ export const useGame = create<Store>((set, get) => ({
       return;
     }
     if (s.autoConnect) {
-      const result = buildConnectedSite(g, kind, gx, gy);
+      const result = buildConnectedSite(g, kind, gx, gy, s.locale);
       if (result.error) {
         s.toast(result.error, 'bad', gx, gy);
         return;
       }
       set({ game: result.state });
-      s.toast('Site connected · ready for service', 'good', gx, gy);
+      s.toast(say(s.locale, 'Site connected · ready for service', 'Nokta bağlandı · hizmete hazır'), 'good', gx, gy);
       return;
     }
     const spec = NODE_SPECS[kind];
@@ -736,7 +772,7 @@ export const useGame = create<Store>((set, get) => ({
       }
       pushLog(draft, `${spec.label} built in ${district.name}.`, 'good');
     });
-    s.toast(`${spec.label} built`, 'good', gx, gy);
+    s.toast(say(s.locale, `${spec.label} built`, `${spec.labelTr} kuruldu`), 'good', gx, gy);
   },
 
   clickNodeForLink: (nodeId) => {
@@ -764,7 +800,7 @@ export const useGame = create<Store>((set, get) => ({
       set({ linkFrom: null });
       return;
     }
-    const issue = fibreConnectionIssue(g, a.id, b.id);
+    const issue = fibreConnectionIssue(g, a.id, b.id, s.locale);
     if (issue) {
       s.toast(issue, 'bad');
       set({ linkFrom: null });
@@ -793,7 +829,7 @@ export const useGame = create<Store>((set, get) => ({
       pushLog(draft, `Fibre span lit: ${a.name} ↔ ${b.name}.`, 'good');
     });
     set({ linkFrom: null });
-    s.toast('Fibre lit', 'good', (a.gx + b.gx) / 2, (a.gy + b.gy) / 2);
+    s.toast(say(s.locale, 'Fibre lit', 'Fiber devrede'), 'good', (a.gx + b.gx) / 2, (a.gy + b.gy) / 2);
   },
 
   cancelBuild: () => set({ tool: null, linkFrom: null }),
@@ -807,32 +843,47 @@ export const useGame = create<Store>((set, get) => ({
     if (
       g.incidents.some((incident) => !incident.resolved && incident.targetType === 'node' && incident.targetId === id)
     ) {
-      s.toast('Resolve the site fault before upgrading it.', 'bad');
+      s.toast(
+        say(s.locale, 'Resolve the site fault before upgrading it.', 'Yükseltmeden önce noktadaki arızayı gider.'),
+        'bad',
+      );
       return;
     }
     if (g.maintenanceOrders.some((order) => order.nodeId === id && order.status !== 'completed')) {
-      s.toast('Finish or clear the planned work before upgrading this site.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Finish or clear the planned work before upgrading this site.',
+          'Bu noktayı yükseltmeden önce planlı işi bitir veya iptal et.',
+        ),
+        'bad',
+      );
       return;
     }
     const mods = researchModifiers(g.researchDone);
     const spec = NODE_SPECS[node.kind];
     const maxTier = node.kind === 'core' ? mods.maxCoreTier : node.kind === 'tower' ? mods.maxTowerTier : spec.maxTier;
     if (node.tier >= maxTier) {
-      s.toast('Needs new research to go further.', 'bad');
+      s.toast(
+        say(s.locale, 'Needs new research to go further.', 'Daha ileri gitmek için yeni araştırma gerekiyor.'),
+        'bad',
+      );
       return;
     }
     const cost = nodeUpgradeCost(node.kind, node.tier);
     if (node.kind === 'datacenter' && node.tier === 0 && !g.researchDone.includes('edge_compute')) {
       s.toast(
-        s.locale === 'tr'
-          ? 'Tam merkeze genişletmek için Edge araştırması gerekiyor.'
-          : 'Research edge compute to expand to a full data centre.',
+        say(
+          s.locale,
+          'Research edge compute to expand to a full data centre.',
+          'Tam merkeze genişletmek için Edge araştırması gerekiyor.',
+        ),
         'bad',
       );
       return;
     }
     if (g.money < cost) {
-      s.toast('Not enough money.', 'bad');
+      s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -850,7 +901,7 @@ export const useGame = create<Store>((set, get) => ({
           : n,
       );
     });
-    s.toast(`${node.name} upgraded`, 'good', node.gx, node.gy);
+    s.toast(say(s.locale, `${node.name} upgraded`, `${node.name} yükseltildi`), 'good', node.gx, node.gy);
   },
 
   repairNode: (id) => {
@@ -862,7 +913,7 @@ export const useGame = create<Store>((set, get) => ({
     const cost = Math.round((100 - node.health) * 260);
     if (cost <= 0) return;
     if (g.money < cost) {
-      s.toast('Not enough money.', 'bad');
+      s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -870,7 +921,7 @@ export const useGame = create<Store>((set, get) => ({
       recordLedger(draft, 'network_service', `Service: ${node.name}`, -cost);
       draft.nodes = draft.nodes.map((n) => (n.id === id ? { ...n, health: 100, servicedAt: draft.minutes } : n));
     });
-    s.toast('Maintenance done', 'good', node.gx, node.gy);
+    s.toast(say(s.locale, 'Maintenance done', 'Bakım tamamlandı'), 'good', node.gx, node.gy);
   },
 
   scheduleMaintenance: (id, mode) => {
@@ -880,20 +931,37 @@ export const useGame = create<Store>((set, get) => ({
     const node = g.nodes.find((entry) => entry.id === id);
     if (!node) return;
     if (mode === 'defer') {
-      s.toast(`${node.name} stays in service, and its failure odds keep climbing.`, 'info');
+      s.toast(
+        say(
+          s.locale,
+          `${node.name} stays in service, and its failure odds keep climbing.`,
+          `${node.name} hizmette kalıyor, arıza ihtimali artmayı sürdürüyor.`,
+        ),
+        'info',
+      );
       return;
     }
     if (node.down || g.incidents.some((incident) => !incident.resolved && incident.targetId === id)) {
-      s.toast('Resolve the active fault before planning service.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Resolve the active fault before planning service.',
+          'Bakım planlamadan önce açık arızayı gider.',
+        ),
+        'bad',
+      );
       return;
     }
     if (g.maintenanceOrders.some((order) => order.nodeId === id && order.status !== 'completed')) {
-      s.toast('This site already has planned work queued.', 'bad');
+      s.toast(say(s.locale, 'This site already has planned work queued.', 'Bu nokta için zaten planlı iş var.'), 'bad');
       return;
     }
     const cost = maintenanceCost(node, mode);
     if (g.money < cost) {
-      s.toast('Not enough cash for this maintenance window.', 'bad');
+      s.toast(
+        say(s.locale, 'Not enough cash for this maintenance window.', 'Bu bakım penceresi için nakit yetmiyor.'),
+        'bad',
+      );
       return;
     }
     const config = MAINTENANCE_CONFIG[mode];
@@ -917,7 +985,14 @@ export const useGame = create<Store>((set, get) => ({
       ];
       pushLog(draft, `${config.label} booked for ${node.name}.`, 'info');
     });
-    s.toast(mode === 'urgent' ? 'Crew queued for dispatch' : '02:00 maintenance booked', 'good', node.gx, node.gy);
+    s.toast(
+      mode === 'urgent'
+        ? say(s.locale, 'Crew queued for dispatch', 'Ekip sevk sırasına alındı')
+        : say(s.locale, '02:00 maintenance booked', 'Bakım 02:00 için planlandı'),
+      'good',
+      node.gx,
+      node.gy,
+    );
   },
   // Work that has not started yet can be called off and the fee returned.
   cancelMaintenance: (orderId) => {
@@ -927,7 +1002,14 @@ export const useGame = create<Store>((set, get) => ({
     const order = g.maintenanceOrders.find((entry) => entry.id === orderId);
     if (!order) return;
     if (order.status !== 'scheduled') {
-      s.toast('The crew is already on site, so this cannot be called off.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'The crew is already on site, so this cannot be called off.',
+          'Ekip sahaya çıktığı için bu iş iptal edilemez.',
+        ),
+        'bad',
+      );
       return;
     }
     const node = g.nodes.find((entry) => entry.id === order.nodeId);
@@ -937,7 +1019,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.maintenanceOrders = draft.maintenanceOrders.filter((entry) => entry.id !== orderId);
       pushLog(draft, `Planned work at ${node?.name ?? 'a site'} was called off.`, 'info');
     });
-    s.toast('Maintenance cancelled and refunded.', 'good');
+    s.toast(say(s.locale, 'Maintenance cancelled and refunded.', 'Bakım iptal edildi, ücret iade edildi.'), 'good');
   },
   sellNode: (id) => {
     const s = get();
@@ -953,11 +1035,25 @@ export const useGame = create<Store>((set, get) => ({
           (incident.targetType === 'link' && attachedLinkIds.has(incident.targetId))),
     );
     if (blockingIncident) {
-      s.toast('Resolve faults on this site and its fibre before decommissioning it.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Resolve faults on this site and its fibre before decommissioning it.',
+          'Noktayı kaldırmadan önce kendisindeki ve fiberindeki arızaları gider.',
+        ),
+        'bad',
+      );
       return;
     }
     if (g.maintenanceOrders.some((order) => order.nodeId === id && order.status !== 'completed')) {
-      s.toast('Complete the planned work before decommissioning this site.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Complete the planned work before decommissioning this site.',
+          'Bu noktayı kaldırmadan önce planlı işi tamamla.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -987,12 +1083,15 @@ export const useGame = create<Store>((set, get) => ({
     if (!link) return;
     const mods = researchModifiers(g.researchDone);
     if (link.tier >= mods.maxLinkTier) {
-      s.toast('Higher grade optics need research.', 'bad');
+      s.toast(
+        say(s.locale, 'Higher grade optics need research.', 'Daha üst sınıf optik için araştırma gerekiyor.'),
+        'bad',
+      );
       return;
     }
     const cost = Math.round(link.length * FIBER_UPGRADE_COST_PER_UNIT * link.tier);
     if (g.money < cost) {
-      s.toast('Not enough money.', 'bad');
+      s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1002,7 +1101,7 @@ export const useGame = create<Store>((set, get) => ({
         l.id === id ? { ...l, tier: l.tier + 1, capacityGbps: linkCapacity(l.tier + 1) * mods.linkCapacityMul } : l,
       );
     });
-    s.toast('Fibre upgraded', 'good');
+    s.toast(say(s.locale, 'Fibre upgraded', 'Fiber yükseltildi'), 'good');
   },
 
   sellLink: (id) => {
@@ -1012,7 +1111,14 @@ export const useGame = create<Store>((set, get) => ({
         (incident) => !incident.resolved && incident.targetType === 'link' && incident.targetId === id,
       )
     ) {
-      s.toast('Resolve the fault before removing this fibre span.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Resolve the fault before removing this fibre span.',
+          'Bu fiber hattını kaldırmadan önce arızayı gider.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -1031,7 +1137,14 @@ export const useGame = create<Store>((set, get) => ({
     if (!s.game || s.planning || s.drillTarget) return;
     const next = buildDistrictLaunch(s.game, id, kind);
     if (!next) {
-      s.toast('Launch unavailable. Review the current cash and network requirements.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Launch unavailable. Review the current cash and network requirements.',
+          'Açılış yapılamıyor. Nakit ve şebeke gereksinimlerini gözden geçir.',
+        ),
+        'bad',
+      );
       return;
     }
     const site = next.nodes[next.nodes.length - 1];
@@ -1044,7 +1157,14 @@ export const useGame = create<Store>((set, get) => ({
       selection: { type: 'district', id },
     });
     s.focus(site.gx, site.gy);
-    s.toast('District connected. Win your first 100 customers, then protect the route.', 'good');
+    s.toast(
+      say(
+        s.locale,
+        'District connected. Win your first 100 customers, then protect the route.',
+        'İlçe bağlandı. İlk 100 müşterini kazan, sonra rotayı koru.',
+      ),
+      'good',
+    );
   },
 
   updateIdentity: (name, logo) => {
@@ -1063,7 +1183,7 @@ export const useGame = create<Store>((set, get) => ({
     const district = g.districts.find((d) => d.id === id);
     if (!district || district.unlocked) return;
     if (g.money < district.entryCost) {
-      s.toast('Not enough money for the licence.', 'bad');
+      s.toast(say(s.locale, 'Not enough money for the licence.', 'Lisans için yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1072,7 +1192,12 @@ export const useGame = create<Store>((set, get) => ({
       draft.districts = draft.districts.map((d) => (d.id === id ? { ...d, unlocked: true } : d));
       pushLog(draft, `Licensed to build in ${district.name}.`, 'good');
     });
-    s.toast(`${district.name} licensed`, 'good', district.center.gx, district.center.gy);
+    s.toast(
+      say(s.locale, `${district.name} licensed`, `${district.name} lisanslandı`),
+      'good',
+      district.center.gx,
+      district.center.gy,
+    );
   },
 
   updatePackage: (id, patch) => {
@@ -1084,7 +1209,14 @@ export const useGame = create<Store>((set, get) => ({
       current.active &&
       !s.game?.packages.some((pack) => pack.id !== id && pack.segment === current.segment && pack.active)
     ) {
-      s.toast(`Keep at least one ${current.segment} package active.`, 'bad');
+      s.toast(
+        say(
+          s.locale,
+          `Keep at least one ${current.segment} package active.`,
+          `En az bir ${SEGMENT_TR[current.segment]} paketi etkin kalmalı.`,
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -1101,15 +1233,18 @@ export const useGame = create<Store>((set, get) => ({
     const node = researchById(id);
     if (!node || g.researchActive || g.researchDone.includes(id)) return;
     if (!node.requires.every((r) => g.researchDone.includes(r))) {
-      s.toast('Prerequisites missing.', 'bad');
+      s.toast(say(s.locale, 'Prerequisites missing.', 'Ön koşullar eksik.'), 'bad');
       return;
     }
     if (g.money < node.cost) {
-      s.toast('Not enough money.', 'bad');
+      s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     if (g.researchPoints < node.points) {
-      s.toast(`Need ${node.points} research points.`, 'bad');
+      s.toast(
+        say(s.locale, `Need ${node.points} research points.`, `${node.points} araştırma puanı gerekiyor.`),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -1119,7 +1254,7 @@ export const useGame = create<Store>((set, get) => ({
       recordLedger(draft, 'research', `Research: ${node.name}`, -node.cost);
       pushLog(draft, `Research started: ${node.name}.`, 'info');
     });
-    s.toast(`Researching ${node.name}`, 'good');
+    s.toast(say(s.locale, `Researching ${node.name}`, `${researchCopy(node, 'tr').name} araştırılıyor`), 'good');
   },
 
   acceptOffer: (id, mode = 'standard') => {
@@ -1129,14 +1264,21 @@ export const useGame = create<Store>((set, get) => ({
     const offer = g.offers.find((o) => o.id === id);
     if (!offer) return;
     if (g.contracts.some((contract) => contract.buildingId === offer.buildingId)) {
-      s.toast('That building already has an active contract.', 'bad');
+      s.toast(
+        say(s.locale, 'That building already has an active contract.', 'Bu binada zaten etkin bir sözleşme var.'),
+        'bad',
+      );
       return;
     }
     const cover = offer.requiresRedundancy ? districtRedundancy(g, offer.districtId) : null;
     if (cover && !cover.complete) {
-      const name = g.districts.find((d) => d.id === offer.districtId)?.name ?? 'that district';
+      const name = g.districts.find((d) => d.id === offer.districtId)?.name ?? say(s.locale, 'that district', 'o ilçe');
       s.toast(
-        `${name}: ${cover.done} of ${cover.total} ${plural(cover.total, 'site')} ${cover.total === 1 ? 'has' : 'have'} a second path.`,
+        say(
+          s.locale,
+          `${name}: ${cover.done} of ${cover.total} ${plural(cover.total, 'site')} ${cover.total === 1 ? 'has' : 'have'} a second path.`,
+          `${name}: ${cover.total} noktadan ${cover.done} tanesinin ikinci yolu var.`,
+        ),
         'bad',
       );
       return;
@@ -1149,7 +1291,12 @@ export const useGame = create<Store>((set, get) => ({
         draft.offers = draft.offers.filter((entry) => entry.id !== id);
         pushLog(draft, `${offer.clientName} rejected the premium counter and walked away.`, 'bad');
       });
-      s.toast('Premium counter rejected', 'bad', building?.gx, building?.gy);
+      s.toast(
+        say(s.locale, 'Premium counter rejected', 'Primli karşı teklif reddedildi'),
+        'bad',
+        building?.gx,
+        building?.gy,
+      );
       return;
     }
 
@@ -1183,7 +1330,9 @@ export const useGame = create<Store>((set, get) => ({
       pushLog(draft, `Signed ${agreed.clientName}${term} at ${fmtMoneyExact(agreed.monthlyRevenue)}/mo.`, 'good');
     });
     s.toast(
-      mode === 'premium' ? 'Premium counter accepted' : `${agreed.clientName} signed`,
+      mode === 'premium'
+        ? say(s.locale, 'Premium counter accepted', 'Primli karşı teklif kabul edildi')
+        : say(s.locale, `${agreed.clientName} signed`, `${agreed.clientName} imzaladı`),
       'good',
       building?.gx,
       building?.gy,
@@ -1199,26 +1348,38 @@ export const useGame = create<Store>((set, get) => ({
     const inc = g.incidents.find((i) => i.id === incidentId);
     if (!inc || inc.resolved) return;
     if (inc.assignedTechId) {
-      s.toast('A crew is already assigned to that incident.', 'bad');
+      s.toast(
+        say(s.locale, 'A crew is already assigned to that incident.', 'Bu arızaya zaten bir ekip atandı.'),
+        'bad',
+      );
       return;
     }
     const candidates = dispatchCandidates(g, inc, mode);
     const tech = (techId ? candidates.find((c) => c.technician.id === techId) : candidates[0])?.technician;
     if (!tech) {
-      s.toast(techId ? 'That crew is no longer available. Choose another crew.' : 'Every crew is already out.', 'bad');
+      s.toast(
+        techId
+          ? say(
+              s.locale,
+              'That crew is no longer available. Choose another crew.',
+              'Bu ekip artık müsait değil. Başka bir ekip seç.',
+            )
+          : say(s.locale, 'Every crew is already out.', 'Bütün ekipler sahada.'),
+        'bad',
+      );
       return;
     }
     // Emergency work needs cash up front.
     if (mode === 'emergency') {
       const cost = repairCost(inc, 'emergency');
       if (g.money < cost) {
-        s.toast('Not enough cash for an emergency call-out.', 'bad');
+        s.toast(say(s.locale, 'Not enough cash for an emergency call-out.', 'Acil çağrı için nakit yetmiyor.'), 'bad');
         return;
       }
     }
     withGame(set, (draft) => dispatchTechnician(draft, incidentId, tech.id, mode));
     set({ openIncidentId: null });
-    s.toast(`${tech.name} is on the way`, 'info');
+    s.toast(say(s.locale, `${tech.name} is on the way`, `${tech.name} yola çıktı`), 'info');
   },
 
   hireTechnician: () => {
@@ -1227,7 +1388,7 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const cost = 80000;
     if (g.money < cost) {
-      s.toast('Not enough money.', 'bad');
+      s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1253,7 +1414,7 @@ export const useGame = create<Store>((set, get) => ({
         },
       ];
     });
-    s.toast('New field crew hired', 'good');
+    s.toast(say(s.locale, 'New field crew hired', 'Yeni saha ekibi işe alındı'), 'good');
   },
 
   hireEmployee: (role) => {
@@ -1262,7 +1423,7 @@ export const useGame = create<Store>((set, get) => ({
     if (!g) return;
     const cost = 120000;
     if (g.money < cost) {
-      s.toast('Not enough money.', 'bad');
+      s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1282,7 +1443,7 @@ export const useGame = create<Store>((set, get) => ({
         { id: uid('e'), name: personName(rng), role, salary, skill: 1 + Math.floor(rng() * 4), experience: 0 },
       ];
     });
-    s.toast('Hired', 'good');
+    s.toast(say(s.locale, 'Hired', 'İşe alındı'), 'good');
   },
 
   fireStaff: (id) => {
@@ -1292,7 +1453,14 @@ export const useGame = create<Store>((set, get) => ({
       technician &&
       (technician.state !== 'idle' || technician.incidentId !== null || technician.maintenanceId !== null)
     ) {
-      s.toast('That crew must finish and return before they can be released.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'That crew must finish and return before they can be released.',
+          'Bu ekip işini bitirip dönmeden çıkarılamaz.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -1306,18 +1474,24 @@ export const useGame = create<Store>((set, get) => ({
     const g = s.game;
     if (!g?.auction || g.auction.result) return;
     if (amount < g.auction.reserve) {
-      s.toast('That is below the reserve price.', 'bad');
+      s.toast(say(s.locale, 'That is below the reserve price.', 'Bu tutar taban fiyatın altında.'), 'bad');
       return;
     }
     if (amount > g.money) {
-      s.toast('You cannot bid more than you hold.', 'bad');
+      s.toast(
+        say(s.locale, 'You cannot bid more than you hold.', 'Elindeki nakitten fazlasını teklif edemezsin.'),
+        'bad',
+      );
       return;
     }
     // Bids are sealed. Nothing is charged unless you win.
     withGame(set, (draft) => {
       if (draft.auction) draft.auction = { ...draft.auction, playerBid: amount };
     });
-    s.toast('Bid sealed. Results when the lot closes.', 'info');
+    s.toast(
+      say(s.locale, 'Bid sealed. Results when the lot closes.', 'Teklif mühürlendi. Sonuçlar lot kapanınca açıklanır.'),
+      'info',
+    );
   },
 
   dismissAuction: () => withGame(set, (draft) => void (draft.auction = null)),
@@ -1333,19 +1507,36 @@ export const useGame = create<Store>((set, get) => ({
     const district = g.districts.find((entry) => entry.id === districtId);
     const config = CAMPAIGN_CONFIG[kind];
     if (!district?.unlocked) {
-      s.toast('Unlock the district before campaigning there.', 'bad');
+      s.toast(
+        say(s.locale, 'Unlock the district before campaigning there.', 'Kampanya için önce ilçenin kilidini aç.'),
+        'bad',
+      );
       return;
     }
     if (g.campaigns.some((campaign) => campaign.districtId === districtId && campaign.endsAt > g.minutes)) {
-      s.toast('A district can run only one focused campaign at a time.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'A district can run only one focused campaign at a time.',
+          'Bir ilçede aynı anda yalnızca tek bir odaklı kampanya yürütülebilir.',
+        ),
+        'bad',
+      );
       return;
     }
     if (kind === 'mobile' && (!g.researchDone.includes('mobile_4g') || !g.spectrum.length)) {
-      s.toast('Launch 4G and secure spectrum before promoting mobile service.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Launch 4G and secure spectrum before promoting mobile service.',
+          'Mobil hizmeti tanıtmadan önce 4G’yi başlat ve spektrum al.',
+        ),
+        'bad',
+      );
       return;
     }
     if (g.money < config.cost) {
-      s.toast('Not enough cash for this campaign.', 'bad');
+      s.toast(say(s.locale, 'Not enough cash for this campaign.', 'Bu kampanya için nakit yetmiyor.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1367,7 +1558,7 @@ export const useGame = create<Store>((set, get) => ({
       ];
       pushLog(draft, `${config.label} started in ${district.name}.`, 'good');
     });
-    s.toast(`${config.label} is live`, 'good');
+    s.toast(say(s.locale, `${config.label} is live`, `${config.labelTr} yayında`), 'good');
   },
 
   setTrafficPolicy: (policy) => {
@@ -1375,18 +1566,32 @@ export const useGame = create<Store>((set, get) => ({
     const g = s.game;
     if (!g || policy === g.trafficPolicy) return;
     if (policy !== 'balanced' && !g.researchDone.includes('noc')) {
-      s.toast('A Network Operations Centre is required for traffic policy control.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'A Network Operations Centre is required for traffic policy control.',
+          'Trafik politikası kontrolü için Şebeke Operasyon Merkezi gerekiyor.',
+        ),
+        'bad',
+      );
       return;
     }
     if (policy === 'mobile' && !g.researchDone.includes('mobile_5g')) {
-      s.toast('5G Standalone research unlocks the mobile network slice.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          '5G Standalone research unlocks the mobile network slice.',
+          '5G Standalone araştırması mobil ağ dilimini açar.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
       draft.trafficPolicy = policy;
       pushLog(draft, `Traffic policy changed to ${policy.replace(/_/g, ' ')}.`, 'info');
     });
-    s.toast('Traffic policy applied', 'good');
+    s.toast(say(s.locale, 'Traffic policy applied', 'Trafik politikası uygulandı'), 'good');
   },
 
   setInterconnectPlan: (plan) => {
@@ -1399,14 +1604,21 @@ export const useGame = create<Store>((set, get) => ({
       config.requiresDataCenter &&
       !g.nodes.some((node) => node.kind === 'datacenter' && !node.down && routes[node.id])
     ) {
-      s.toast('The CDN partner needs an online data centre.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'The CDN partner needs an online data centre.',
+          'CDN ortağı için çalışan bir veri merkezi gerekiyor.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
       draft.interconnectPlan = plan;
       pushLog(draft, `${config.label} interconnection activated.`, 'info');
     });
-    s.toast(`${config.label} selected`, 'good');
+    s.toast(say(s.locale, `${config.label} selected`, `${config.labelTr} seçildi`), 'good');
   },
 
   toggleWholesaleFixed: () =>
@@ -1420,7 +1632,14 @@ export const useGame = create<Store>((set, get) => ({
     const g = s.game;
     if (!g) return;
     if (!g.mvnoEnabled && (!g.researchDone.includes('mobile_4g') || !g.spectrum.length)) {
-      s.toast('MVNO access needs a live mobile platform and spectrum.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'MVNO access needs a live mobile platform and spectrum.',
+          'MVNO erişimi için çalışan bir mobil platform ve spektrum gerekiyor.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -1438,13 +1657,27 @@ export const useGame = create<Store>((set, get) => ({
     const availableAt = changedAt > 0 ? changedAt + DATA_CENTER_MODE_COOLDOWN : -Infinity;
     if (g.minutes < availableAt) {
       const wait = Math.ceil((availableAt - g.minutes) / MINUTES_PER_DAY);
-      s.toast(`Workload change available in ${wait} ${plural(wait, 'day')}.`, 'bad');
+      s.toast(
+        say(
+          s.locale,
+          `Workload change available in ${wait} ${plural(wait, 'day')}.`,
+          `İş yükü değişimi ${wait} gün sonra yapılabilir.`,
+        ),
+        'bad',
+      );
       return;
     }
     const config = DATA_CENTER_MODE_CONFIG[mode];
     const cost = dataCenterModeChangeCost(node);
     if (g.money < cost) {
-      s.toast('Not enough cash to reconfigure this data centre.', 'bad');
+      s.toast(
+        say(
+          s.locale,
+          'Not enough cash to reconfigure this data centre.',
+          'Bu veri merkezini yeniden yapılandırmak için nakit yetmiyor.',
+        ),
+        'bad',
+      );
       return;
     }
     withGame(set, (draft) => {
@@ -1454,7 +1687,14 @@ export const useGame = create<Store>((set, get) => ({
       draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: draft.minutes };
       pushLog(draft, `${node.name} switched to ${config.label}.`, 'info');
     });
-    s.toast(`${config.label} workload applied · ${fmtMoneyExact(cost)}`, 'good');
+    s.toast(
+      say(
+        s.locale,
+        `${config.label} workload applied · ${fmtMoneyExact(cost)}`,
+        `${config.labelTr} iş yükü uygulandı · ${fmtMoneyExact(cost)}`,
+      ),
+      'good',
+    );
   },
 
   takeLoan: (principal, termMonths) => {
@@ -1462,12 +1702,12 @@ export const useGame = create<Store>((set, get) => ({
     const g = s.game;
     if (!g) return;
     if (!Number.isFinite(principal) || principal <= 0 || !Number.isInteger(termMonths) || termMonths <= 0) {
-      s.toast('Choose a valid loan amount and term.', 'bad');
+      s.toast(say(s.locale, 'Choose a valid loan amount and term.', 'Geçerli bir kredi tutarı ve vade seç.'), 'bad');
       return;
     }
     const headroom = creditLimit(g);
     if (principal > headroom) {
-      s.toast('More than the banks will lend you.', 'bad');
+      s.toast(say(s.locale, 'More than the banks will lend you.', 'Bankaların vereceğinden fazla.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1476,7 +1716,7 @@ export const useGame = create<Store>((set, get) => ({
       recordLedger(draft, 'loan_draw', 'Loan drawdown', principal);
       pushLog(draft, `Borrowed ${fmtMoneyExact(principal)} over ${termMonths} ${plural(termMonths, 'month')}.`, 'info');
     });
-    s.toast('Loan drawn down', 'good');
+    s.toast(say(s.locale, 'Loan drawn down', 'Kredi kullanıldı'), 'good');
   },
 
   repayLoan: (id) => {
@@ -1486,7 +1726,7 @@ export const useGame = create<Store>((set, get) => ({
     const loan = g.loans.find((l) => l.id === id);
     if (!loan) return;
     if (g.money < loan.remaining) {
-      s.toast('Not enough cash to clear it.', 'bad');
+      s.toast(say(s.locale, 'Not enough cash to clear it.', 'Kapatmak için nakit yetmiyor.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
@@ -1495,7 +1735,7 @@ export const useGame = create<Store>((set, get) => ({
       recordLedger(draft, 'loan_payment', 'Loan repaid in full', -loan.remaining);
       pushLog(draft, 'Loan repaid in full.', 'good');
     });
-    s.toast('Loan cleared', 'good');
+    s.toast(say(s.locale, 'Loan cleared', 'Kredi kapatıldı'), 'good');
   },
 
   setTransitTier: (tier) => {
@@ -1506,7 +1746,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.transitTier = tier;
       pushLog(draft, `Upstream transit changed.`, 'info');
     });
-    s.toast('Transit updated', 'good');
+    s.toast(say(s.locale, 'Transit updated', 'Transit güncellendi'), 'good');
   },
 
   setEnergyPlan: (plan) => {
@@ -1515,7 +1755,7 @@ export const useGame = create<Store>((set, get) => ({
     const next = applyEnergyPlan(s.game, plan);
     if (!next) return false;
     set({ game: next });
-    s.toast(s.locale === 'tr' ? 'Enerji tarifesi güncellendi' : 'Energy tariff updated', 'good');
+    s.toast(say(s.locale, 'Energy tariff updated', 'Enerji tarifesi güncellendi'), 'good');
     return true;
   },
 
@@ -1525,7 +1765,7 @@ export const useGame = create<Store>((set, get) => ({
     const next = buildSolar(s.game, nodeId, researchModifiers(s.game.researchDone).hasOnsiteSolar);
     if (!next) return false;
     set({ game: next });
-    s.toast(s.locale === 'tr' ? 'Saha üretimi devreye alındı' : 'On-site generation commissioned', 'good');
+    s.toast(say(s.locale, 'On-site generation commissioned', 'Saha üretimi devreye alındı'), 'good');
     return true;
   },
 

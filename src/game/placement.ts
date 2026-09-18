@@ -18,7 +18,7 @@ export function nodePlacementIssue(
   const tr = locale === 'tr';
   const spec = NODE_SPECS[kind];
   if (spec.requires && !state.researchDone.includes(spec.requires))
-    return tr ? `${spec.label} için önce araştırma gerekiyor.` : `${spec.label} needs research first.`;
+    return tr ? `${spec.labelTr} için önce araştırma gerekiyor.` : `${spec.label} needs research first.`;
   const district = state.districts.find((entry) => entry.cells.some((cell) => cell.gx === gx && cell.gy === gy));
   if (!district) return tr ? 'Şehir içinden bir kare seç.' : 'Choose a tile inside the city.';
   if (!district.unlocked)

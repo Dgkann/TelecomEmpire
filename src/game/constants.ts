@@ -16,6 +16,7 @@ export const GRID = 26;
 export interface NodeSpec {
   kind: NodeKind;
   label: string;
+  labelTr: string;
   icon: string;
   baseCost: number;
   baseCapacity: number;
@@ -33,6 +34,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   core: {
     kind: 'core',
     label: 'Core Router',
+    labelTr: 'Çekirdek yönlendirici',
     icon: '◈',
     baseCost: 900000,
     baseCapacity: 10,
@@ -47,6 +49,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   pop: {
     kind: 'pop',
     label: 'POP',
+    labelTr: 'POP',
     icon: '▣',
     baseCost: 360000,
     baseCapacity: 4,
@@ -61,6 +64,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   access: {
     kind: 'access',
     label: 'Access Node',
+    labelTr: 'Erişim düğümü',
     icon: '▤',
     baseCost: 130000,
     baseCapacity: 2,
@@ -75,6 +79,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   datacenter: {
     kind: 'datacenter',
     label: 'Data Center',
+    labelTr: 'Veri merkezi',
     icon: '▦',
     baseCost: 4400000,
     baseCapacity: 40,
@@ -90,6 +95,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   tower: {
     kind: 'tower',
     label: 'Mobile Tower',
+    labelTr: 'Mobil kule',
     icon: '⌁',
     baseCost: 1200000,
     baseCapacity: 6,
