@@ -1371,7 +1371,7 @@ function recordChurn(s: GameState, d: District, count: number, rng: Rng, toMarke
       districtId: d.id,
       count,
       toId: poached ? rival!.id : null,
-      toName: poached ? rival!.name : 'left the market',
+      toName: poached ? rival!.name : line('left the market', 'pazardan ayrıldı'),
       reason,
     },
     ...s.churn,
