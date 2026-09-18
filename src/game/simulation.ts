@@ -30,12 +30,13 @@ import { createAuction, grantStarterSpectrum, settleAuction } from './spectrum';
 import { playerShareTarget, strongestRival, tickCompetitors } from './competitors';
 import { chargeLoans, checkSolvency } from './finance';
 import { recordLedger, recordOperatingMonth } from './financeLedger';
-import { makeRegulation, settleRegulations, shouldIssue } from './regulator';
+import { makeRegulation, regulationCopy, settleRegulations, shouldIssue } from './regulator';
 import { checkPromotion, customerCount, isTopRank } from './progression';
 import { approach, clamp, plural } from './util';
 import { generateCity } from './cityGen';
 import { averageSpeed, fmtMoneyExact, monthlyBreakdown, packageMix, priceIndex } from './economy';
 import {
+  incidentCopy,
   repairCost,
   repairMinutes,
   incidentLocation,
@@ -46,11 +47,22 @@ import {
   type RepairMode,
 } from './incidents';
 import { contractProfile } from './contracts';
-import { CITY_EVENTS, companyName, enterpriseName, handleName, makePost, makeSwitchPost, personName } from './names';
+import {
+  CITY_EVENTS,
+  cityEventCopy,
+  companyName,
+  enterpriseName,
+  handleName,
+  makePost,
+  makeSwitchPost,
+  personName,
+} from './names';
 import { computeRoutes, loadServices, servingNodes, type TrafficService } from './network';
 import { initialEnergy, siteDrawKw, tickEnergyMonth } from './energy';
 import { initialSignalTraining } from './signalTraining';
-import { researchModifiers, type ResearchMods } from './research';
+import { researchModifiers, researchById, type ResearchMods } from './research';
+import { researchCopy } from './researchCopy';
+import { line } from './lang';
 import { CAMPAIGN_STAGES, scenarioStatus } from './scenarios';
 import { staffModifiers, trainEmployee, trainTechnician } from './staff';
 import {
@@ -371,7 +383,15 @@ export function createNewGame(opts: NewGameOptions): GameState {
     ],
     posts: [],
     log: [
-      { id: uid('log'), at: 8 * 60, text: `${opts.companyName} is licensed to operate in ${home.name}.`, tone: 'info' },
+      {
+        id: uid('log'),
+        at: 8 * 60,
+        text: line(
+          `${opts.companyName} is licensed to operate in ${home.name}.`,
+          `${opts.companyName} ${home.name} ilçesinde faaliyet lisansı aldı.`,
+        ),
+        tone: 'info',
+      },
     ],
     stats: {
       demandGbps: 0,
@@ -534,17 +554,24 @@ export function redistributePackages(state: GameState) {
 
 // Restore the busiest or first tariff when a segment has none active before calculating revenue and demand.
 function ensureActiveTariffs(s: GameState) {
-  const restore = (segment: 'residential' | 'mobile', label: string) => {
+  const restore = (segment: 'residential' | 'mobile', label: string, labelTr: string) => {
     const plans = s.packages.filter((p) => p.segment === segment);
     if (!plans.length || plans.some((p) => p.active)) return false;
     const fallback = plans.reduce((best, p) => (p.subscribers > best.subscribers ? p : best), plans[0]);
     s.packages = s.packages.map((p) => (p.id === fallback.id ? { ...p, active: true } : p));
-    pushLog(s, `${fallback.name} was kept active; ${label} service needs at least one tariff.`, 'info');
+    pushLog(
+      s,
+      line(
+        `${fallback.name} was kept active; ${label} service needs at least one tariff.`,
+        `${fallback.name} etkin bırakıldı; ${labelTr} hizmeti için en az bir tarife gerekiyor.`,
+      ),
+      'info',
+    );
     return true;
   };
 
-  const fixedRestored = restore('residential', 'fixed');
-  const mobileRestored = restore('mobile', 'mobile');
+  const fixedRestored = restore('residential', 'fixed', 'sabit');
+  const mobileRestored = restore('mobile', 'mobile', 'mobil');
   if (fixedRestored) redistributePackages(s);
   if (mobileRestored) redistributeMobilePackages(s);
 }
@@ -685,7 +712,14 @@ export function step(prev: GameState): GameState {
           contractDelta: contracts - campaign.baselineContracts,
         },
       ];
-      pushLog(s, `${district?.name ?? 'District'} campaign completed.`, 'info');
+      pushLog(
+        s,
+        line(
+          `${district?.name ?? 'District'} campaign completed.`,
+          `${district?.name ?? 'İlçe'} kampanyası tamamlandı.`,
+        ),
+        'info',
+      );
     }
     s.campaigns = s.campaigns.filter((campaign) => campaign.endsAt > s.minutes);
   }
@@ -695,7 +729,14 @@ export function step(prev: GameState): GameState {
   // 1. Demand
   const eventMul = s.activeEvent && s.minutes < s.activeEvent.endsAt ? s.activeEvent.mul : 1;
   if (s.activeEvent && s.minutes >= s.activeEvent.endsAt) {
-    pushLog(s, `${s.activeEvent.name} is over. Traffic is settling back down.`, 'info');
+    pushLog(
+      s,
+      line(
+        `${s.activeEvent.name} is over. Traffic is settling back down.`,
+        `${cityEventCopy(s.activeEvent, true).name} sona erdi. Trafik normale dönüyor.`,
+      ),
+      'info',
+    );
     s.activeEvent = null;
   }
   const curve = demandCurve(s.minutes) * eventMul;
@@ -912,12 +953,27 @@ export function step(prev: GameState): GameState {
       const doneId = s.researchActive.id;
       s.researchDone = [...s.researchDone, doneId];
       s.researchActive = null;
-      pushLog(s, `Research complete: ${doneId.replace(/_/g, ' ')}.`, 'good');
+      const doneNode = researchById(doneId);
+      pushLog(
+        s,
+        line(
+          `Research complete: ${doneId.replace(/_/g, ' ')}.`,
+          `Araştırma tamamlandı: ${doneNode ? researchCopy(doneNode, 'tr').name : doneId}.`,
+        ),
+        'good',
+      );
 
       if (doneId === 'mobile_4g') {
         // The regulator hands every new entrant a starter block.
         grantStarterSpectrum(s);
-        pushLog(s, 'Regulator granted a starter block at 1800 MHz. Towers can go live.', 'good');
+        pushLog(
+          s,
+          line(
+            'Regulator granted a starter block at 1800 MHz. Towers can go live.',
+            'Düzenleyici 1800 MHz’te başlangıç bloğu tahsis etti. Kuleler devreye alınabilir.',
+          ),
+          'good',
+        );
       }
     } else {
       s.researchActive = { ...s.researchActive, daysLeft };
@@ -932,7 +988,7 @@ export function step(prev: GameState): GameState {
   if (failure) {
     s.gameOver = { reason: failure, at: s.minutes };
     s.speed = 0;
-    pushLog(s, 'The company has gone under.', 'bad');
+    pushLog(s, line('The company has gone under.', 'Şirket battı.'), 'bad');
   }
 
   // 9. Daily / monthly beats
@@ -953,7 +1009,11 @@ export function step(prev: GameState): GameState {
     if (!s.gameOver) tickBoard(s);
     if (promoted) {
       s.reputation = clamp(s.reputation + 5, 0, 100);
-      pushLog(s, `${s.companyName} is now a ${promoted.name}.`, 'good');
+      pushLog(
+        s,
+        line(`${s.companyName} is now a ${promoted.name}.`, `${s.companyName} artık ${promoted.nameTr}.`),
+        'good',
+      );
       // Reaching the top rung is the win, but the game carries on afterwards.
       if (s.scenarioId === 'freeplay' && isTopRank(s) && s.victoryAt === null) s.victoryAt = s.minutes;
     }
@@ -962,11 +1022,14 @@ export function step(prev: GameState): GameState {
       if (status.complete) {
         s.scenarioCompletedAt = s.minutes;
         s.victoryAt = s.minutes;
-        pushLog(s, `${status.scenario.name} completed.`, 'good');
+        pushLog(s, line(`${status.scenario.name} completed.`, `${status.scenario.nameTr} tamamlandı.`), 'good');
       } else if (status.expired) {
-        s.gameOver = { reason: `${status.scenario.name} missed its deadline.`, at: s.minutes };
+        s.gameOver = {
+          reason: line(`${status.scenario.name} missed its deadline.`, `${status.scenario.nameTr} için süre doldu.`),
+          at: s.minutes,
+        };
         s.speed = 0;
-        pushLog(s, 'The scenario deadline was missed.', 'bad');
+        pushLog(s, line('The scenario deadline was missed.', 'Senaryonun süresi doldu.'), 'bad');
       }
     }
     if (s.minutes > s.nextEventAt) startCityEvent(s, rng);
@@ -1003,7 +1066,15 @@ export function step(prev: GameState): GameState {
     const debtPaid = chargeLoans(s);
     recordOperatingMonth(s, money, completedRevenue, completedExpense, completedPenalties, debtPaid);
     s.monthAccumulator = { revenue: 0, expense: 0 };
-    if (debtPaid > 0) pushLog(s, `Loan repayments of ${fmtMoneyExact(debtPaid)} went out.`, 'info');
+    if (debtPaid > 0)
+      pushLog(
+        s,
+        line(
+          `Loan repayments of ${fmtMoneyExact(debtPaid)} went out.`,
+          `${fmtMoneyExact(debtPaid)} tutarında kredi ödemesi yapıldı.`,
+        ),
+        'info',
+      );
     s.contracts = s.contracts.map((contract) => ({ ...contract, downtimeMinutes: 0 }));
     s.finance = { ...s.finance, penalties: 0, costLoanPayments: debtPaid };
   }
@@ -1350,7 +1421,14 @@ function autoScheduleMaintenance(s: GameState, mods: ResearchMods) {
         cost,
       },
     ];
-    pushLog(s, `Telemetry booked overnight work for ${node.name} before it fails.`, 'info');
+    pushLog(
+      s,
+      line(
+        `Telemetry booked overnight work for ${node.name} before it fails.`,
+        `Telemetri, arıza çıkmadan ${node.name} için gece bakımı planladı.`,
+      ),
+      'info',
+    );
     return;
   }
 }
@@ -1375,7 +1453,14 @@ export function tickMaintenance(s: GameState, dt: number) {
     s.technicians = s.technicians.map((entry) =>
       entry.id === technician.id ? { ...entry, maintenanceId: order.id, state: 'driving' as const } : entry,
     );
-    pushLog(s, `${technician.name} dispatched for planned work at ${node.name}.`, 'info');
+    pushLog(
+      s,
+      line(
+        `${technician.name} dispatched for planned work at ${node.name}.`,
+        `${technician.name}, ${node.name} noktasındaki planlı iş için yola çıktı.`,
+      ),
+      'info',
+    );
   }
 
   for (const order of s.maintenanceOrders) {
@@ -1404,7 +1489,14 @@ export function tickMaintenance(s: GameState, dt: number) {
         ? { ...trainTechnician(entry), maintenanceId: null, incidentId: null, state: 'returning' as const }
         : entry,
     );
-    pushLog(s, `Planned work at ${node.name} completed. Equipment health restored.`, 'good');
+    pushLog(
+      s,
+      line(
+        `Planned work at ${node.name} completed. Equipment health restored.`,
+        `${node.name} noktasındaki planlı iş tamamlandı. Donanım sağlığı yenilendi.`,
+      ),
+      'good',
+    );
   }
 
   if (s.maintenanceOrders.length > 20) {
@@ -1448,7 +1540,12 @@ function tickIncidents(
       inc.repairTotalMinutes = Math.round(inc.repairTotalMinutes * scale);
       s.incidents = [...s.incidents, inc];
       applyIncidentDown(s, inc, true);
-      pushLog(s, `${inc.title} in ${s.districts.find((d) => d.id === inc.districtId)?.name ?? 'network'}`, 'bad');
+      const where = s.districts.find((d) => d.id === inc.districtId)?.name;
+      pushLog(
+        s,
+        line(`${inc.title} in ${where ?? 'network'}`, `${where ?? 'Şebeke'}: ${incidentCopy(inc, s, true).title}`),
+        'bad',
+      );
       s.reputation = clamp(s.reputation - (inc.degrade ? 0.5 : 1.5), 0, 100);
     }
   }
@@ -1463,7 +1560,7 @@ function tickIncidents(
     touched = true;
     if (left <= 0) {
       applyIncidentDown(s, inc, false);
-      pushLog(s, `${inc.title} resolved.`, 'good');
+      pushLog(s, line(`${inc.title} resolved.`, `${incidentCopy(inc, s, true).title} giderildi.`), 'good');
       return { ...inc, repairMinutesLeft: 0, resolved: true };
     }
     return { ...inc, repairMinutesLeft: left };
@@ -1658,7 +1755,10 @@ function tickContracts(s: GameState, mods: ResearchMods, dt: number, rng: Rng, i
         });
         pushLog(
           s,
-          `${contract.clientName} renewed for ${termMonths} ${plural(termMonths, 'month')} at ${fmtMoneyExact(monthlyRevenue)}/mo.`,
+          line(
+            `${contract.clientName} renewed for ${termMonths} ${plural(termMonths, 'month')} at ${fmtMoneyExact(monthlyRevenue)}/mo.`,
+            `${contract.clientName} sözleşmesini ${termMonths} ay için ayda ${fmtMoneyExact(monthlyRevenue)} bedelle yeniledi.`,
+          ),
           'good',
         );
       } else {
@@ -1666,8 +1766,14 @@ function tickContracts(s: GameState, mods: ResearchMods, dt: number, rng: Rng, i
         pushLog(
           s,
           slaMet
-            ? `${contract.clientName} completed its contract and moved on.`
-            : `${contract.clientName} declined to renew after missed SLA targets.`,
+            ? line(
+                `${contract.clientName} completed its contract and moved on.`,
+                `${contract.clientName} sözleşmesini tamamladı ve ayrıldı.`,
+              )
+            : line(
+                `${contract.clientName} declined to renew after missed SLA targets.`,
+                `${contract.clientName}, SLA hedefleri tutturulamadığı için yenilemedi.`,
+              ),
           slaMet ? 'info' : 'bad',
         );
       }
@@ -1754,7 +1860,14 @@ function tickAuction(s: GameState, rng: Rng) {
     const auction = createAuction(s, rng);
     if (auction) {
       s.auction = auction;
-      pushLog(s, `Spectrum auction announced: ${SPECTRUM_BANDS[auction.band].label}.`, 'info');
+      pushLog(
+        s,
+        line(
+          `Spectrum auction announced: ${SPECTRUM_BANDS[auction.band].label}.`,
+          `Spektrum ihalesi duyuruldu: ${SPECTRUM_BANDS[auction.band].label}.`,
+        ),
+        'info',
+      );
     }
     s.nextAuctionAt = s.minutes + MINUTES_PER_DAY * randInt(rng, 40, 70);
     return;
@@ -1781,7 +1894,10 @@ function tickAuction(s: GameState, rng: Rng) {
     playerDefaulted = true;
     pushLog(
       s,
-      `You could not cover your ${fmtMoneyExact(result.price)} bid for ${SPECTRUM_BANDS[settled.band].label}. The lot went elsewhere.`,
+      line(
+        `You could not cover your ${fmtMoneyExact(result.price)} bid for ${SPECTRUM_BANDS[settled.band].label}. The lot went elsewhere.`,
+        `${SPECTRUM_BANDS[settled.band].label} için verdiğin ${fmtMoneyExact(result.price)} teklifi karşılayamadın. Lot başkasına gitti.`,
+      ),
       'bad',
     );
     s.reputation = clamp(s.reputation - 4, 0, 100);
@@ -1803,12 +1919,22 @@ function tickAuction(s: GameState, rng: Rng) {
     }
     pushLog(
       s,
-      `Won ${settled.blocks} ${plural(settled.blocks, 'block')} at ${SPECTRUM_BANDS[settled.band].label} for ${fmtMoneyExact(result.price)}.`,
+      line(
+        `Won ${settled.blocks} ${plural(settled.blocks, 'block')} at ${SPECTRUM_BANDS[settled.band].label} for ${fmtMoneyExact(result.price)}.`,
+        `${SPECTRUM_BANDS[settled.band].label} bandında ${settled.blocks} blok ${fmtMoneyExact(result.price)} bedelle kazanıldı.`,
+      ),
       'good',
     );
     s.reputation = clamp(s.reputation + 2, 0, 100);
   } else if (result.winnerId === 'none') {
-    pushLog(s, `The ${SPECTRUM_BANDS[settled.band].label} lot went unsold.`, 'info');
+    pushLog(
+      s,
+      line(
+        `The ${SPECTRUM_BANDS[settled.band].label} lot went unsold.`,
+        `${SPECTRUM_BANDS[settled.band].label} lotu satılmadı.`,
+      ),
+      'info',
+    );
   } else {
     const winner = s.competitors.find((competitor) => competitor.id === result.winnerId);
     if (!winner || winner.cash < result.price) {
@@ -1816,7 +1942,14 @@ function tickAuction(s: GameState, rng: Rng) {
         ...settled,
         result: { ...result, winnerId: 'none', winnerName: 'Nobody', price: 0 },
       };
-      pushLog(s, `The ${SPECTRUM_BANDS[settled.band].label} lot went unsold after the winner defaulted.`, 'info');
+      pushLog(
+        s,
+        line(
+          `The ${SPECTRUM_BANDS[settled.band].label} lot went unsold after the winner defaulted.`,
+          `Kazanan ödeme yapamayınca ${SPECTRUM_BANDS[settled.band].label} lotu satılmadan kaldı.`,
+        ),
+        'info',
+      );
       return;
     }
     s.competitors = s.competitors.map((competitor) => {
@@ -1839,7 +1972,15 @@ function tickAuction(s: GameState, rng: Rng) {
         lastMove: `won ${SPECTRUM_BANDS[settled.band].label} spectrum`,
       };
     });
-    if (!playerDefaulted) pushLog(s, `${result.winnerName} took the ${SPECTRUM_BANDS[settled.band].label} lot.`, 'bad');
+    if (!playerDefaulted)
+      pushLog(
+        s,
+        line(
+          `${result.winnerName} took the ${SPECTRUM_BANDS[settled.band].label} lot.`,
+          `${SPECTRUM_BANDS[settled.band].label} lotunu ${result.winnerName} aldı.`,
+        ),
+        'bad',
+      );
   }
 }
 
@@ -1869,12 +2010,23 @@ function tickRegulator(s: GameState, rng: Rng) {
   for (const outcome of settleRegulations(s)) {
     if (outcome.met) {
       s.reputation = clamp(s.reputation + 4, 0, 100);
-      pushLog(s, `${outcome.regulation.title} met.`, 'good');
+      pushLog(
+        s,
+        line(`${outcome.regulation.title} met.`, `${regulationCopy(outcome.regulation, s, true).title} karşılandı.`),
+        'good',
+      );
     } else {
       s.money -= outcome.regulation.fine;
       recordLedger(s, 'regulatory_fine', outcome.regulation.title, -outcome.regulation.fine);
       s.reputation = clamp(s.reputation - 8, 0, 100);
-      pushLog(s, `${outcome.regulation.title} missed. Fined ${fmtMoneyExact(outcome.regulation.fine)}.`, 'bad');
+      pushLog(
+        s,
+        line(
+          `${outcome.regulation.title} missed. Fined ${fmtMoneyExact(outcome.regulation.fine)}.`,
+          `${regulationCopy(outcome.regulation, s, true).title} karşılanmadı. ${fmtMoneyExact(outcome.regulation.fine)} ceza kesildi.`,
+        ),
+        'bad',
+      );
     }
   }
 
@@ -1883,7 +2035,8 @@ function tickRegulator(s: GameState, rng: Rng) {
     const reg = makeRegulation(s, rng, customers);
     if (reg) {
       s.regulations = [...s.regulations, reg];
-      pushLog(s, `${reg.title}: ${reg.detail}`, 'info');
+      const regTr = regulationCopy(reg, s, true);
+      pushLog(s, line(`${reg.title}: ${reg.detail}`, `${regTr.title}: ${regTr.detail}`), 'info');
     }
     s.nextRegulationAt = s.minutes + MINUTES_PER_DAY * randInt(rng, 90, 160);
   }
@@ -1898,7 +2051,14 @@ function startCityEvent(s: GameState, rng: Rng) {
     blurb: ev.blurb,
   };
   s.nextEventAt = s.minutes + MINUTES_PER_DAY * randInt(rng, 5, 14);
-  pushLog(s, `${ev.name}: expect roughly +${Math.round((ev.mul - 1) * 100)}% traffic for ${ev.hours}h.`, 'info');
+  pushLog(
+    s,
+    line(
+      `${ev.name}: expect roughly +${Math.round((ev.mul - 1) * 100)}% traffic for ${ev.hours}h.`,
+      `${cityEventCopy(ev, true).name}: ${ev.hours} saat boyunca yaklaşık %${Math.round((ev.mul - 1) * 100)} fazla trafik bekleniyor.`,
+    ),
+    'info',
+  );
 }
 
 function growCity(s: GameState, rng: Rng) {

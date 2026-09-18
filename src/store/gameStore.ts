@@ -64,6 +64,7 @@ import {
   DATA_CENTER_MODE_COOLDOWN,
   INTERCONNECT_CONFIG,
   MAINTENANCE_CONFIG,
+  TRAFFIC_POLICY_CONFIG,
   maintenanceCost,
   maintenanceStart,
   dataCenterModeChangeCost,
@@ -84,6 +85,7 @@ import type {
 } from '../game/types';
 import type { Locale } from '../ui/i18n';
 import { researchCopy } from '../game/researchCopy';
+import { line, setGameLanguage } from '../game/lang';
 
 export type BuildTool = NodeKind | 'fiber' | null;
 
@@ -228,6 +230,9 @@ function initialLocale(): Locale {
     return 'en';
   }
 }
+
+// The simulation writes its own lines, so it follows the stored preference from the first render on.
+setGameLanguage(initialLocale());
 
 // Toasts and banners disappear with the session, so they are phrased in the current language on the spot.
 const say = (locale: Locale, en: string, tr: string) => (locale === 'tr' ? tr : en);
@@ -542,7 +547,10 @@ export const useGame = create<Store>((set, get) => ({
     }
     pushLog(
       result.state,
-      `Network plan commissioned: ${s.blueprint.length} ${plural(s.blueprint.length, 'item')}.`,
+      line(
+        `Network plan commissioned: ${s.blueprint.length} ${plural(s.blueprint.length, 'item')}.`,
+        `Ağ planı kuruldu: ${s.blueprint.length} kalem.`,
+      ),
       'good',
     );
     set({
@@ -643,6 +651,7 @@ export const useGame = create<Store>((set, get) => ({
     } catch {
       // The preference still applies for this tab when storage is unavailable.
     }
+    setGameLanguage(locale);
     set({ locale });
   },
   saveToSlot: (slot) => {
@@ -770,7 +779,11 @@ export const useGame = create<Store>((set, get) => ({
         // Zero marks a newly built site whose initial workload can be changed immediately.
         draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: 0 };
       }
-      pushLog(draft, `${spec.label} built in ${district.name}.`, 'good');
+      pushLog(
+        draft,
+        line(`${spec.label} built in ${district.name}.`, `${district.name} ilçesine ${spec.labelTr} kuruldu.`),
+        'good',
+      );
     });
     s.toast(say(s.locale, `${spec.label} built`, `${spec.labelTr} kuruldu`), 'good', gx, gy);
   },
@@ -826,7 +839,11 @@ export const useGame = create<Store>((set, get) => ({
           builtAt: draft.minutes,
         },
       ];
-      pushLog(draft, `Fibre span lit: ${a.name} ↔ ${b.name}.`, 'good');
+      pushLog(
+        draft,
+        line(`Fibre span lit: ${a.name} ↔ ${b.name}.`, `Fiber hattı devrede: ${a.name} ↔ ${b.name}.`),
+        'good',
+      );
     });
     set({ linkFrom: null });
     s.toast(say(s.locale, 'Fibre lit', 'Fiber devrede'), 'good', (a.gx + b.gx) / 2, (a.gy + b.gy) / 2);
@@ -983,7 +1000,14 @@ export const useGame = create<Store>((set, get) => ({
           cost,
         },
       ];
-      pushLog(draft, `${config.label} booked for ${node.name}.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `${config.label} booked for ${node.name}.`,
+          `${node.name} için ${config.labelTr.toLocaleLowerCase('tr-TR')} planlandı.`,
+        ),
+        'info',
+      );
     });
     s.toast(
       mode === 'urgent'
@@ -1017,7 +1041,14 @@ export const useGame = create<Store>((set, get) => ({
       draft.money += order.cost;
       recordLedger(draft, 'network_service', `Cancelled: ${node?.name ?? 'site'}`, order.cost);
       draft.maintenanceOrders = draft.maintenanceOrders.filter((entry) => entry.id !== orderId);
-      pushLog(draft, `Planned work at ${node?.name ?? 'a site'} was called off.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `Planned work at ${node?.name ?? 'a site'} was called off.`,
+          `${node?.name ?? 'Bir nokta'} için planlı iş iptal edildi.`,
+        ),
+        'info',
+      );
     });
     s.toast(say(s.locale, 'Maintenance cancelled and refunded.', 'Bakım iptal edildi, ücret iade edildi.'), 'good');
   },
@@ -1070,7 +1101,14 @@ export const useGame = create<Store>((set, get) => ({
       draft.dataCenterModeChangedAt = Object.fromEntries(
         Object.entries(draft.dataCenterModeChangedAt).filter(([nodeId]) => nodeId !== id),
       );
-      pushLog(draft, `${node.name} decommissioned (+${fmtMoneyExact(refund)}).`, 'info');
+      pushLog(
+        draft,
+        line(
+          `${node.name} decommissioned (+${fmtMoneyExact(refund)}).`,
+          `${node.name} kaldırıldı (+${fmtMoneyExact(refund)}).`,
+        ),
+        'info',
+      );
     });
     set({ selection: null });
   },
@@ -1148,7 +1186,12 @@ export const useGame = create<Store>((set, get) => ({
       return;
     }
     const site = next.nodes[next.nodes.length - 1];
-    pushLog(next, 'Starter network commissioned in ' + next.districts.find((d) => d.id === id)!.name + '.', 'good');
+    const launchedIn = next.districts.find((d) => d.id === id)!.name;
+    pushLog(
+      next,
+      line(`Starter network commissioned in ${launchedIn}.`, `${launchedIn} ilçesinde başlangıç şebekesi kuruldu.`),
+      'good',
+    );
     set({
       game: { ...next, speed: 0 },
       screen: 'map',
@@ -1190,7 +1233,11 @@ export const useGame = create<Store>((set, get) => ({
       draft.money -= district.entryCost;
       recordLedger(draft, 'district_licence', `${district.name} licence`, -district.entryCost);
       draft.districts = draft.districts.map((d) => (d.id === id ? { ...d, unlocked: true } : d));
-      pushLog(draft, `Licensed to build in ${district.name}.`, 'good');
+      pushLog(
+        draft,
+        line(`Licensed to build in ${district.name}.`, `${district.name} ilçesinde kurulum lisansı alındı.`),
+        'good',
+      );
     });
     s.toast(
       say(s.locale, `${district.name} licensed`, `${district.name} lisanslandı`),
@@ -1252,7 +1299,11 @@ export const useGame = create<Store>((set, get) => ({
       draft.researchPoints -= node.points;
       draft.researchActive = { id, daysLeft: node.days };
       recordLedger(draft, 'research', `Research: ${node.name}`, -node.cost);
-      pushLog(draft, `Research started: ${node.name}.`, 'info');
+      pushLog(
+        draft,
+        line(`Research started: ${node.name}.`, `Araştırma başladı: ${researchCopy(node, 'tr').name}.`),
+        'info',
+      );
     });
     s.toast(say(s.locale, `Researching ${node.name}`, `${researchCopy(node, 'tr').name} araştırılıyor`), 'good');
   },
@@ -1289,7 +1340,14 @@ export const useGame = create<Store>((set, get) => ({
     if (!negotiation.accepted) {
       withGame(set, (draft) => {
         draft.offers = draft.offers.filter((entry) => entry.id !== id);
-        pushLog(draft, `${offer.clientName} rejected the premium counter and walked away.`, 'bad');
+        pushLog(
+          draft,
+          line(
+            `${offer.clientName} rejected the premium counter and walked away.`,
+            `${offer.clientName} primli karşı teklifi reddetti ve masadan kalktı.`,
+          ),
+          'bad',
+        );
       });
       s.toast(
         say(s.locale, 'Premium counter rejected', 'Primli karşı teklif reddedildi'),
@@ -1327,7 +1385,15 @@ export const useGame = create<Store>((set, get) => ({
         b.id === agreed.buildingId ? { ...b, connected: 1, lastConnectedAt: draft.minutes } : b,
       );
       const term = mode === 'flexible' ? ' on a flexible SLA' : mode === 'premium' ? ' after a premium counter' : '';
-      pushLog(draft, `Signed ${agreed.clientName}${term} at ${fmtMoneyExact(agreed.monthlyRevenue)}/mo.`, 'good');
+      const termTr = mode === 'flexible' ? ' esnek SLA ile' : mode === 'premium' ? ' primli karşı teklifle' : '';
+      pushLog(
+        draft,
+        line(
+          `Signed ${agreed.clientName}${term} at ${fmtMoneyExact(agreed.monthlyRevenue)}/mo.`,
+          `${agreed.clientName}${termTr} ayda ${fmtMoneyExact(agreed.monthlyRevenue)} karşılığında imzaladı.`,
+        ),
+        'good',
+      );
     });
     s.toast(
       mode === 'premium'
@@ -1556,7 +1622,14 @@ export const useGame = create<Store>((set, get) => ({
           baselineContracts: draft.contracts.filter((contract) => contract.districtId === districtId).length,
         },
       ];
-      pushLog(draft, `${config.label} started in ${district.name}.`, 'good');
+      pushLog(
+        draft,
+        line(
+          `${config.label} started in ${district.name}.`,
+          `${district.name} ilçesinde ${config.labelTr.toLocaleLowerCase('tr-TR')} başladı.`,
+        ),
+        'good',
+      );
     });
     s.toast(say(s.locale, `${config.label} is live`, `${config.labelTr} yayında`), 'good');
   },
@@ -1589,7 +1662,14 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.trafficPolicy = policy;
-      pushLog(draft, `Traffic policy changed to ${policy.replace(/_/g, ' ')}.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `Traffic policy changed to ${policy.replace(/_/g, ' ')}.`,
+          `Trafik politikası ${TRAFFIC_POLICY_CONFIG[policy].labelTr} olarak değiştirildi.`,
+        ),
+        'info',
+      );
     });
     s.toast(say(s.locale, 'Traffic policy applied', 'Trafik politikası uygulandı'), 'good');
   },
@@ -1616,7 +1696,11 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.interconnectPlan = plan;
-      pushLog(draft, `${config.label} interconnection activated.`, 'info');
+      pushLog(
+        draft,
+        line(`${config.label} interconnection activated.`, `${config.labelTr} bağlantısı etkinleştirildi.`),
+        'info',
+      );
     });
     s.toast(say(s.locale, `${config.label} selected`, `${config.labelTr} seçildi`), 'good');
   },
@@ -1624,7 +1708,14 @@ export const useGame = create<Store>((set, get) => ({
   toggleWholesaleFixed: () =>
     withGame(set, (draft) => {
       draft.wholesaleFixed = !draft.wholesaleFixed;
-      pushLog(draft, `Fixed wholesale ${draft.wholesaleFixed ? 'opened' : 'closed'} to partners.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `Fixed wholesale ${draft.wholesaleFixed ? 'opened' : 'closed'} to partners.`,
+          `Sabit toptan satış iş ortaklarına ${draft.wholesaleFixed ? 'açıldı' : 'kapatıldı'}.`,
+        ),
+        'info',
+      );
     }),
 
   toggleMvno: () => {
@@ -1644,7 +1735,14 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.mvnoEnabled = !draft.mvnoEnabled;
-      pushLog(draft, `MVNO access ${draft.mvnoEnabled ? 'opened' : 'closed'} to partners.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `MVNO access ${draft.mvnoEnabled ? 'opened' : 'closed'} to partners.`,
+          `MVNO erişimi iş ortaklarına ${draft.mvnoEnabled ? 'açıldı' : 'kapatıldı'}.`,
+        ),
+        'info',
+      );
     });
   },
 
@@ -1685,7 +1783,14 @@ export const useGame = create<Store>((set, get) => ({
       recordLedger(draft, 'network_service', `${node.name}: ${config.label} reconfiguration`, -cost);
       draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: mode };
       draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: draft.minutes };
-      pushLog(draft, `${node.name} switched to ${config.label}.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `${node.name} switched to ${config.label}.`,
+          `${node.name} ${config.labelTr.toLocaleLowerCase('tr-TR')} moduna geçti.`,
+        ),
+        'info',
+      );
     });
     s.toast(
       say(
@@ -1714,7 +1819,14 @@ export const useGame = create<Store>((set, get) => ({
       draft.loans = [...draft.loans, createLoan(draft, principal, termMonths)];
       draft.money += principal;
       recordLedger(draft, 'loan_draw', 'Loan drawdown', principal);
-      pushLog(draft, `Borrowed ${fmtMoneyExact(principal)} over ${termMonths} ${plural(termMonths, 'month')}.`, 'info');
+      pushLog(
+        draft,
+        line(
+          `Borrowed ${fmtMoneyExact(principal)} over ${termMonths} ${plural(termMonths, 'month')}.`,
+          `${termMonths} ay vadeyle ${fmtMoneyExact(principal)} kredi kullanıldı.`,
+        ),
+        'info',
+      );
     });
     s.toast(say(s.locale, 'Loan drawn down', 'Kredi kullanıldı'), 'good');
   },
@@ -1733,7 +1845,7 @@ export const useGame = create<Store>((set, get) => ({
       draft.money -= loan.remaining;
       draft.loans = draft.loans.filter((l) => l.id !== id);
       recordLedger(draft, 'loan_payment', 'Loan repaid in full', -loan.remaining);
-      pushLog(draft, 'Loan repaid in full.', 'good');
+      pushLog(draft, line('Loan repaid in full.', 'Kredi tamamen kapatıldı.'), 'good');
     });
     s.toast(say(s.locale, 'Loan cleared', 'Kredi kapatıldı'), 'good');
   },
@@ -1744,7 +1856,7 @@ export const useGame = create<Store>((set, get) => ({
     if (!g || tier === g.transitTier) return;
     withGame(set, (draft) => {
       draft.transitTier = tier;
-      pushLog(draft, `Upstream transit changed.`, 'info');
+      pushLog(draft, line('Upstream transit changed.', 'Üst bağlantı transiti değiştirildi.'), 'info');
     });
     s.toast(say(s.locale, 'Transit updated', 'Transit güncellendi'), 'good');
   },

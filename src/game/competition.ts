@@ -2,6 +2,7 @@ import { MINUTES_PER_DAY, MINUTES_PER_STEP } from './constants';
 import { recordLedger } from './financeLedger';
 import { uid } from './rng';
 import { clamp } from './util';
+import { line } from './lang';
 import type { GameState, MarketOperation, CompetitionState, MarketTactic } from './types';
 
 export const MARKET_TACTICS = {
@@ -139,7 +140,14 @@ export function startMarketOperation(original: GameState, districtId: string, ki
     competition: { ...original.competition, operations: [...original.competition.operations, operation] },
   };
   recordLedger(s, 'market_operation', MARKET_TACTICS[kind].title, cost * -1);
-  log(s, MARKET_TACTICS[kind].title + ' launched in ' + s.districts.find((d) => d.id === districtId)!.name + '.');
+  const inDistrict = s.districts.find((d) => d.id === districtId)!.name;
+  log(
+    s,
+    line(
+      `${MARKET_TACTICS[kind].title} launched in ${inDistrict}.`,
+      `${inDistrict} ilçesinde ${MARKET_TACTICS[kind].titleTr.toLocaleLowerCase('tr-TR')} başlatıldı.`,
+    ),
+  );
   return s;
 }
 function finishOperation(s: GameState, o: MarketOperation, cancelled: boolean) {
@@ -158,9 +166,14 @@ function finishOperation(s: GameState, o: MarketOperation, cancelled: boolean) {
   ].slice(0, 24);
   log(
     s,
-    MARKET_TACTICS[o.kind].title +
-      (cancelled ? ' ended early.' : ' completed.') +
-      (o.kind === 'service' ? (reputationDelta > 0 ? ' Service promise kept.' : ' Service promise missed.') : ''),
+    line(
+      MARKET_TACTICS[o.kind].title +
+        (cancelled ? ' ended early.' : ' completed.') +
+        (o.kind === 'service' ? (reputationDelta > 0 ? ' Service promise kept.' : ' Service promise missed.') : ''),
+      MARKET_TACTICS[o.kind].titleTr +
+        (cancelled ? ' erken sona erdi.' : ' tamamlandı.') +
+        (o.kind === 'service' ? (reputationDelta > 0 ? ' Hizmet sözü tutuldu.' : ' Hizmet sözü tutulamadı.') : ''),
+    ),
     reputationDelta < 0 ? 'bad' : 'info',
   );
 }
@@ -235,7 +248,13 @@ export function tickCompetition(s: GameState, dt: number, daily = false) {
               lastMove: RIVAL_MOVES[kind].title + ' in ' + d.name,
             },
       );
-      log(s, c.name + ': ' + RIVAL_MOVES[kind].title + ' in ' + d.name + '.');
+      log(
+        s,
+        line(
+          `${c.name}: ${RIVAL_MOVES[kind].title} in ${d.name}.`,
+          `${c.name}, ${d.name} ilçesinde ${RIVAL_MOVES[kind].titleTr.toLocaleLowerCase('tr-TR')} başlattı.`,
+        ),
+      );
       s.competition.sequence = old.sequence + 1;
     }
   }

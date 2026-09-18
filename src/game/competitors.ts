@@ -154,7 +154,8 @@ export function rivalMoveCopy(move: string, tr: boolean) {
     .replace(/^building in (.+)$/, '$1 ilçesinde kurulum yapıyor')
     .replace(/^expanding mobile coverage in (.+)$/, '$1 ilçesinde mobil kapsamayı genişletiyor')
     .replace(/^upgrading their network$/, 'şebekesini yükseltiyor')
-    .replace(/^cutting prices$/, 'fiyatları düşürüyor');
+    .replace(/^cutting prices$/, 'fiyatları düşürüyor')
+    .replace(/^won (.+) spectrum$/, '$1 spektrumunu kazandı');
 }
 
 const COVERAGE_STEP = 0.06;

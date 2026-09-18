@@ -4,6 +4,7 @@ import { rankOf } from './progression';
 import { researchModifiers } from './research';
 import { uid } from './rng';
 import { clamp } from './util';
+import { line } from './lang';
 import type { GameState, Loan } from './types';
 
 // Debt turns cash from a score into a constraint.
@@ -95,7 +96,10 @@ export function checkSolvency(s: GameState): string | null {
   }
   const days = (s.minutes - s.insolventSince) / MINUTES_PER_DAY;
   if (days < GRACE_DAYS) return null;
-  return `Your lenders called in the debt after ${GRACE_DAYS} days past the credit limit.`;
+  return line(
+    `Your lenders called in the debt after ${GRACE_DAYS} days past the credit limit.`,
+    `Kredi limitini ${GRACE_DAYS} gün aşınca alacaklılar borcu geri çağırdı.`,
+  );
 }
 
 export function daysUntilInsolvency(s: GameState) {

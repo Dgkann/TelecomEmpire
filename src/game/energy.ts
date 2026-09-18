@@ -7,6 +7,7 @@ import {
   nodePowerScale,
 } from './constants';
 import { recordLedger } from './financeLedger';
+import { line } from './lang';
 import type { EnergyPlan, EnergyState, GameState, NetNode } from './types';
 import type { Rng } from './rng';
 import { clamp } from './util';
@@ -178,7 +179,10 @@ export function tickEnergyMonth(s: GameState, rng: Rng, totalKw: number): Energy
   if (s.energy.plan === 'spot' && spotIndex > previous * 1.25) {
     events.push({
       kind: 'spot',
-      text: `Wholesale power jumped ${Math.round((spotIndex / previous - 1) * 100)}% this month.`,
+      text: line(
+        `Wholesale power jumped ${Math.round((spotIndex / previous - 1) * 100)}% this month.`,
+        `Toptan elektrik bu ay %${Math.round((spotIndex / previous - 1) * 100)} arttı.`,
+      ),
       textTr: `Toptan elektrik bu ay %${Math.round((spotIndex / previous - 1) * 100)} zamlandı.`,
       tone: 'bad',
     });
@@ -188,7 +192,10 @@ export function tickEnergyMonth(s: GameState, rng: Rng, totalKw: number): Energy
     s.energy = { ...s.energy, plan: 'spot', fixedUntil: null };
     events.push({
       kind: 'spot',
-      text: 'Your fixed power contract expired. You are back on the spot tariff.',
+      text: line(
+        'Your fixed power contract expired. You are back on the spot tariff.',
+        'Sabit elektrik sözleşmen sona erdi. Yeniden serbest tarifedesin.',
+      ),
       textTr: 'Sabit elektrik sözleşmen sona erdi. Serbest tarifeye döndün.',
       tone: 'info',
     });
@@ -203,7 +210,10 @@ export function tickEnergyMonth(s: GameState, rng: Rng, totalKw: number): Energy
       recordLedger(s, 'regulatory_fine', 'Carbon levy on network power', -levy);
       events.push({
         kind: 'levy',
-        text: `Carbon levy charged on ${Math.round(totalKw)} kW of network draw.`,
+        text: line(
+          `Carbon levy charged on ${Math.round(totalKw)} kW of network draw.`,
+          `${Math.round(totalKw)} kW şebeke çekişi üzerinden karbon vergisi tahakkuk etti.`,
+        ),
         textTr: `${Math.round(totalKw)} kW şebeke tüketimi üzerinden karbon vergisi alındı.`,
         tone: 'bad',
       });

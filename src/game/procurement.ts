@@ -3,6 +3,7 @@ import { recordLedger } from './financeLedger';
 import { computeRoutes, isRedundant } from './network';
 import { fixedCoverageTarget } from './reach';
 import { uid } from './rng';
+import { line } from './lang';
 import type { GameState, CityTender, ProcurementState } from './types';
 
 export const TENDER_PROGRAMMES = {
@@ -201,9 +202,10 @@ export function tickProcurement(state: GameState, dt: number) {
         tender.dueAt = state.minutes + TENDER_PROGRAMMES[tender.kind].days * MINUTES_PER_DAY;
         note(
           state,
-          'Tender won: ' +
-            TENDER_PROGRAMMES[tender.kind].title +
-            '. Build and hold service for six hours before the deadline.',
+          line(
+            `Tender won: ${TENDER_PROGRAMMES[tender.kind].title}. Build and hold service for six hours before the deadline.`,
+            `İhale kazanıldı: ${TENDER_PROGRAMMES[tender.kind].titleTr}. Süre dolmadan kur ve altı saat hizmette tut.`,
+          ),
           'good',
         );
       } else {
@@ -213,9 +215,10 @@ export function tickProcurement(state: GameState, dt: number) {
         tender.bond = 0;
         note(
           state,
-          TENDER_PROGRAMMES[tender.kind].title +
-            ': ' +
-            (winner ? winner.name + ' won the tender.' : 'No eligible bids.'),
+          line(
+            `${TENDER_PROGRAMMES[tender.kind].title}: ${winner ? `${winner.name} won the tender.` : 'No eligible bids.'}`,
+            `${TENDER_PROGRAMMES[tender.kind].titleTr}: ${winner ? `İhaleyi ${winner.name} kazandı.` : 'Geçerli teklif yok.'}`,
+          ),
           'info',
         );
         state.procurement.nextTenderAt = state.minutes + 5 * MINUTES_PER_DAY;
@@ -237,7 +240,14 @@ export function tickProcurement(state: GameState, dt: number) {
       tender.bond = 0;
       state.reputation = Math.min(100, state.reputation + 5);
       state.researchPoints += spec.reward;
-      note(state, spec.title + ' accepted. Payment and performance bond released.', 'good');
+      note(
+        state,
+        line(
+          `${spec.title} accepted. Payment and performance bond released.`,
+          `${spec.titleTr} kabul edildi. Ödeme ve teminat serbest bırakıldı.`,
+        ),
+        'good',
+      );
       state.procurement.nextTenderAt = state.minutes + 5 * MINUTES_PER_DAY;
     } else if (state.minutes >= tender.dueAt!) {
       tender.status = 'failed';
@@ -246,7 +256,10 @@ export function tickProcurement(state: GameState, dt: number) {
       state.reputation = Math.max(0, state.reputation - 5);
       note(
         state,
-        spec.title + ' missed its deadline. The performance bond was forfeited; reputation fell by 5.',
+        line(
+          `${spec.title} missed its deadline. The performance bond was forfeited; reputation fell by 5.`,
+          `${spec.titleTr} süresinde tamamlanamadı. Teminat irat kaydedildi; itibar 5 puan düştü.`,
+        ),
         'bad',
       );
       state.procurement.nextTenderAt = state.minutes + 5 * MINUTES_PER_DAY;
@@ -300,5 +313,12 @@ export function tickProcurement(state: GameState, dt: number) {
     sequence: sequence + 1,
     tenders: [tender, ...tenders].slice(0, 12),
   };
-  note(state, 'City tender opened: ' + spec.title + ' in ' + district.name + '.', 'info');
+  note(
+    state,
+    line(
+      `City tender opened: ${spec.title} in ${district.name}.`,
+      `Şehir ihalesi açıldı: ${district.name} ilçesinde ${spec.titleTr.toLocaleLowerCase('tr-TR')}.`,
+    ),
+    'info',
+  );
 }

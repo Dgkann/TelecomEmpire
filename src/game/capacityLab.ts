@@ -1,5 +1,6 @@
 import { effectiveNodeCapacity } from './capacity';
 import { plural } from './util';
+import { line } from './lang';
 import { FIBER_UPGRADE_COST_PER_UNIT, NODE_SPECS, TRANSIT_TIERS, linkCapacity, nodeUpgradeCost } from './constants';
 import { monthlyBreakdown } from './economy';
 import { recordLedger } from './financeLedger';
@@ -169,7 +170,14 @@ export function commissionCapacityPlan(state: GameState, items: CapacityUpgrade[
     `Capacity programme: ${items.length} ${plural(items.length, 'upgrade')}`,
     -plan.cost,
   );
-  pushLog(next, `${items.length} capacity upgrades commissioned.`, 'good');
+  pushLog(
+    next,
+    line(
+      `${items.length} ${plural(items.length, 'capacity upgrade')} commissioned.`,
+      `${items.length} kapasite yükseltmesi sipariş edildi.`,
+    ),
+    'good',
+  );
   return next;
 }
 
