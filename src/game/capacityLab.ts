@@ -167,7 +167,10 @@ export function commissionCapacityPlan(state: GameState, items: CapacityUpgrade[
   recordLedger(
     next,
     'network_upgrade',
-    `Capacity programme: ${items.length} ${plural(items.length, 'upgrade')}`,
+    line(
+      `Capacity programme: ${items.length} ${plural(items.length, 'upgrade')}`,
+      `Kapasite programı: ${items.length} yükseltme`,
+    ),
     -plan.cost,
   );
   pushLog(

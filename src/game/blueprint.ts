@@ -6,6 +6,7 @@ import { researchModifiers } from './research';
 import { monthlyBreakdown } from './economy';
 import { recordLedger } from './financeLedger';
 import type { GameState, NodeKind } from './types';
+import { line } from './lang';
 
 export type BuildStep =
   | { type: 'node'; id: string; kind: NodeKind; gx: number; gy: number }
@@ -72,7 +73,12 @@ export function projectBlueprint(original: GameState, steps: BuildStep[], locale
         state.dataCenterModes = { ...state.dataCenterModes, [step.id]: 'colocation' };
         state.dataCenterModeChangedAt = { ...state.dataCenterModeChangedAt, [step.id]: 0 };
       }
-      recordLedger(state, 'network_build', `${spec.label}: ${district.name}`, -cost);
+      recordLedger(
+        state,
+        'network_build',
+        line(`${spec.label}: ${district.name}`, `${spec.labelTr}: ${district.name}`),
+        -cost,
+      );
     } else {
       error = fibreConnectionIssue(state, step.aId, step.bId, locale);
       if (error) break;
@@ -94,7 +100,12 @@ export function projectBlueprint(original: GameState, steps: BuildStep[], locale
           builtAt: state.minutes,
         },
       ];
-      recordLedger(state, 'network_build', `Fibre: ${a.name} to ${b.name}`, -cost);
+      recordLedger(
+        state,
+        'network_build',
+        line(`Fibre: ${a.name} to ${b.name}`, `Fiber: ${a.name} → ${b.name}`),
+        -cost,
+      );
     }
   }
   if (error) state = original;

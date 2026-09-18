@@ -115,7 +115,12 @@ export function buildSolar(state: GameState, nodeId: string, hasResearch: boolea
     energy: { ...state.energy, solarNodeIds: [...state.energy.solarNodeIds, nodeId] },
   };
   const node = next.nodes.find((n) => n.id === nodeId);
-  recordLedger(next, 'network_build', `On-site generation: ${node?.name ?? nodeId}`, -cost);
+  recordLedger(
+    next,
+    'network_build',
+    line(`On-site generation: ${node?.name ?? nodeId}`, `Saha üretimi: ${node?.name ?? nodeId}`),
+    -cost,
+  );
   return next;
 }
 
@@ -155,7 +160,7 @@ export function setEnergyPlan(state: GameState, plan: EnergyPlan): GameState | n
       fixedIndex: plan === 'fixed' ? state.energy.spotIndex : state.energy.fixedIndex,
     },
   };
-  if (exit > 0) recordLedger(next, 'power', 'Energy contract exit fee', -exit);
+  if (exit > 0) recordLedger(next, 'power', line('Energy contract exit fee', 'Enerji sözleşmesi çıkış bedeli'), -exit);
   return next;
 }
 
@@ -207,7 +212,12 @@ export function tickEnergyMonth(s: GameState, rng: Rng, totalKw: number): Energy
       const levy = carbonLevy(totalKw, s.energy.plan);
       s.money -= levy;
       s.energy = { ...s.energy, leviesPaid: s.energy.leviesPaid + levy };
-      recordLedger(s, 'regulatory_fine', 'Carbon levy on network power', -levy);
+      recordLedger(
+        s,
+        'regulatory_fine',
+        line('Carbon levy on network power', 'Şebeke elektriğinde karbon vergisi'),
+        -levy,
+      );
       events.push({
         kind: 'levy',
         text: line(

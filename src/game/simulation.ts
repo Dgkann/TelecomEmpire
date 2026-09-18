@@ -1406,7 +1406,7 @@ function autoScheduleMaintenance(s: GameState, mods: ResearchMods) {
     const cost = maintenanceCost(node, 'overnight');
     if (s.money < cost * 3) continue;
     s.money -= cost;
-    recordLedger(s, 'network_service', `Predicted service: ${node.name}`, -cost);
+    recordLedger(s, 'network_service', line(`Predicted service: ${node.name}`, `Öngörülü bakım: ${node.name}`), -cost);
     s.maintenanceOrders = [
       ...s.maintenanceOrders,
       {
@@ -1611,7 +1611,10 @@ export function dispatch(s: GameState, incidentId: string, techId: string, mode:
     recordLedger(
       s,
       'incident_response',
-      `${mode === 'emergency' ? 'Emergency' : 'Scheduled'} repair: ${inc.title}`,
+      line(
+        `${mode === 'emergency' ? 'Emergency' : 'Scheduled'} repair: ${inc.title}`,
+        `${mode === 'emergency' ? 'Acil' : 'Planlı'} onarım: ${incidentCopy(inc, s, true).title}`,
+      ),
       -cost,
     );
   }
@@ -1905,7 +1908,12 @@ function tickAuction(s: GameState, rng: Rng) {
 
   if (result.winnerId === 'player') {
     s.money -= result.price;
-    recordLedger(s, 'spectrum', `${SPECTRUM_BANDS[settled.band].label} spectrum`, -result.price);
+    recordLedger(
+      s,
+      'spectrum',
+      line(`${SPECTRUM_BANDS[settled.band].label} spectrum`, `${SPECTRUM_BANDS[settled.band].label} spektrumu`),
+      -result.price,
+    );
     const existing = s.spectrum.find((h) => h.band === settled.band);
     if (existing) {
       s.spectrum = s.spectrum.map((h) =>
@@ -2017,7 +2025,12 @@ function tickRegulator(s: GameState, rng: Rng) {
       );
     } else {
       s.money -= outcome.regulation.fine;
-      recordLedger(s, 'regulatory_fine', outcome.regulation.title, -outcome.regulation.fine);
+      recordLedger(
+        s,
+        'regulatory_fine',
+        line(outcome.regulation.title, regulationCopy(outcome.regulation, s, true).title),
+        -outcome.regulation.fine,
+      );
       s.reputation = clamp(s.reputation - 8, 0, 100);
       pushLog(
         s,

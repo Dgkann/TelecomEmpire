@@ -5,6 +5,7 @@ import { isRoad } from './cityGen';
 import { uid } from './rng';
 import { clamp } from './util';
 import type { GameState, StrategyState } from './types';
+import { line } from './lang';
 
 export function initialStrategy(minutes: number): StrategyState {
   return {
@@ -215,7 +216,12 @@ export function resolveDecision(state: GameState, decisionId: string, optionId: 
   const option = definition.options.find((o) => o.id === optionId)!;
   const next: GameState = { ...state, strategy: { ...state.strategy, decision: null } };
   next.money -= option.cost;
-  recordLedger(next, 'strategic_investment', `${definition.title[0]}: ${option.title[0]}`, -option.cost);
+  recordLedger(
+    next,
+    'strategic_investment',
+    line(`${definition.title[0]}: ${option.title[0]}`, `${definition.title[1]}: ${option.title[1]}`),
+    -option.cost,
+  );
   if (optionId === 'invest') {
     developDistrict(next, decision.districtId, 8);
     next.reputation = clamp(next.reputation + 4, 0, 100);
@@ -273,7 +279,12 @@ export function claimChallenge(state: GameState): GameState | null {
       nextChallengeAt: state.minutes + 15 * MINUTES_PER_DAY,
     },
   };
-  recordLedger(next, 'milestone_reward', 'Operator charter completed', progress.reward);
+  recordLedger(
+    next,
+    'milestone_reward',
+    line('Operator charter completed', 'Operatör beratı tamamlandı'),
+    progress.reward,
+  );
   boardHistory(
     next,
     'Operator charter completed. The next charter will be harder.',

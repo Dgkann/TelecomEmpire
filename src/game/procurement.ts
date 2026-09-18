@@ -147,7 +147,15 @@ export function submitTenderBid(original: GameState, id: string, price: number):
       ),
     },
   };
-  recordLedger(state, 'tender_bond', 'Performance bond: ' + TENDER_PROGRAMMES[tender.kind].title, -delta);
+  recordLedger(
+    state,
+    'tender_bond',
+    line(
+      `Performance bond: ${TENDER_PROGRAMMES[tender.kind].title}`,
+      `Teminat: ${TENDER_PROGRAMMES[tender.kind].titleTr}`,
+    ),
+    -delta,
+  );
   return state;
 }
 export function withdrawTenderBid(original: GameState, id: string): GameState | null {
@@ -168,7 +176,12 @@ export function withdrawTenderBid(original: GameState, id: string): GameState | 
       tenders: original.procurement.tenders.map((t) => (t.id === id ? { ...t, playerBid: null, bond: 0 } : t)),
     },
   };
-  recordLedger(state, 'tender_bond', 'Withdrawn bid: bond returned', tender.bond);
+  recordLedger(
+    state,
+    'tender_bond',
+    line('Withdrawn bid: bond returned', 'Teklif geri çekildi: teminat iade edildi'),
+    tender.bond,
+  );
   return state;
 }
 
@@ -211,7 +224,12 @@ export function tickProcurement(state: GameState, dt: number) {
       } else {
         tender.status = 'lost';
         state.money += tender.bond;
-        recordLedger(state, 'tender_bond', 'Unsuccessful tender: bond returned', tender.bond);
+        recordLedger(
+          state,
+          'tender_bond',
+          line('Unsuccessful tender: bond returned', 'İhale kaybedildi: teminat iade edildi'),
+          tender.bond,
+        );
         tender.bond = 0;
         note(
           state,
@@ -235,8 +253,18 @@ export function tickProcurement(state: GameState, dt: number) {
       tender.finishedAt = state.minutes;
       const payment = tender.playerBid!.price;
       state.money += payment + tender.bond;
-      recordLedger(state, 'tender_payment', 'Infrastructure accepted: ' + spec.title, payment);
-      recordLedger(state, 'tender_bond', 'Accepted project: bond returned', tender.bond);
+      recordLedger(
+        state,
+        'tender_payment',
+        line(`Infrastructure accepted: ${spec.title}`, `Altyapı kabul edildi: ${spec.titleTr}`),
+        payment,
+      );
+      recordLedger(
+        state,
+        'tender_bond',
+        line('Accepted project: bond returned', 'Kabul edilen proje: teminat iade edildi'),
+        tender.bond,
+      );
       tender.bond = 0;
       state.reputation = Math.min(100, state.reputation + 5);
       state.researchPoints += spec.reward;

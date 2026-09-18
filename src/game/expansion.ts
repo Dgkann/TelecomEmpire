@@ -6,6 +6,7 @@ import { computeRoutes, isRedundant } from './network';
 import { nodePlacementCost } from './placement';
 import { networkReachGain } from './reach';
 import type { GameState } from './types';
+import { line } from './lang';
 
 export type ExpansionKind = 'access' | 'pop';
 
@@ -134,6 +135,11 @@ export function launchDistrict(state: GameState, districtId: string, kind: Expan
   );
   if (result.error || result.disconnected) return null;
   if (quote.licenceCost > 0)
-    recordLedger(result.state, 'district_licence', `${quote.district.name} licence`, -quote.licenceCost);
+    recordLedger(
+      result.state,
+      'district_licence',
+      line(`${quote.district.name} licence`, `${quote.district.name} lisansı`),
+      -quote.licenceCost,
+    );
   return result.state;
 }

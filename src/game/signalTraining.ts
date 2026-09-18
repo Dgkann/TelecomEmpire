@@ -2,6 +2,7 @@ import { MINUTES_PER_DAY } from './constants';
 import { recordLedger } from './financeLedger';
 import { makeRng } from './rng';
 import type { GameState, SignalPuzzle, SignalTraining } from './types';
+import { line } from './lang';
 
 export const TRAINING_REWARD = 30000;
 export const TRAINING_RESEARCH = 3;
@@ -177,7 +178,8 @@ export function finishSignalTraining(s: GameState): GameState | null {
       active: { ...active, completed: true, reward, researchDaysSaved },
     },
   };
-  if (reward) recordLedger(next, 'milestone_reward', 'Signal routing exercise', reward);
+  if (reward)
+    recordLedger(next, 'milestone_reward', line('Signal routing exercise', 'Sinyal rotası alıştırması'), reward);
   return next;
 }
 

@@ -13,6 +13,7 @@ import {
   type SmartPauseNotice,
 } from '../game/smartPause';
 import { updateCompanyIdentity } from '../game/identity';
+import { STAFF_ROLE_INFO } from '../game/staff';
 import { buildSolar, setEnergyPlan as applyEnergyPlan } from '../game/energy';
 import { launchDistrict as buildDistrictLaunch, type ExpansionKind } from '../game/expansion';
 import type { FailureTarget } from '../game/failureDrill';
@@ -755,7 +756,12 @@ export const useGame = create<Store>((set, get) => ({
     const nodeId = uid('n');
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_build', `${spec.label}: ${district.name}`, -cost);
+      recordLedger(
+        draft,
+        'network_build',
+        line(`${spec.label}: ${district.name}`, `${spec.labelTr}: ${district.name}`),
+        -cost,
+      );
       draft.nodes = [
         ...draft.nodes,
         {
@@ -824,7 +830,12 @@ export const useGame = create<Store>((set, get) => ({
     const mods = researchModifiers(g.researchDone);
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_build', `Fibre: ${a.name} to ${b.name}`, -cost);
+      recordLedger(
+        draft,
+        'network_build',
+        line(`Fibre: ${a.name} to ${b.name}`, `Fiber: ${a.name} → ${b.name}`),
+        -cost,
+      );
       draft.links = [
         ...draft.links,
         {
@@ -905,7 +916,12 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_upgrade', `${node.name}: tier ${node.tier + 1}`, -cost);
+      recordLedger(
+        draft,
+        'network_upgrade',
+        line(`${node.name}: tier ${node.tier + 1}`, `${node.name}: ${node.tier + 1}. seviye`),
+        -cost,
+      );
       draft.nodes = draft.nodes.map((n) =>
         n.id === id
           ? {
@@ -935,7 +951,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_service', `Service: ${node.name}`, -cost);
+      recordLedger(draft, 'network_service', line(`Service: ${node.name}`, `Bakım: ${node.name}`), -cost);
       draft.nodes = draft.nodes.map((n) => (n.id === id ? { ...n, health: 100, servicedAt: draft.minutes } : n));
     });
     s.toast(say(s.locale, 'Maintenance done', 'Bakım tamamlandı'), 'good', node.gx, node.gy);
@@ -985,7 +1001,12 @@ export const useGame = create<Store>((set, get) => ({
     const scheduledAt = maintenanceStart(g.minutes, mode);
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_service', `${config.label}: ${node.name}`, -cost);
+      recordLedger(
+        draft,
+        'network_service',
+        line(`${config.label}: ${node.name}`, `${config.labelTr}: ${node.name}`),
+        -cost,
+      );
       draft.maintenanceOrders = [
         ...draft.maintenanceOrders,
         {
@@ -1039,7 +1060,12 @@ export const useGame = create<Store>((set, get) => ({
     const node = g.nodes.find((entry) => entry.id === order.nodeId);
     withGame(set, (draft) => {
       draft.money += order.cost;
-      recordLedger(draft, 'network_service', `Cancelled: ${node?.name ?? 'site'}`, order.cost);
+      recordLedger(
+        draft,
+        'network_service',
+        line(`Cancelled: ${node?.name ?? 'site'}`, `İptal: ${node?.name ?? 'nokta'}`),
+        order.cost,
+      );
       draft.maintenanceOrders = draft.maintenanceOrders.filter((entry) => entry.id !== orderId);
       pushLog(
         draft,
@@ -1092,7 +1118,7 @@ export const useGame = create<Store>((set, get) => ({
       if (!node) return;
       const refund = Math.round(nodeCapitalCost(node.kind, node.tier) * 0.35);
       draft.money += refund;
-      recordLedger(draft, 'asset_sale', `Decommissioned: ${node.name}`, refund);
+      recordLedger(draft, 'asset_sale', line(`Decommissioned: ${node.name}`, `Kaldırıldı: ${node.name}`), refund);
       draft.nodes = draft.nodes.filter((n) => n.id !== id);
       draft.links = draft.links.filter((l) => l.aId !== id && l.bId !== id);
       draft.dataCenterModes = Object.fromEntries(
@@ -1134,7 +1160,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_upgrade', 'Fibre capacity upgrade', -cost);
+      recordLedger(draft, 'network_upgrade', line('Fibre capacity upgrade', 'Fiber kapasite yükseltmesi'), -cost);
       draft.links = draft.links.map((l) =>
         l.id === id ? { ...l, tier: l.tier + 1, capacityGbps: linkCapacity(l.tier + 1) * mods.linkCapacityMul } : l,
       );
@@ -1164,7 +1190,7 @@ export const useGame = create<Store>((set, get) => ({
       if (!link) return;
       const refund = Math.round(link.length * FIBER_COST_PER_UNIT * 0.2);
       draft.money += refund;
-      recordLedger(draft, 'asset_sale', 'Fibre recovery', refund);
+      recordLedger(draft, 'asset_sale', line('Fibre recovery', 'Fiber geri kazanımı'), refund);
       draft.links = draft.links.filter((l) => l.id !== id);
     });
     set({ selection: null });
@@ -1231,7 +1257,12 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= district.entryCost;
-      recordLedger(draft, 'district_licence', `${district.name} licence`, -district.entryCost);
+      recordLedger(
+        draft,
+        'district_licence',
+        line(`${district.name} licence`, `${district.name} lisansı`),
+        -district.entryCost,
+      );
       draft.districts = draft.districts.map((d) => (d.id === id ? { ...d, unlocked: true } : d));
       pushLog(
         draft,
@@ -1298,7 +1329,12 @@ export const useGame = create<Store>((set, get) => ({
       draft.money -= node.cost;
       draft.researchPoints -= node.points;
       draft.researchActive = { id, daysLeft: node.days };
-      recordLedger(draft, 'research', `Research: ${node.name}`, -node.cost);
+      recordLedger(
+        draft,
+        'research',
+        line(`Research: ${node.name}`, `Araştırma: ${researchCopy(node, 'tr').name}`),
+        -node.cost,
+      );
       pushLog(
         draft,
         line(`Research started: ${node.name}.`, `Araştırma başladı: ${researchCopy(node, 'tr').name}.`),
@@ -1362,7 +1398,12 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       draft.offers = draft.offers.filter((o) => o.id !== id && o.buildingId !== offer.buildingId);
       draft.money += agreed.signingBonus;
-      recordLedger(draft, 'contract_bonus', `${agreed.clientName} signing bonus`, agreed.signingBonus);
+      recordLedger(
+        draft,
+        'contract_bonus',
+        line(`${agreed.clientName} signing bonus`, `${agreed.clientName} imza primi`),
+        agreed.signingBonus,
+      );
       draft.contracts = [
         ...draft.contracts,
         {
@@ -1461,7 +1502,7 @@ export const useGame = create<Store>((set, get) => ({
       const rng = makeRng(Math.floor(Math.random() * 1e9));
       const base = draft.nodes.find((n) => n.kind === 'pop') ?? draft.nodes[0];
       draft.money -= cost;
-      recordLedger(draft, 'staff', 'Field crew recruitment', -cost);
+      recordLedger(draft, 'staff', line('Field crew recruitment', 'Saha ekibi alımı'), -cost);
       draft.technicians = [
         ...draft.technicians,
         {
@@ -1503,7 +1544,12 @@ export const useGame = create<Store>((set, get) => ({
         security: 104000,
       }[role];
       draft.money -= cost;
-      recordLedger(draft, 'staff', `${role.replace(/_/g, ' ')} recruitment`, -cost);
+      recordLedger(
+        draft,
+        'staff',
+        line(`${role.replace(/_/g, ' ')} recruitment`, `${STAFF_ROLE_INFO[role].labelTr} alımı`),
+        -cost,
+      );
       draft.employees = [
         ...draft.employees,
         { id: uid('e'), name: personName(rng), role, salary, skill: 1 + Math.floor(rng() * 4), experience: 0 },
@@ -1607,7 +1653,12 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= config.cost;
-      recordLedger(draft, 'campaign', `${config.label}: ${district.name}`, -config.cost);
+      recordLedger(
+        draft,
+        'campaign',
+        line(`${config.label}: ${district.name}`, `${config.labelTr}: ${district.name}`),
+        -config.cost,
+      );
       draft.campaigns = [
         ...draft.campaigns,
         {
@@ -1780,7 +1831,12 @@ export const useGame = create<Store>((set, get) => ({
     }
     withGame(set, (draft) => {
       draft.money -= cost;
-      recordLedger(draft, 'network_service', `${node.name}: ${config.label} reconfiguration`, -cost);
+      recordLedger(
+        draft,
+        'network_service',
+        line(`${node.name}: ${config.label} reconfiguration`, `${node.name}: ${config.labelTr} yapılandırması`),
+        -cost,
+      );
       draft.dataCenterModes = { ...draft.dataCenterModes, [nodeId]: mode };
       draft.dataCenterModeChangedAt = { ...draft.dataCenterModeChangedAt, [nodeId]: draft.minutes };
       pushLog(
@@ -1818,7 +1874,7 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       draft.loans = [...draft.loans, createLoan(draft, principal, termMonths)];
       draft.money += principal;
-      recordLedger(draft, 'loan_draw', 'Loan drawdown', principal);
+      recordLedger(draft, 'loan_draw', line('Loan drawdown', 'Kredi kullanımı'), principal);
       pushLog(
         draft,
         line(
@@ -1844,7 +1900,7 @@ export const useGame = create<Store>((set, get) => ({
     withGame(set, (draft) => {
       draft.money -= loan.remaining;
       draft.loans = draft.loans.filter((l) => l.id !== id);
-      recordLedger(draft, 'loan_payment', 'Loan repaid in full', -loan.remaining);
+      recordLedger(draft, 'loan_payment', line('Loan repaid in full', 'Kredi tamamen kapatıldı'), -loan.remaining);
       pushLog(draft, line('Loan repaid in full.', 'Kredi tamamen kapatıldı.'), 'good');
     });
     s.toast(say(s.locale, 'Loan cleared', 'Kredi kapatıldı'), 'good');

@@ -1,6 +1,7 @@
 import type { MonthlyBreakdown } from './economy';
 import { MINUTES_PER_MONTH } from './constants';
 import type { FinanceCategory, GameState } from './types';
+import { line } from './lang';
 
 const OPERATING_CATEGORIES = new Set<FinanceCategory>([
   'residential',
@@ -89,25 +90,25 @@ export function recordOperatingMonth(
   loanPayments: number,
 ) {
   const revenues: Array<[FinanceCategory, string, number]> = [
-    ['residential', 'Residential service', breakdown.revenueResidential],
-    ['mobile', 'Mobile service', breakdown.revenueMobile],
-    ['business', 'Business contracts', breakdown.revenueBusiness],
-    ['enterprise', 'Enterprise contracts', breakdown.revenueEnterprise],
-    ['hosting', 'Hosting and edge services', breakdown.revenueHosting],
-    ['wholesale', 'Wholesale access', breakdown.revenueWholesale],
+    ['residential', line('Residential service', 'Konut hizmeti'), breakdown.revenueResidential],
+    ['mobile', line('Mobile service', 'Mobil hizmet'), breakdown.revenueMobile],
+    ['business', line('Business contracts', 'Kurumsal sözleşmeler'), breakdown.revenueBusiness],
+    ['enterprise', line('Enterprise contracts', 'Büyük kurumsal sözleşmeler'), breakdown.revenueEnterprise],
+    ['hosting', line('Hosting and edge services', 'Barındırma ve uç hizmetler'), breakdown.revenueHosting],
+    ['wholesale', line('Wholesale access', 'Toptan erişim'), breakdown.revenueWholesale],
   ];
   const costs: Array<[FinanceCategory, string, number]> = [
-    ['salaries', 'Staff salaries', breakdown.costSalaries],
-    ['power', 'Electricity', breakdown.costPower],
-    ['maintenance', 'Network maintenance', breakdown.costMaintenance],
-    ['transit', 'Upstream transit', breakdown.costTransit],
-    ['marketing', 'Marketing', breakdown.costMarketing],
-    ['retention', 'Customer retention', breakdown.costRetention],
+    ['salaries', line('Staff salaries', 'Personel maaşları'), breakdown.costSalaries],
+    ['power', line('Electricity', 'Elektrik'), breakdown.costPower],
+    ['maintenance', line('Network maintenance', 'Şebeke bakımı'), breakdown.costMaintenance],
+    ['transit', line('Upstream transit', 'Üst bağlantı transiti'), breakdown.costTransit],
+    ['marketing', line('Marketing', 'Pazarlama'), breakdown.costMarketing],
+    ['retention', line('Customer retention', 'Müşteri elde tutma'), breakdown.costRetention],
   ];
   const revenueScale = breakdown.totalRevenue > 0 ? actualRevenue / breakdown.totalRevenue : 0;
   const costScale = breakdown.totalCost > 0 ? actualExpense / breakdown.totalCost : 0;
   for (const [category, label, amount] of revenues) recordLedger(state, category, label, amount * revenueScale);
   for (const [category, label, amount] of costs) recordLedger(state, category, label, -amount * costScale);
-  recordLedger(state, 'sla_penalty', 'SLA penalties', -penalties);
-  recordLedger(state, 'loan_payment', 'Loan repayments', -loanPayments);
+  recordLedger(state, 'sla_penalty', line('SLA penalties', 'SLA cezaları'), -penalties);
+  recordLedger(state, 'loan_payment', line('Loan repayments', 'Kredi ödemeleri'), -loanPayments);
 }

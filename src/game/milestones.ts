@@ -1,6 +1,7 @@
 import { computeRoutes, isRedundant } from './network';
 import { recordLedger } from './financeLedger';
 import type { GameState } from './types';
+import { line } from './lang';
 
 export const MILESTONE_IDS = [
   'connected',
@@ -135,6 +136,6 @@ export function claimMilestone(state: GameState, id: string): GameState | null {
     money: state.money + goal.reward,
     researchPoints: state.researchPoints + goal.research,
   };
-  recordLedger(next, 'milestone_reward', goal.title[0], goal.reward);
+  recordLedger(next, 'milestone_reward', line(goal.title[0], goal.title[1]), goal.reward);
   return next;
 }

@@ -139,7 +139,7 @@ export function startMarketOperation(original: GameState, districtId: string, ki
     money: original.money - cost,
     competition: { ...original.competition, operations: [...original.competition.operations, operation] },
   };
-  recordLedger(s, 'market_operation', MARKET_TACTICS[kind].title, cost * -1);
+  recordLedger(s, 'market_operation', line(MARKET_TACTICS[kind].title, MARKET_TACTICS[kind].titleTr), cost * -1);
   const inDistrict = s.districts.find((d) => d.id === districtId)!.name;
   log(
     s,
