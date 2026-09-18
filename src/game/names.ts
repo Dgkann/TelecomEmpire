@@ -1,4 +1,5 @@
 import { pick, type Rng } from './rng';
+import { isTurkish } from './lang';
 
 const FIRST = [
   'Deniz',
@@ -94,40 +95,77 @@ const HANDLES = [
 ];
 export const handleName = (rng: Rng) => pick(rng, HANDLES);
 
-const GOOD_POSTS = [
-  (c: string, s: number) => `Installed ${c} Fibre today. ${s} Mbps on the speed test, no drama.`,
-  (c: string) => `Switched to ${c} last week. Zero dropouts so far. Genuinely surprised.`,
-  (c: string) => `${c} engineer showed up on time and actually fixed it. Rare.`,
-  (c: string, s: number) => `${s} Mbps for what I was paying for 50. Thanks ${c}.`,
+// Every post is written twice, so the feed reads in the player's language without a second lookup.
+type Post<A extends unknown[]> = [(...args: A) => string, (...args: A) => string];
+const inLanguage = <A extends unknown[]>(post: Post<A>, ...args: A) => post[isTurkish() ? 1 : 0](...args);
+
+const GOOD_POSTS: Post<[string, number]>[] = [
+  [
+    (c, s) => `Installed ${c} Fibre today. ${s} Mbps on the speed test, no drama.`,
+    (c, s) => `Bugün ${c} Fiber bağlattım. Hız testinde ${s} Mbps, hiçbir sorun yok.`,
+  ],
+  [
+    (c) => `Switched to ${c} last week. Zero dropouts so far. Genuinely surprised.`,
+    (c) => `Geçen hafta ${c} operatörüne geçtim. Şu ana kadar tek kopma yok. Açıkçası şaşırdım.`,
+  ],
+  [
+    (c) => `${c} engineer showed up on time and actually fixed it. Rare.`,
+    (c) => `${c} teknisyeni zamanında geldi ve sorunu gerçekten çözdü. Nadir görülür.`,
+  ],
+  [
+    (c, s) => `${s} Mbps for what I was paying for 50. Thanks ${c}.`,
+    (c, s) => `50 Mbps’ye ödediğim paraya ${s} Mbps alıyorum. Teşekkürler ${c}.`,
+  ],
 ];
 
-const BAD_POSTS = [
-  (c: string) => `${c} went down again. Two hours without internet.`,
-  (c: string) => `Paying premium prices to ${c} for dial-up speeds tonight.`,
-  (c: string) => `Third outage this month, ${c}. My patience has a data cap too.`,
-  (c: string) => `${c} support said "have you tried restarting the router". I am the router now.`,
+const BAD_POSTS: Post<[string]>[] = [
+  [(c) => `${c} went down again. Two hours without internet.`, (c) => `${c} yine çöktü. İki saattir internet yok.`],
+  [
+    (c) => `Paying premium prices to ${c} for dial-up speeds tonight.`,
+    (c) => `Bu gece ${c} operatörüne çevirmeli ağ hızı için en yüksek parayı ödüyorum.`,
+  ],
+  [
+    (c) => `Third outage this month, ${c}. My patience has a data cap too.`,
+    (c) => `Bu ay üçüncü kesinti, ${c}. Benim sabrımın da bir kotası var.`,
+  ],
+  [
+    (c) => `${c} support said "have you tried restarting the router". I am the router now.`,
+    (c) => `${c} destek hattı “modemi kapatıp açtınız mı” dedi. Artık modem benim.`,
+  ],
 ];
 
-const MEH_POSTS = [
-  (c: string) => `${c} is fine I guess. Evenings get sluggish.`,
-  (c: string) => `Speeds with ${c} are okay until about 9pm, then it crawls.`,
+const MEH_POSTS: Post<[string]>[] = [
+  [(c) => `${c} is fine I guess. Evenings get sluggish.`, (c) => `${c} idare eder sanırım. Akşamları ağırlaşıyor.`],
+  [
+    (c) => `Speeds with ${c} are okay until about 9pm, then it crawls.`,
+    (c) => `${c} hızları akşam dokuza kadar iyi, sonra sürünüyor.`,
+  ],
 ];
 
-const SWITCH_POSTS = [
-  (c: string, r: string) => `Left ${c} for ${r} today. Same speed, smaller bill.`,
-  (c: string, r: string) => `${r} just wired my street. Sorry ${c}, you had your chance.`,
-  (c: string, r: string) => `Cancelled ${c} after the third outage. ${r} it is.`,
+const SWITCH_POSTS: Post<[string, string]>[] = [
+  [
+    (c, r) => `Left ${c} for ${r} today. Same speed, smaller bill.`,
+    (c, r) => `Bugün ${c} operatöründen ${r} operatörüne geçtim. Aynı hız, daha küçük fatura.`,
+  ],
+  [
+    (c, r) => `${r} just wired my street. Sorry ${c}, you had your chance.`,
+    (c, r) => `${r} sokağıma fiber çekti. Kusura bakma ${c}, fırsatın vardı.`,
+  ],
+  [
+    (c, r) => `Cancelled ${c} after the third outage. ${r} it is.`,
+    (c, r) => `Üçüncü kesintiden sonra ${c} aboneliğimi iptal ettim. Artık ${r} var.`,
+  ],
 ];
 
 // A defection names the rival that took them, so the feed matches the churn list.
 export function makeSwitchPost(rng: Rng, company: string, rival: string) {
-  return { text: pick(rng, SWITCH_POSTS)(company, rival), stars: rng() < 0.7 ? 1 : 2 };
+  return { text: inLanguage(pick(rng, SWITCH_POSTS), company, rival), stars: rng() < 0.7 ? 1 : 2 };
 }
 
 export function makePost(rng: Rng, company: string, mood: 'good' | 'bad' | 'meh', speed: number) {
-  if (mood === 'good') return { text: pick(rng, GOOD_POSTS)(company, speed), stars: rng() < 0.6 ? 5 : 4 };
-  if (mood === 'bad') return { text: pick(rng, BAD_POSTS)(company), stars: rng() < 0.6 ? 1 : 2 };
-  return { text: pick(rng, MEH_POSTS)(company), stars: 3 };
+  if (mood === 'good') return { text: inLanguage(pick(rng, GOOD_POSTS), company, speed), stars: rng() < 0.6 ? 5 : 4 };
+  if (mood === 'bad') return { text: inLanguage(pick(rng, BAD_POSTS), company), stars: rng() < 0.6 ? 1 : 2 };
+  return { text: inLanguage(pick(rng, MEH_POSTS), company), stars: 3 };
 }
 
 export const CITY_EVENTS = [
