@@ -1,4 +1,4 @@
-import type { ResearchNode } from '../game/types';
+import type { ResearchNode } from './types';
 
 const TR: Record<string, [string, string, string[]]> = {
   ftth: [

@@ -6,7 +6,7 @@ import { totalCustomers } from '../../game/simulation';
 import { staffModifiers } from '../../game/staff';
 import { useGame } from '../../store/gameStore';
 import { t } from '../i18n';
-import { researchCopy } from '../researchCopy';
+import { researchCopy } from '../../game/researchCopy';
 import ResearchGuidance from '../ResearchGuidance';
 
 const BRANCH = {

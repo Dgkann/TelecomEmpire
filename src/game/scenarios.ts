@@ -13,7 +13,9 @@ export interface ScenarioObjective {
 export interface ScenarioDefinition {
   id: ScenarioId;
   name: string;
+  nameTr: string;
   description: string;
+  descriptionTr: string;
   deadlineDays: number | null;
   objectives: ScenarioObjective[];
 }
@@ -81,35 +83,45 @@ export const SCENARIOS: ScenarioDefinition[] = [
   {
     id: 'freeplay',
     name: 'Free play',
+    nameTr: 'Serbest oyun',
     description: 'Build without a deadline. Reaching Global Telecom remains the long-term victory.',
+    descriptionTr: 'Süre sınırı olmadan büyü. Uzun vadeli zafer hedefi Küresel Telekom seviyesidir.',
     deadlineDays: null,
     objectives: [],
   },
   {
     id: 'rapid_expansion',
     name: 'Rapid expansion',
+    nameTr: 'Hızlı genişleme',
     description: 'Prove the first network can fund a second district before the launch window closes.',
+    descriptionTr: 'İlk şebekenin ikinci ilçeyi finanse edebildiğini süre dolmadan kanıtla.',
     deadlineDays: 180,
     objectives: [customers(1500), districts(2)],
   },
   {
     id: 'service_standard',
     name: 'Service standard',
+    nameTr: 'Hizmet standardı',
     description: 'Grow across the city while keeping the operator trusted.',
+    descriptionTr: 'Operatörün itibarını koruyarak şehir genelinde büyü.',
     deadlineDays: 450,
     objectives: [customers(5000), districts(4), reputation(75), mobile],
   },
   {
     id: 'debt_free',
     name: 'Debt-free growth',
+    nameTr: 'Borçsuz büyüme',
     description: 'Reach scale with a clean balance sheet.',
+    descriptionTr: 'Temiz bir bilançoyla hedef müşteri ölçeğine ulaş.',
     deadlineDays: 365,
     objectives: [customers(5000), districts(3), debtFree],
   },
   {
     id: 'market_leader',
     name: 'Market leader',
+    nameTr: 'Pazar lideri',
     description: 'Build the full-service operator that leads the final city.',
+    descriptionTr: 'Son şehirde lider olan tam hizmet operatörünü kur.',
     deadlineDays: 540,
     objectives: [customers(12000), districts(5), marketShare(0.45), mobile, dataCentre],
   },

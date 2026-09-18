@@ -1,3 +1,5 @@
+import { SCENARIOS } from '../game/scenarios';
+
 export type Locale = 'en' | 'tr';
 
 const tr = {
@@ -794,27 +796,6 @@ export function t(locale: Locale, key: TranslationKey) {
 
 export function scenarioCopy(locale: Locale, id: string) {
   if (locale !== 'tr') return null;
-  const copy: Record<string, { name: string; description: string }> = {
-    freeplay: {
-      name: 'Serbest oyun',
-      description: 'Süre sınırı olmadan büyü. Uzun vadeli zafer hedefi Küresel Telekom seviyesidir.',
-    },
-    rapid_expansion: {
-      name: 'Hızlı genişleme',
-      description: 'İlk şebekenin ikinci ilçeyi finanse edebildiğini süre dolmadan kanıtla.',
-    },
-    service_standard: {
-      name: 'Hizmet standardı',
-      description: 'Operatörün itibarını koruyarak şehir genelinde büyü.',
-    },
-    debt_free: {
-      name: 'Borçsuz büyüme',
-      description: 'Temiz bir bilançoyla hedef müşteri ölçeğine ulaş.',
-    },
-    market_leader: {
-      name: 'Pazar lideri',
-      description: 'Son şehirde lider olan tam hizmet operatörünü kur.',
-    },
-  };
-  return copy[id] ?? null;
+  const scenario = SCENARIOS.find((entry) => entry.id === id);
+  return scenario ? { name: scenario.nameTr, description: scenario.descriptionTr } : null;
 }

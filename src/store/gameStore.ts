@@ -83,7 +83,7 @@ import type {
   TrafficPolicy,
 } from '../game/types';
 import type { Locale } from '../ui/i18n';
-import { researchCopy } from '../ui/researchCopy';
+import { researchCopy } from '../game/researchCopy';
 
 export type BuildTool = NodeKind | 'fiber' | null;
 

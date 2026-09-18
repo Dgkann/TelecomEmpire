@@ -3,7 +3,7 @@ import { plural } from '../game/util';
 import { researchPlan } from '../game/researchPlanning';
 import { researchById } from '../game/research';
 import { useGame } from '../store/gameStore';
-import { researchCopy } from './researchCopy';
+import { researchCopy } from '../game/researchCopy';
 import { NODE_SPECS, DATACENTER_PILOT_COST, nodeUpgradeCost } from '../game/constants';
 import GoalWait from './GoalWait';
 import DataCenterFinance from './DataCenterFinance';
