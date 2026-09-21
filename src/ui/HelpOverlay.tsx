@@ -15,7 +15,7 @@ const SECTIONS = [
     lines: [
       'Fibre colour is utilisation: green under 50%, yellow to 75%, orange to 90%, red above that.',
       'Buildings turn cyan as their households subscribe. A glowing dot means they are on your network.',
-      'Traffic roughly doubles between 18:00 and 23:00, so a span that looks fine at noon can be red by 20:00.',
+      'Traffic peaks around 19:00–20:00 at about 1.5× the midday load, so a span that looks fine at noon can be red by 20:00.',
     ],
   },
   {
@@ -48,7 +48,7 @@ const SECTIONS_TR = [
     lines: [
       'Fiber rengi kullanımı gösterir: yüzde 50 altı yeşil, yüzde 75 sarı, yüzde 90 turuncu ve üzeri kırmızı.',
       'Haneler abone oldukça binalar camgöbeği olur. Parlayan nokta binanın şebekende olduğunu gösterir.',
-      'Trafik 18:00 ile 23:00 arasında yaklaşık iki katına çıkar.',
+      'Trafik 19:00–20:00 civarında zirve yapar ve öğle yükünün yaklaşık 1,5 katına çıkar; öğlen sorunsuz görünen bir hat 20:00’de kırmızıya dönebilir.',
     ],
   },
   {

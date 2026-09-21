@@ -42,10 +42,10 @@ const STEPS: TutorialStep[] = [
   },
   {
     title: 'Watch the evening peak',
-    body: 'Traffic roughly doubles between 18:00 and 23:00; upgrade a POP from T1 to T2 and watch its map badge and capacity change.',
+    body: 'Traffic peaks around 19:00–20:00 at about 1.5× the midday load; upgrade a POP from T1 to T2 and watch its map badge and capacity change.',
     titleTr: 'Akşam yoğunluğunu izle',
     bodyTr:
-      'Trafik 18:00 ile 23:00 arasında yaklaşık iki katına çıkar. Bir POP noktasını T1 seviyesinden T2 seviyesine yükselt.',
+      'Trafik 19:00–20:00 civarında zirve yapar ve öğle yükünün yaklaşık 1,5 katına çıkar. Bir POP noktasını T1 seviyesinden T2 seviyesine yükselt.',
     done: (g) => g.nodes.some((n) => n.kind === 'pop' && n.tier >= 2),
   },
   {
