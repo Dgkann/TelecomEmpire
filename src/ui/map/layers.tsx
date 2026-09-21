@@ -78,6 +78,39 @@ export const GroundLayer = memo(
       }
     });
 
+    return (
+      <g data-ground-tiles="true">
+        <CityFoundation districts={districts} />
+        {tiles}
+        {marks}
+        {junctions}
+      </g>
+    );
+  },
+  (a, b) =>
+    a.night === b.night &&
+    a.selectedId === b.selectedId &&
+    sameIds(a.outageIds, b.outageIds) &&
+    sameIds(a.obligationIds, b.obligationIds) &&
+    sameDistrictMap(a.districts, b.districts),
+);
+
+// District borders pulse while a district is selected, failing or owes an obligation, so they
+// live on their own map layer and the animation never repaints the ground beneath them.
+export const DistrictOutlines = memo(
+  function DistrictOutlines({
+    districts,
+    selectedId,
+    outageIds,
+    obligationIds,
+  }: {
+    districts: District[];
+    selectedId: string | null;
+    outageIds: string[];
+    obligationIds: string[];
+  }) {
+    const outages = new Set(outageIds);
+    const obligations = new Set(obligationIds);
     // Boundaries carry the district colour, drawn as the shared edge between two districts rather than a ring around every border tile.
     const outlines = districts.map((d) => {
       const set = new Set(d.cells.map((c) => `${c.gx},${c.gy}`));
@@ -136,18 +169,9 @@ export const GroundLayer = memo(
       );
     });
 
-    return (
-      <g data-ground-tiles="true">
-        <CityFoundation districts={districts} />
-        {tiles}
-        {marks}
-        {junctions}
-        {outlines}
-      </g>
-    );
+    return <g aria-hidden="true">{outlines}</g>;
   },
   (a, b) =>
-    a.night === b.night &&
     a.selectedId === b.selectedId &&
     sameIds(a.outageIds, b.outageIds) &&
     sameIds(a.obligationIds, b.obligationIds) &&
@@ -221,14 +245,12 @@ export const BuildingsLayer = memo(function BuildingsLayer({
   developedIds,
   night,
   dim,
-  minutes,
   economical,
 }: {
   buildings: Building[];
   developedIds: Set<string>;
   night: number;
   dim: boolean;
-  minutes: number;
   economical: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -399,16 +421,37 @@ export const BuildingsLayer = memo(function BuildingsLayer({
     }
     view.globalAlpha = 1;
   }, [buildings, night, dim, developedIds, bounds, resolution]);
+  // Positioned in world units inside the map's camera layer, which moves it without repainting.
+  return (
+    <canvas
+      ref={canvas}
+      aria-hidden="true"
+      width={Math.ceil(bounds.width * resolution)}
+      height={Math.ceil(bounds.height * resolution)}
+      style={{
+        position: 'absolute',
+        left: bounds.x,
+        top: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        display: 'block',
+      }}
+    />
+  );
+});
+
+// Rings where a building has just joined the network, drawn above the architecture.
+export const ConnectionRings = memo(function ConnectionRings({
+  buildings,
+  minutes,
+  economical,
+}: {
+  buildings: Building[];
+  minutes: number;
+  economical: boolean;
+}) {
   return (
     <g pointerEvents="none" aria-hidden="true">
-      <foreignObject {...bounds}>
-        <canvas
-          ref={canvas}
-          width={Math.ceil(bounds.width * resolution)}
-          height={Math.ceil(bounds.height * resolution)}
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
-      </foreignObject>
       {buildings
         .filter((b) => minutes - b.lastConnectedAt < 25)
         .slice(0, economical ? 8 : 32)

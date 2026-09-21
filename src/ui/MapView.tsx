@@ -19,7 +19,16 @@ import type { District, GameState, NetLink, NetNode } from '../game/types';
 import { FLOOR_H, TILE_H, TILE_W, isoX, isoY, mix, tileDiamond, unIso } from './iso';
 
 import { COMPANY } from './map/palette';
-import { GroundLayer, CityTraffic, BuildingsLayer, RivalsLayer, CoverageLayer, CustomersLayer } from './map/layers';
+import {
+  GroundLayer,
+  DistrictOutlines,
+  CityTraffic,
+  BuildingsLayer,
+  ConnectionRings,
+  RivalsLayer,
+  CoverageLayer,
+  CustomersLayer,
+} from './map/layers';
 import { LinkGlyph, NodeGlyph, TechnicianGlyph } from './map/glyphs';
 
 const PLACEMENT_BLOCKER = '[data-map-placement-blocker="true"]';
@@ -68,7 +77,15 @@ export default function MapView() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState<Camera>({ x: 0, y: -60, zoom: 1 });
+  // The map is drawn as stacked layers so a change in one never repaints the others.
+  // They all share the camera: SVG layers as an attribute, the building canvas as CSS.
+  const groundRef = useRef<SVGGElement>(null);
+  const underlayRef = useRef<SVGGElement>(null);
+  const buildingsWorldRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<SVGGElement>(null);
+  const svgCamera = (c: Camera) => `translate(${size.w / 2} ${size.h / 2}) scale(${c.zoom}) translate(${c.x} ${c.y})`;
+  const cssCamera = (c: Camera) =>
+    `translate(${size.w / 2}px, ${size.h / 2}px) scale(${c.zoom}) translate(${c.x}px, ${c.y}px)`;
   const panCamera = useRef<Camera | null>(null);
   const panFrame = useRef<number | null>(null);
   useEffect(
@@ -296,11 +313,10 @@ export default function MapView() {
           panFrame.current = requestAnimationFrame(() => {
             panFrame.current = null;
             const c = panCamera.current;
-            if (c)
-              worldRef.current?.setAttribute(
-                'transform',
-                `translate(${size.w / 2} ${size.h / 2}) scale(${c.zoom}) translate(${c.x} ${c.y})`,
-              );
+            if (!c) return;
+            for (const layer of [groundRef, underlayRef, worldRef])
+              layer.current?.setAttribute('transform', svgCamera(c));
+            if (buildingsWorldRef.current) buildingsWorldRef.current.style.transform = cssCamera(c);
           });
       }
     } else if (tool) {
@@ -401,6 +417,48 @@ export default function MapView() {
       />
       <DistrictNavigator />
       {drill && <FailureDrillPanel report={drill} />}
+      <svg className="map-layer pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+        <g ref={groundRef} transform={svgCamera(cam)} opacity={1 - night * 0.3}>
+          <GroundLayer
+            districts={game.districts}
+            night={0}
+            selectedId={selectedDistrictId}
+            outageIds={outageDistrictIds}
+            obligationIds={obligationDistrictIds}
+          />
+        </g>
+      </svg>
+      <svg className="map-layer pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+        <g ref={underlayRef} transform={svgCamera(cam)}>
+          <g opacity={1 - night * 0.3}>
+            <DistrictOutlines
+              districts={game.districts}
+              selectedId={selectedDistrictId}
+              outageIds={outageDistrictIds}
+              obligationIds={obligationDistrictIds}
+            />
+          </g>
+          {!drill && <ProjectFootprint game={game} />}
+          {overlay === 'normal' && !economical && <CityTraffic districts={game.districts} />}
+          {overlay === 'coverage' && (
+            <CoverageLayer nodes={game.nodes} districts={game.districts} spectrum={game.spectrum} />
+          )}
+          {overlay === 'rivals' && <RivalsLayer game={game} />}
+        </g>
+      </svg>
+      <div
+        ref={buildingsWorldRef}
+        className="map-layer map-buildings pointer-events-none absolute left-0 top-0"
+        style={{ transformOrigin: '0 0', transform: cssCamera(cam) }}
+      >
+        <BuildingsLayer
+          economical={economical}
+          developedIds={developedIds}
+          buildings={game.buildings}
+          night={night}
+          dim={overlay === 'load' || overlay === 'rivals' || overlay === 'customers'}
+        />
+      </div>
       <svg
         ref={svgRef}
         role="application"
@@ -425,38 +483,8 @@ export default function MapView() {
             <feGaussianBlur stdDeviation="3" />
           </filter>
         </defs>
-        <g
-          ref={worldRef}
-          style={{ pointerEvents: drill ? 'none' : undefined }}
-          transform={`translate(${size.w / 2} ${size.h / 2}) scale(${cam.zoom}) translate(${cam.x} ${cam.y})`}
-        >
-          <g opacity={1 - night * 0.3}>
-            <GroundLayer
-              districts={game.districts}
-              night={0}
-              selectedId={selectedDistrictId}
-              outageIds={outageDistrictIds}
-              obligationIds={obligationDistrictIds}
-            />
-          </g>
-          {!drill && <ProjectFootprint game={game} />}
-          {overlay === 'normal' && !economical && <CityTraffic districts={game.districts} />}
-
-          {overlay === 'coverage' && (
-            <CoverageLayer nodes={game.nodes} districts={game.districts} spectrum={game.spectrum} />
-          )}
-
-          {overlay === 'rivals' && <RivalsLayer game={game} />}
-
-          <BuildingsLayer
-            economical={economical}
-            developedIds={developedIds}
-            buildings={game.buildings}
-            night={night}
-            dim={overlay === 'load' || overlay === 'rivals' || overlay === 'customers'}
-            minutes={game.minutes}
-          />
-
+        <g ref={worldRef} style={{ pointerEvents: drill ? 'none' : undefined }} transform={svgCamera(cam)}>
+          <ConnectionRings buildings={game.buildings} minutes={game.minutes} economical={economical} />
           {overlay === 'customers' && <CustomersLayer game={game} />}
 
           {tool && tool !== 'fiber' && hover && (

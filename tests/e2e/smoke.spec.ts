@@ -43,7 +43,7 @@ test('city canvas paints architecture and refreshes its night lighting', async (
       store.setState({ game: { ...store.getState().game, speed: 0, minutes: time, tutorialDone: true } });
     }, minutes);
   await setTime(720);
-  const canvas = page.locator('svg.map-surface canvas');
+  const canvas = page.locator('.map-buildings canvas');
   await expect(canvas).toBeVisible();
   const day = await canvas.evaluate((element: HTMLCanvasElement) => {
     const ctx = element.getContext('2d')!;
@@ -231,7 +231,7 @@ test('builds a connected POP and restores the expanded network from another slot
   await expect(fibres).toHaveCount(1);
 
   await page.getByRole('button', { name: /^POP/ }).click();
-  const tile = map.locator('[data-ground-tiles] > polygon').first();
+  const tile = page.locator('[data-ground-tiles] > polygon').first();
   const tileBox = await tile.boundingBox();
   expect(tileBox).not.toBeNull();
   await page.mouse.click(tileBox!.x + tileBox!.width * 0.25, tileBox!.y + tileBox!.height * 0.5);

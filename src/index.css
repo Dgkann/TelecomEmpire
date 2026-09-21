@@ -332,6 +332,11 @@ select:focus-visible,
   animation: towerblink 3s ease-in-out infinite;
 }
 
+/* Each map layer gets its own compositing layer, so repainting one leaves the others untouched. */
+.map-layer {
+  will-change: transform;
+}
+
 .map-surface {
   cursor: grab;
   touch-action: none;
