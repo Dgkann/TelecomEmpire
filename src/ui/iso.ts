@@ -30,24 +30,32 @@ export function tileDiamond(gx: number, gy: number, inset = 0.06) {
   return `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`;
 }
 
+// Map painting mixes the same few hundred colours over and over, so parsed values are kept.
+const parsedColors = new Map<string, readonly [number, number, number]>();
+
 // Accepts both #hex and the rgb() strings these helpers return, so results can be fed back in.
-function parseColor(color: string): [number, number, number] {
+function parseColor(color: string): readonly [number, number, number] {
+  const cached = parsedColors.get(color);
+  if (cached) return cached;
+  let rgb: readonly [number, number, number] = [0, 0, 0];
   if (color.startsWith('rgb')) {
     const parts = color.match(/\d+/g);
-    if (parts && parts.length >= 3) return [Number(parts[0]), Number(parts[1]), Number(parts[2])];
-    return [0, 0, 0];
+    if (parts && parts.length >= 3) rgb = [Number(parts[0]), Number(parts[1]), Number(parts[2])];
+  } else {
+    const h = color.replace('#', '');
+    const full =
+      h.length === 3
+        ? h
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : h;
+    const n = parseInt(full, 16);
+    if (!Number.isNaN(n)) rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
-  const h = color.replace('#', '');
-  const full =
-    h.length === 3
-      ? h
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : h;
-  const n = parseInt(full, 16);
-  if (Number.isNaN(n)) return [0, 0, 0];
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  if (parsedColors.size >= 4096) parsedColors.clear();
+  parsedColors.set(color, rgb);
+  return rgb;
 }
 
 export function shade(color: string, amount: number) {

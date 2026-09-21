@@ -34,7 +34,7 @@ function pathFor(key: string, create: () => Path2D) {
 }
 export function buildingPaint(b: Building, night: number, dim: boolean, developed: boolean) {
   const connected = visualConnection(b.connected);
-  const key = JSON.stringify([b.gx, b.gy, b.floors, b.kind, b.seed, connected, night, dim, developed]);
+  const key = `${b.gx},${b.gy},${b.floors},${b.kind},${b.seed},${connected},${night},${dim},${developed}`;
   const cached = paints.get(key);
   if (cached) return cached;
   const ops: Paint[] = [];
