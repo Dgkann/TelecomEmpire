@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Solving the board click by click takes about 6 s in Chromium but 20-45 s in WebKit, which ran into the 45 s limit.
+test.slow(({ browserName }) => browserName === 'webkit', 'WebKit works through the cable board far more slowly');
+
 async function setup(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Commission new network' }).click();
