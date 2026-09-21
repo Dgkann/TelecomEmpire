@@ -1,5 +1,29 @@
 # City rendering benchmark
 
+## September 22, 2026: building canvas
+
+Profiles of the construction burst showed the building canvas repainting all 328
+buildings whenever one customer threshold changed, and again at each of the 16
+daily lighting steps. The canvas now keeps the city painted at full daylight and
+at full night, blends the two for the current hour, and repaints only the area
+around a building whose appearance changed. A lighting layer the current hour
+does not show is caught up when it is next needed.
+
+End-to-end frame counts on this host were too noisy to compare: the simulation
+tick p95, which this change does not touch, ranged from 23 to 98 ms between
+identical runs. Three interleaved CPU profiles per build at 4x throttling gave:
+
+| Metric (10 s sample)                |       Before |      After |
+| ----------------------------------- | -----------: | ---------: |
+| Building canvas JavaScript          | 727–1,012 ms | 369–853 ms |
+| Canvas time / simulation time (med) |         2.03 |       0.78 |
+
+Partial repaints were checked against full repaints over a simulated day and a
+half: at most 6 pixels differed, by at most 3/255, and the difference did not
+accumulate. At intermediate hours the blend matches direct painting within 4/255
+for over 99.5% of pixels; the rest are nearly transparent edge pixels. Native
+SVG rasterisation of the network overlay is now the largest remaining cost.
+
 ## September 21, 2026 release check
 
 Measured at game commit `9ba651c` on Windows with Node.js 26.5.0 and npm 11.17.0.

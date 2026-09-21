@@ -179,6 +179,42 @@ export const CityTraffic = memo(
   (a, b) => sameDistrictMap(a.districts, b.districts),
 );
 
+interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+// Everything a building paints plus a small anti-aliasing margin: the roof or marker above the
+// top face and the shadow thrown to the right are its widest parts.
+function paintBox(b: Building): Box {
+  const x = isoX(b.gx, b.gy),
+    y = isoY(b.gx, b.gy);
+  const h = b.kind === 'park' ? 0 : Math.max(4, b.floors * FLOOR_H);
+  return { x0: x - TILE_W / 2 - 2, x1: x + TILE_W / 2 + h * 0.4 + 2, y0: y - h - TILE_H - 2, y1: y + TILE_H / 2 + 3 };
+}
+
+const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+const union = (a: Box, b: Box): Box => ({
+  x0: Math.min(a.x0, b.x0),
+  y0: Math.min(a.y0, b.y0),
+  x1: Math.max(a.x1, b.x1),
+  y1: Math.max(a.y1, b.y1),
+});
+
+interface Painted {
+  scene: string;
+  looks: Map<string, string>;
+  boxes: Map<string, Box>;
+}
+
+interface LightLayer {
+  canvas: HTMLCanvasElement;
+  light: number;
+  painted: Painted | null;
+}
+
 // Decorative architecture shares a canvas; network controls remain interactive SVG.
 export const BuildingsLayer = memo(function BuildingsLayer({
   buildings,
@@ -196,7 +232,9 @@ export const BuildingsLayer = memo(function BuildingsLayer({
   economical: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const lastPaint = useRef('');
+  const lastNight = useRef<number | null>(null);
+  const lightLayers = useRef<LightLayer[] | null>(null);
+  const scratchCanvas = useRef<HTMLCanvasElement | null>(null);
   const bounds = useMemo(() => {
     let minX = Infinity,
       minY = Infinity,
@@ -221,37 +259,145 @@ export const BuildingsLayer = memo(function BuildingsLayer({
     4096 / bounds.height,
   );
   useLayoutEffect(() => {
-    const ctx = canvas.current?.getContext('2d');
-    if (!ctx) return;
-    const signature = JSON.stringify([
-      night,
-      dim,
-      resolution,
-      bounds,
-      [...developedIds],
-      buildings.map((b) => [b.id, b.gx, b.gy, b.kind, b.seed, b.floors, visualConnection(b.connected)]),
+    const view = canvas.current?.getContext('2d');
+    if (!view) return;
+    const { width, height } = view.canvas;
+    // Every building colour is a straight line between its daylight and night colours, so the city
+    // is kept painted in both and the visible canvas only blends them when the hour changes.
+    const layers = (lightLayers.current ??= [
+      { canvas: document.createElement('canvas'), light: 0, painted: null },
+      { canvas: document.createElement('canvas'), light: 1, painted: null },
     ]);
-    if (lastPaint.current === signature) return;
-    lastPaint.current = signature;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.setTransform(resolution, 0, 0, resolution, -bounds.x * resolution, -bounds.y * resolution);
-    for (const b of [...buildings].sort((a, b) => a.gx + a.gy - b.gx - b.gy)) {
-      for (const op of buildingPaint(b, night, dim, developedIds.has(b.id))) {
-        if (op.fill !== 'none') {
-          ctx.globalAlpha = op.fillAlpha;
-          ctx.fillStyle = op.fill;
-          ctx.fill(op.path);
-        }
-        if (op.stroke && op.stroke !== 'none') {
-          ctx.globalAlpha = op.strokeAlpha;
-          ctx.strokeStyle = op.stroke;
-          ctx.lineWidth = op.width;
-          ctx.stroke(op.path);
+    // A layer the current hour does not show is left alone and caught up when it is next needed.
+    const needed = layers.filter((layer) => (layer.light === 0 ? night < 1 : night > 0));
+    // Dimming and the canvas size touch every building at once.
+    const scene = `${dim}|${resolution}|${bounds.x},${bounds.y},${bounds.width},${bounds.height}|${buildings.length}`;
+    const looks = new Map<string, string>();
+    for (const b of buildings)
+      looks.set(
+        b.id,
+        `${b.gx},${b.gy},${b.kind},${b.seed},${b.floors},${visualConnection(b.connected)},${developedIds.has(b.id)}`,
+      );
+    const ordered = [...buildings].sort((a, b) => a.gx + a.gy - b.gx - b.gy);
+    const boxes = new Map(buildings.map((b) => [b.id, paintBox(b)]));
+    // Paints into any context whose origin is `offsetX, offsetY` device pixels into the canvas.
+    const draw = (target: CanvasRenderingContext2D, light: number, drawn: Building[], offsetX = 0, offsetY = 0) => {
+      target.setTransform(
+        resolution,
+        0,
+        0,
+        resolution,
+        -bounds.x * resolution - offsetX,
+        -bounds.y * resolution - offsetY,
+      );
+      for (const b of drawn) {
+        for (const op of buildingPaint(b, light, dim, developedIds.has(b.id))) {
+          if (op.fill !== 'none') {
+            target.globalAlpha = op.fillAlpha;
+            target.fillStyle = op.fill;
+            target.fill(op.path);
+          }
+          if (op.stroke && op.stroke !== 'none') {
+            target.globalAlpha = op.strokeAlpha;
+            target.strokeStyle = op.stroke;
+            target.lineWidth = op.width;
+            target.stroke(op.path);
+          }
         }
       }
+      target.globalAlpha = 1;
+    };
+    const whole: [number, number, number, number] = [0, 0, width, height];
+    // Pixel rectangles to re-blend onto the visible canvas.
+    let blend: Array<[number, number, number, number]> = lastNight.current === night ? [] : [whole];
+    lastNight.current = night;
+
+    for (const layer of needed) {
+      const before = layer.painted;
+      layer.painted = { scene, looks, boxes };
+      let full = !before || before.scene !== scene;
+      const dirty: Box[] = [];
+      for (const [id, look] of full ? [] : looks) {
+        const previous = before!.looks.get(id);
+        if (previous === undefined) {
+          full = true;
+          break;
+        }
+        if (previous === look) continue;
+        // Cover where it was and where it is now; merge overlapping areas so a busy block is repainted once.
+        let area = union(before!.boxes.get(id)!, boxes.get(id)!);
+        for (let i = dirty.length - 1; i >= 0; i--)
+          if (overlaps(dirty[i], area)) area = union(area, dirty.splice(i, 1)[0]);
+        dirty.push(area);
+      }
+      const pieces = dirty
+        .map((area) => {
+          const x0 = Math.max(0, Math.floor((area.x0 - bounds.x) * resolution));
+          const y0 = Math.max(0, Math.floor((area.y0 - bounds.y) * resolution));
+          const x1 = Math.min(width, Math.ceil((area.x1 - bounds.x) * resolution));
+          const y1 = Math.min(height, Math.ceil((area.y1 - bounds.y) * resolution));
+          const covered = {
+            x0: x0 / resolution + bounds.x,
+            y0: y0 / resolution + bounds.y,
+            x1: x1 / resolution + bounds.x,
+            y1: y1 / resolution + bounds.y,
+          };
+          return { x0, y0, w: x1 - x0, h: y1 - y0, drawn: ordered.filter((b) => overlaps(boxes.get(b.id)!, covered)) };
+        })
+        .filter((piece) => piece.w > 0 && piece.h > 0);
+      // Past the point where patching costs more than starting over, repaint the layer.
+      if (pieces.reduce((sum, piece) => sum + piece.drawn.length, 0) > buildings.length) full = true;
+      if (full) {
+        // Setting the size also clears the layer.
+        layer.canvas.width = width;
+        layer.canvas.height = height;
+        const target = layer.canvas.getContext('2d');
+        if (!target) return;
+        draw(target, layer.light, ordered);
+        blend = [whole];
+        continue;
+      }
+      if (!pieces.length) continue;
+      // A customer change only repaints the pixels around that building. The area is drawn on a
+      // scratch canvas, neighbours included, and copied in whole: a clip would blend its edges.
+      const scratch = (scratchCanvas.current ??= document.createElement('canvas'));
+      const needWidth = Math.max(...pieces.map((piece) => piece.w));
+      const needHeight = Math.max(...pieces.map((piece) => piece.h));
+      if (scratch.width < needWidth || scratch.height < needHeight) {
+        scratch.width = Math.max(scratch.width, needWidth);
+        scratch.height = Math.max(scratch.height, needHeight);
+      }
+      const piece = scratch.getContext('2d');
+      const target = layer.canvas.getContext('2d');
+      if (!piece || !target) return;
+      target.setTransform(1, 0, 0, 1, 0, 0);
+      for (const { x0, y0, w, h, drawn } of pieces) {
+        piece.setTransform(1, 0, 0, 1, 0, 0);
+        piece.clearRect(0, 0, w, h);
+        draw(piece, layer.light, drawn, x0, y0);
+        target.clearRect(x0, y0, w, h);
+        target.drawImage(scratch, 0, 0, w, h, x0, y0, w, h);
+        if (blend[0] !== whole) blend.push([x0, y0, w, h]);
+      }
     }
-    ctx.globalAlpha = 1;
+    if (!blend.length) return;
+    // 'lighter' adds the two weighted layers, which is an exact blend where both are opaque.
+    const [day, dark] = layers;
+    view.setTransform(1, 0, 0, 1, 0, 0);
+    for (const [x, y, w, h] of blend) {
+      view.clearRect(x, y, w, h);
+      if (night < 1) {
+        view.globalAlpha = 1 - night;
+        view.drawImage(day.canvas, x, y, w, h, x, y, w, h);
+      }
+      if (night > 0) {
+        view.globalAlpha = night;
+        view.globalCompositeOperation = 'lighter';
+        view.drawImage(dark.canvas, x, y, w, h, x, y, w, h);
+        view.globalCompositeOperation = 'source-over';
+      }
+    }
+    view.globalAlpha = 1;
   }, [buildings, night, dim, developedIds, bounds, resolution]);
   return (
     <g pointerEvents="none" aria-hidden="true">
