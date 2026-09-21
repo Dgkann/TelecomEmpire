@@ -168,7 +168,3 @@ export function generateCity(seed: number, cityName = 'Marmara'): GeneratedCity 
 
   return { districts, buildings };
 }
-
-export function districtAt(districts: District[], gx: number, gy: number): District | undefined {
-  return districts.find((d) => d.cells.some((c) => c.gx === gx && c.gy === gy));
-}

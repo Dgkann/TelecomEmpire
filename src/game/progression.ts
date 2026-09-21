@@ -159,13 +159,6 @@ export function meetsRank(s: GameState, rank: Rank) {
   return rank.requirements.every((r) => r.progress(s) >= 1);
 }
 
-export function rankProgress(s: GameState) {
-  const next = nextRank(s);
-  if (!next) return 1;
-  if (!next.requirements.length) return 1;
-  return next.requirements.reduce((sum, r) => sum + r.progress(s), 0) / next.requirements.length;
-}
-
 // Called once a day. Returns the rank just earned, if any.
 export function checkPromotion(s: GameState): Rank | null {
   const next = nextRank(s);

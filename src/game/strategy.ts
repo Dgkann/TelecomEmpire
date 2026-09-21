@@ -259,10 +259,6 @@ export function dataCenterMode(state: Pick<GameState, 'dataCenterModes'>, nodeId
   return state.dataCenterModes[nodeId] ?? 'colocation';
 }
 
-export function isLiveDataCenter(state: Pick<GameState, 'nodes'>) {
-  return state.nodes.some((node) => node.kind === 'datacenter' && !node.down);
-}
-
 export function operationalDataCenters(
   state: Pick<GameState, 'nodes' | 'links'>,
   routes: Record<string, RouteInfo> = computeRoutes(state as GameState),

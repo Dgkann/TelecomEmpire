@@ -1,4 +1,4 @@
-import type { BandId, Difficulty, GameState, NodeKind, SpectrumHolding } from './types';
+import type { BandId, Difficulty, NodeKind, SpectrumHolding } from './types';
 
 export const SAVE_KEY = 'telecom-empire-save-v1';
 export const SAVE_VERSION = 26;
@@ -269,10 +269,6 @@ export const DIFFICULTY: Record<
 // A data centre earns from hosting and colocation.
 export const DATACENTER_HOSTING_BASE = 760000;
 
-// Edge caching serves popular traffic locally, so it never crosses your network at all.
-export const DATACENTER_CACHE_PER_TIER = 0.08;
-export const DATACENTER_CACHE_CAP = 0.3;
-
 // Share of a subscriber's headline speed really on the wire at peak. Biggest balance dial.
 export const OVERSUBSCRIPTION = 0.005;
 
@@ -283,8 +279,6 @@ export const HOURLY_DEMAND_CURVE = [
   0.22, 0.16, 0.12, 0.1, 0.1, 0.14, 0.26, 0.42, 0.55, 0.58, 0.6, 0.62, 0.66, 0.64, 0.62, 0.64, 0.72, 0.84, 0.95, 1.0,
   0.98, 0.9, 0.7, 0.42,
 ];
-
-export const COMPANY_COLOR = '#3ee6d6';
 
 export const UTIL_COLORS = [
   { max: 0.5, color: '#4ade80' },
@@ -343,8 +337,4 @@ export function towerRadius(spectrum: SpectrumHolding[], tier: number) {
 
 export function towerCapacity(spectrum: SpectrumHolding[], tier: number) {
   return nodeCapacity('tower', tier) * spectrumCapacityFactor(spectrum);
-}
-
-export function blocksOf(state: Pick<GameState, 'spectrum'>, band: BandId) {
-  return state.spectrum.filter((h) => h.band === band).reduce((s, h) => s + h.blocks, 0);
 }

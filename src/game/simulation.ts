@@ -1254,18 +1254,6 @@ export function mobileCoverageTarget(s: GameState, d: District, liveTowers?: Net
   return d.cells.length ? covered / d.cells.length : 0;
 }
 
-// Signal strength at a point, 0 outside every footprint and 1 at a mast.
-export function signalAt(s: GameState, gx: number, gy: number) {
-  let best = 0;
-  for (const t of s.nodes) {
-    if (t.kind !== 'tower' || t.down) continue;
-    const r = towerRadius(s.spectrum, t.tier);
-    if (r <= 0) continue;
-    best = Math.max(best, 1 - Math.min(1, Math.hypot(t.gx - gx, t.gy - gy) / r));
-  }
-  return best;
-}
-
 function growMobile(s: GameState, diff: (typeof DIFFICULTY)[Difficulty], dayFrac: number) {
   if (!s.spectrum.length) return;
   const mix = packageMix(s.packages, 'mobile');

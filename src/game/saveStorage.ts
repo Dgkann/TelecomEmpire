@@ -36,14 +36,6 @@ export function loadGame(slot = 0): GameState | null {
   }
 }
 
-export function hasSave(slot = 0) {
-  try {
-    return localStorage.getItem(keyForSlot(safeSlot(slot))) !== null;
-  } catch {
-    return false;
-  }
-}
-
 export interface SaveMeta {
   slot: number;
   savedAt: number;

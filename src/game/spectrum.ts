@@ -1,4 +1,4 @@
-import { MINUTES_PER_DAY, SPECTRUM_BANDS, blocksOf } from './constants';
+import { MINUTES_PER_DAY, SPECTRUM_BANDS } from './constants';
 import { rand, randInt, uid, type Rng } from './rng';
 import type { Auction, AuctionBid, BandId, GameState } from './types';
 
@@ -74,11 +74,4 @@ export function settleAuction(state: GameState, auction: Auction, rng: Rng): Auc
     ...auction,
     result: { winnerId: winner.bidderId, winnerName: winner.bidderName, price: winner.amount, bids },
   };
-}
-
-export function spectrumSummary(state: GameState) {
-  const held = (Object.keys(SPECTRUM_BANDS) as BandId[])
-    .map((b) => ({ band: b, blocks: blocksOf(state, b) }))
-    .filter((h) => h.blocks > 0);
-  return held;
 }

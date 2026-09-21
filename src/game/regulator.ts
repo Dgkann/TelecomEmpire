@@ -1,7 +1,7 @@
 import { MINUTES_PER_DAY } from './constants';
 import { priceIndex } from './economy';
 import { computeRoutes, isRedundant } from './network';
-import { pick, randInt, uid, type Rng } from './rng';
+import { randInt, uid, type Rng } from './rng';
 import { clamp } from './util';
 import type { GameState, Regulation } from './types';
 
@@ -140,5 +140,3 @@ export function networkResilience(s: GameState) {
   if (!sites.length) return 1;
   return sites.filter((node) => isRedundant(s, node.id, routes)).length / sites.length;
 }
-
-export const randomRegulator = (rng: Rng) => pick(rng, ['the regulator', 'the ministry', 'the telecoms authority']);

@@ -8,10 +8,6 @@ export function setGameLanguage(locale: 'en' | 'tr') {
   language = locale;
 }
 
-export function gameLanguage() {
-  return language;
-}
-
 export const isTurkish = () => language === 'tr';
 
 // Both wordings sit side by side at the call site, so a log line reads the same in either language.

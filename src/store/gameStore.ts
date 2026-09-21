@@ -39,7 +39,7 @@ import { createLoan, creditLimit } from '../game/finance';
 import { recordLedger } from '../game/financeLedger';
 import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
 import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/saveStorage';
-import { RESEARCH, researchById, researchModifiers } from '../game/research';
+import { researchById, researchModifiers } from '../game/research';
 import { CAMPAIGN_STAGES } from '../game/scenarios';
 import { claimMilestone as grantMilestone, MILESTONES } from '../game/milestones';
 import { fmtMoneyExact } from '../game/economy';
@@ -1947,8 +1947,6 @@ export const useGame = create<Store>((set, get) => ({
 
   skipTutorial: () => withGame(set, (draft) => void (draft.tutorialDone = true)),
 }));
-
-export const researchList = RESEARCH;
 
 if (typeof window !== 'undefined' && import.meta.env.VITE_E2E === 'true') {
   (window as unknown as { __game?: typeof useGame }).__game = useGame;

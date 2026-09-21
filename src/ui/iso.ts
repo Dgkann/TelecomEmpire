@@ -30,8 +30,6 @@ export function tileDiamond(gx: number, gy: number, inset = 0.06) {
   return `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`;
 }
 
-export const depth = (gx: number, gy: number) => gx + gy;
-
 // Accepts both #hex and the rgb() strings these helpers return, so results can be fed back in.
 function parseColor(color: string): [number, number, number] {
   if (color.startsWith('rgb')) {
