@@ -37,8 +37,8 @@ Things worth knowing:
   interactive network controls remain available in every mode.
 - Fibre colour is utilisation. Green under 50%, yellow to 75%, orange to 90%,
   red above that. The dashes crawl faster on busy spans.
-- Demand roughly doubles between 18:00 and 23:00, so a span that looks fine at
-  midday can be red by eight in the evening.
+- Demand peaks around 19:00–20:00 at about 1.5× the midday load, so a span that
+  looks fine at midday can be red by eight in the evening.
 - A site with one fibre path goes dark the moment that span is cut. The context
   panel tells you which sites are single-path.
 - Emergency repairs are fast and expensive. Scheduled repairs are cheap and
@@ -104,6 +104,7 @@ src/
     spectrum.ts    sealed-bid auctions
     research.ts    tech tree
     names.ts       generated people, firms and social posts
+    lang.ts        language for generated log, feed and ledger lines
     save.ts        schema migrations and save validation
     saveStorage.ts localStorage slots and import/export
   store/
