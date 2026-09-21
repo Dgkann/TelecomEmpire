@@ -1,5 +1,29 @@
 # City rendering benchmark
 
+## September 22, 2026: map layers and the graphics card
+
+By default Playwright's Chromium draws with SwiftShader, a software renderer, so
+earlier samples measured CPU drawing rather than the graphics card players use.
+`PERF_GPU=1` passes the flags that select the real GPU on Windows (verified as
+Direct3D 11 on an RTX 4060 laptop GPU).
+
+The map now draws four stacked layers: ground tiles, district borders with cars and
+overlays, the building canvas, and the interactive network. Animations and network
+updates no longer repaint the ground, and the building canvas moves with the
+camera as a CSS transform. Screenshots of six scenes, including one taken in the
+middle of a drag, matched the single-SVG map with zero differing pixels.
+
+Four interleaved pairs per scenario with the GPU enabled, 4x CPU throttling:
+
+| Frames in 10 s (median) | Single SVG | Layers | Pairs improved |
+| ----------------------- | ---------: | -----: | -------------: |
+| Construction burst      |        347 |    390 |         3 of 4 |
+| Construction with pan   |        187 |    230 |         4 of 4 |
+
+Sliding the layers with CSS during a drag, instead of updating the camera each
+frame, was also tried; it lowered pan frames from about 162 to 106 in all four
+pairs, so the camera is still applied per frame while dragging.
+
 ## September 22, 2026: building canvas
 
 Profiles of the construction burst showed the building canvas repainting all 328
