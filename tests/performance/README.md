@@ -1,5 +1,56 @@
 # City rendering benchmark
 
+## September 21, 2026 release check
+
+Measured at game commit `9ba651c` on Windows with Node.js 26.5.0 and npm 11.17.0.
+Browser samples ran sequentially, after the full E2E suite, at 1280 x 720 with
+seed 4242. These are single diagnostic samples, not a before/after comparison
+or an FPS guarantee. No runtime code changed during this release check.
+
+| Metric                           | Standard construction burst | Large settled network with panning |
+| -------------------------------- | --------------------------: | ---------------------------------: |
+| Sites / fibre spans              |                     42 / 41 |                          152 / 151 |
+| CPU slowdown                     |                          4x |                                 1x |
+| Sample duration                  |                        10 s |                               30 s |
+| Frames delivered                 |                         190 |                              1,375 |
+| Frame interval, 95th percentile  |                    250.0 ms |                            33.4 ms |
+| Maximum frame interval           |                    699.9 ms |                           133.4 ms |
+| Simulation tick, 95th percentile |                     51.1 ms |                            20.4 ms |
+| Long tasks / total time          |               43 / 4,726 ms |                         8 / 437 ms |
+| Game minutes advanced            |                         660 |                              2,300 |
+
+Both browser tests passed. The large-network sample reported no persistence
+error and an autosave timestamp of game minute 2,910. The construction sample
+did not reach an autosave. CPU-throttled construction still has visible stalls;
+the large-network sample averaged about 46 frames per second, with occasional
+long frames. These results do not establish a regression against historical
+samples taken under different host conditions.
+
+The separate 152-site traffic allocation benchmark measured a 3.68 ms median
+and 5.06 ms p95. Reproduce the two browser configurations in PowerShell, using
+a fresh shell for the default sample:
+
+```powershell
+npm run performance
+
+$env:PERF_SITES = '150'
+$env:PERF_DURATION = '30000'
+$env:PERF_PAN = '1'
+$env:PERF_SETTLED = '1'
+$env:PERF_CPU_RATE = '1'
+npm run performance
+
+npm run performance:network
+```
+
+The full release check also passed TypeScript, ESLint, Prettier, production
+build, all 729 simulation assertions and all 137 applicable E2E cases across
+desktop Chromium, mobile Chromium and mobile WebKit. One desktop case was
+skipped because it tests a narrow-screen-only component. The dependency audit
+reported zero vulnerabilities. The checks did not change gameplay or balance.
+
+## Earlier measurements
+
 `npm run performance:network` isolates traffic allocation on a 152-site chain
 with 15 service groups and three priorities. The shared-backhaul follow-up avoids
 rechecking the same resource for every flow in a service, and computes automatic
@@ -42,12 +93,12 @@ including multiple cores, failures and parallel spans.
 With adaptive map detail, cached unchanged building paints and the new
 resilience calculation, the same 10-second large-city fixture measured:
 
-| Metric | Previous release | Network Lab update |
-| --- | ---: | ---: |
-| Frame interval, 95th percentile | 349.9 ms | 83.3 ms |
-| Frames delivered | 83 | 396 |
-| Total long-task time | 7,789 ms | 2,751 ms |
-| Simulation tick, 95th percentile | 90.7 ms | 61.1 ms |
+| Metric                           | Previous release | Network Lab update |
+| -------------------------------- | ---------------: | -----------------: |
+| Frame interval, 95th percentile  |         349.9 ms |            83.3 ms |
+| Frames delivered                 |               83 |                396 |
+| Total long-task time             |         7,789 ms |           2,751 ms |
+| Simulation tick, 95th percentile |          90.7 ms |            61.1 ms |
 
 The previous-release sample also captured a CPU profile, so treat precise
 percentages as approximate. Panning now updates the camera's SVG transform at
@@ -70,13 +121,13 @@ a real menu click before setup to exercise that audio initialization path.
 
 Same machine, viewport (1280 x 720), seed (4242), setup and throttle:
 
-| Metric | Before | After |
-| --- | ---: | ---: |
-| Frame interval, 95th percentile | 1,000 ms | 116.6 ms |
-| Frames delivered during sample | 28 | 353 |
-| Simulation tick, 95th percentile | 74.3 ms | 15.0 ms |
-| Total long-task time | 9,559 ms | 2,519 ms |
-| Game minutes advanced | 120 | 760 |
+| Metric                           |   Before |    After |
+| -------------------------------- | -------: | -------: |
+| Frame interval, 95th percentile  | 1,000 ms | 116.6 ms |
+| Frames delivered during sample   |       28 |      353 |
+| Simulation tick, 95th percentile |  74.3 ms |  15.0 ms |
+| Total long-task time             | 9,559 ms | 2,519 ms |
+| Game minutes advanced            |      120 |      760 |
 
 The old renderer falls behind the simulation timer; the new renderer advances
 more game time within the wall-clock sample. These measurements include initial
