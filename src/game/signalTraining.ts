@@ -207,7 +207,8 @@ export function validSignalTraining(value: unknown): value is SignalTraining {
     !integer(active.moves) ||
     typeof active.completed !== 'boolean' ||
     (active.mode !== undefined && !['routing', 'fault', 'restoration'].includes(active.mode)) ||
-    ![0, TRAINING_REWARD].includes(active.reward)
+    // The stored reward is what the round actually paid, so saves stay valid if the grant is ever rescaled.
+    !integer(active.reward)
   )
     return false;
   if (
@@ -215,7 +216,7 @@ export function validSignalTraining(value: unknown): value is SignalTraining {
     (!Number.isFinite(active.researchDaysSaved) ||
       active.researchDaysSaved < 0 ||
       active.researchDaysSaved > TRAINING_LAB_DAYS ||
-      (active.researchDaysSaved > 0 && (!active.completed || active.reward !== TRAINING_REWARD)))
+      (active.researchDaysSaved > 0 && (!active.completed || active.reward === 0)))
   )
     return false;
   if (

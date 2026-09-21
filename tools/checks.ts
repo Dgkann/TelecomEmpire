@@ -4649,6 +4649,23 @@ group('optional signal routing exercises');
   );
   const claimedSave = migrate(JSON.parse(JSON.stringify(rewarded)), SAVE_VERSION)!;
   check('loading a completed exercise cannot claim twice', !!claimedSave && finishSignalTraining(claimedSave) === null);
+  const withGrant = (reward: number) => ({
+    ...rewarded.signalTraining,
+    active: { ...rewarded.signalTraining.active!, reward },
+  });
+  check(
+    'a completed exercise saved with a larger or smaller grant still loads',
+    validSignalTraining(withGrant(TRAINING_REWARD * 4)) && validSignalTraining(withGrant(TRAINING_REWARD / 2)),
+  );
+  check(
+    'negative, fractional or unfinished grants are rejected',
+    !validSignalTraining(withGrant(-1)) &&
+      !validSignalTraining(withGrant(1.5)) &&
+      !validSignalTraining({
+        ...started.signalTraining,
+        active: { ...started.signalTraining.active!, reward: TRAINING_REWARD },
+      }),
+  );
   const legacy = JSON.parse(JSON.stringify(g));
   delete legacy.signalTraining;
   legacy.version = 23;
