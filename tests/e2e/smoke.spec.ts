@@ -268,6 +268,9 @@ test('dispatches a field crew from a live incident', async ({ page }) => {
     store.setState({
       game: {
         ...game,
+        // Keep the injected incident independent of random live simulation events.
+        speed: 0,
+        tutorialDone: true,
         nodes: game.nodes.map((node: any) => (node.id === target.id ? { ...node, down: true } : node)),
         incidents: [
           {

@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-test('fault finding saves the repair, pauses time and shares rewards with routing', async ({ page }, testInfo) => {
+test('fault finding saves the repair, pauses time and shares rewards with routing', async ({
+  page,
+  browserName,
+}, testInfo) => {
+  test.slow(browserName === 'webkit', 'The second exercise solves an entire cable board through the UI');
   await page.goto('/');
   const before = await page.evaluate(() => {
     const store = (window as any).__game;

@@ -49,6 +49,13 @@ desktop Chromium, mobile Chromium and mobile WebKit. One desktop case was
 skipped because it tests a narrow-screen-only component. The dependency audit
 reported zero vulnerabilities. The checks did not change gameplay or balance.
 
+The first Linux CI run exposed three WebKit exercise timeouts despite the local
+pass. The worker-scoped `test.slow` callback extended its setup hook instead of
+the running test's 45-second budget. The follow-up applies `test.slow` inside
+each of the three board-solving tests. The injected-incident dispatch fixture
+also pauses the simulation so random events cannot consume the available crew
+while the test operates the dialog. These changes affect tests only.
+
 ## Earlier measurements
 
 `npm run performance:network` isolates traffic allocation on a 152-site chain

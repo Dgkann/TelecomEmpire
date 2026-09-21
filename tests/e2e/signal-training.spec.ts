@@ -1,8 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Solving the board click by click takes about 6 s in Chromium but 20-45 s in WebKit, which ran into the 45 s limit.
-test.slow(({ browserName }) => browserName === 'webkit', 'WebKit works through the cable board far more slowly');
-
 async function setup(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Commission new network' }).click();
@@ -25,7 +22,9 @@ async function solve(page: Page, tr = false) {
   }
 }
 
-test('routing exercise saves progress, protects the clock and awards once', async ({ page }, testInfo) => {
+test('routing exercise saves progress, protects the clock and awards once', async ({ page, browserName }, testInfo) => {
+  // Apply to the running test, not a worker-scoped modifier's beforeAll hook.
+  test.slow(browserName === 'webkit', 'WebKit works through the cable board far more slowly');
   await setup(page);
   const baseline = await page.evaluate(() => {
     const g = (window as any).__game.getState().game;
@@ -74,7 +73,11 @@ test('routing exercise saves progress, protects the clock and awards once', asyn
   expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
 });
 
-test('Turkish challenge is playable on touch and practice cannot farm rewards', async ({ page }, testInfo) => {
+test('Turkish challenge is playable on touch and practice cannot farm rewards', async ({
+  page,
+  browserName,
+}, testInfo) => {
+  test.slow(browserName === 'webkit', 'WebKit works through the cable board far more slowly');
   await setup(page);
   await page.evaluate(() => {
     const store = (window as any).__game;
