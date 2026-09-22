@@ -24,7 +24,7 @@ export default function DevelopmentGoals({ onNavigate }: { onNavigate: () => voi
   return (
     <section className="panel development-goals p-3" aria-label={tr ? 'Gelişim hedefleri' : 'Development goals'}>
       <button
-        className="flex w-full items-center justify-between gap-2 text-left"
+        className="flex w-full items-center justify-between gap-2 py-0.5 text-left"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
       >

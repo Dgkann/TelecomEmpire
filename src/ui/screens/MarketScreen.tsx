@@ -539,7 +539,7 @@ export default function MarketScreen() {
                   </dl>
                   {move ? (
                     <button
-                      className="mt-3 text-left text-xs text-[#ed9e77] underline underline-offset-4"
+                      className="mt-2 py-1 text-left text-xs text-[#ed9e77] underline underline-offset-4"
                       onClick={() => {
                         setId(move.districtId);
                         document.querySelector('.market-command-grid')?.scrollIntoView({ block: 'start' });

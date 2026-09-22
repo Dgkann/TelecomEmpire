@@ -45,6 +45,20 @@ function EngineerOutlook({ vm }: { vm: CompanyModel }) {
   );
 }
 
+function ReleaseButton({ name, tr, onClick }: { name: string; tr: boolean; onClick: () => void }) {
+  const label = tr ? `İşten çıkar: ${name}` : `Release ${name}`;
+  return (
+    <button
+      className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-neon-red"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
+      ✕
+    </button>
+  );
+}
+
 export default function StaffPanel({ vm }: { vm: CompanyModel }) {
   const tr = vm.locale === 'tr';
   return (
@@ -85,9 +99,7 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="num text-[11px] text-white/50">{fmtMoney(t.salary)}</span>
-              <button className="text-[11px] text-white/30 hover:text-neon-red" onClick={() => vm.fireStaff(t.id)}>
-                ✕
-              </button>
+              <ReleaseButton name={t.name} tr={tr} onClick={() => vm.fireStaff(t.id)} />
             </div>
           </div>
         ))}
@@ -110,9 +122,7 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="num text-[11px] text-white/50">{fmtMoney(e.salary)}</span>
-              <button className="text-[11px] text-white/30 hover:text-neon-red" onClick={() => vm.fireStaff(e.id)}>
-                ✕
-              </button>
+              <ReleaseButton name={e.name} tr={tr} onClick={() => vm.fireStaff(e.id)} />
             </div>
           </div>
         ))}

@@ -87,7 +87,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
             const share = vm.mix.find((m) => m.pkg.id === p.id)?.share ?? 0;
             return (
               <div key={p.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <div className="flex items-center justify-between">
+                <label className="flex cursor-pointer items-center justify-between py-1">
                   <span className="text-sm font-semibold">{p.name}</span>
                   <input
                     type="checkbox"
@@ -96,7 +96,7 @@ export default function PackagesPanel({ vm }: { vm: CompanyModel }) {
                     onChange={(e) => vm.updatePackage(p.id, { active: e.target.checked })}
                     className="h-4 w-4 accent-[#3ee6d6]"
                   />
-                </div>
+                </label>
                 <div className="num mt-1 text-xs text-white/45">{p.speedMbps} Mbps</div>
 
                 <div className="mt-3">
