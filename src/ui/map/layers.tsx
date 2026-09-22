@@ -441,6 +441,10 @@ export const BuildingsLayer = memo(function BuildingsLayer({
 });
 
 // Rings where a building has just joined the network, drawn above the architecture.
+// SMIL animations ignore the CSS reduced-motion rule, so the expanding rings are left out instead.
+const REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
 export const ConnectionRings = memo(function ConnectionRings({
   buildings,
   minutes,
@@ -450,6 +454,7 @@ export const ConnectionRings = memo(function ConnectionRings({
   minutes: number;
   economical: boolean;
 }) {
+  if (REDUCED_MOTION) return null;
   return (
     <g pointerEvents="none" aria-hidden="true">
       {buildings
