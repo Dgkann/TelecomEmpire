@@ -75,7 +75,15 @@ Research needs both cash and research points. Points beyond a project's
 requirement take 1,200 ₺ each off its bill, up to 40% of the price, and are
 spent with it. Network engineers produce most points: a new hire costs 120,000 ₺
 plus 64,000 ₺ a month, and while research runs, an engineer of average skill
-earns about that much back in credit.
+earns about that much back in credit. The Staff panel works this out for the
+company's current research and says when banked points already cover the next
+project's full credit.
+
+Upstream transit is shared by every district. When the last step's peak traffic
+fills it, a red banner under the top bar shows traffic against capacity and
+offers the next transit tier at its monthly price; a full upstream lowers
+satisfaction in every district, and new sites do not help. At the top tier the
+banner links to the interconnect options instead.
 
 Selecting a construction tool shows extra monthly power/maintenance expense,
 cash remaining and an approximate runway at current revenue, including loan
@@ -90,7 +98,8 @@ automatically purchase that connection. Use Fibre to complete the route.
 
 The city uses distinct residential, commercial and public buildings, parks,
 warm night windows and street traffic. Traffic animation pauses with the game,
-and reduced-motion preferences are respected. The camera refits after a screen
+and reduced-motion preferences are respected: interface animations skip their
+movement and new connections are not ringed on the map. The camera refits after a screen
 resize; zoom controls remain available on touch devices. Construction can be
 cancelled with the close button or Escape, including when a tool has focus.
 
@@ -295,7 +304,7 @@ District expansion: Company → Strategy desk → Expansion compares residential
 
 Company profile: click the company name or emblem in the top bar to pause and open your operator journey. Rename the company, choose an emblem, inspect all five ranks and navigate directly from unmet requirements to growth, district exploration, research or data-centre construction. Brand changes are free and persist through ordinary game saves; rank eligibility and rewards retain their existing rules.
 
-Smart pause: click the clock in the top bar to select automatic stops for new incidents, contract offers, completed research and promotions. Disabled by default; preferences persist in this browser across save slots. Accelerated play stops after the first five-minute step containing an enabled event and lists all simultaneous events. Review links keep time paused; Resume restores the previous speed, while Dismiss only hides the notice.
+Smart pause: click the clock in the top bar to select automatic stops for new incidents, full upstream transit, contract offers, completed research and promotions. Disabled by default; preferences persist in this browser across save slots. Accelerated play stops after the first five-minute step containing an enabled event and lists all simultaneous events. Review links keep time paused; Resume restores the previous speed, while Dismiss only hides the notice.
 
 City infrastructure procurement (save schema 20): the Projects screen hosts rotating school, emergency-service and district rollout tenders. Sealed bids score price at 70% and reputation at 30%, with a real 10% performance bond. A winning operator must deliver licensed, routed access sites, programme-specific reach and independent paths, and at least 80% live-site condition for six continuous hours before the deadline. A cut resets acceptance. Success pays the requested amount, refunds the bond and grants 5 reputation plus research points; failure forfeits the bond and costs 5 reputation. Losing or withdrawn bids recover their bond. The project district is marked on the map, and smart pause can stop on project updates. Older saves migrate without any bond or bid being created.
 
