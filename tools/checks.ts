@@ -3405,6 +3405,52 @@ group('development grants and investment planning');
     'failed companies cannot claim grants',
     claimMilestone({ ...g, gameOver: { reason: 'test', at: g.minutes } }, 'customers') === null,
   );
+  const midgame = milestoneProgress({
+    ...g,
+    researchDone: ['ftth', 'noc', 'gpon', 'fiber10g'],
+    nodes: [...g.nodes, { ...g.nodes.find((n) => n.kind === 'pop')!, id: 'hosting-site', kind: 'datacenter', tier: 0 }],
+  });
+  const goal = (id: string) => midgame.find((m) => m.id === id)!;
+  check(
+    'mid-game goals sit between the second district and the mobile launch',
+    midgame.map((m) => m.id).join(',') ===
+      'connected,customers,resilient,expansion,contract,research,growth,districts,laboratory,accounts,protected,mobile,hosting',
+  );
+  check(
+    'mid-game goals measure research, hosting and customers',
+    goal('laboratory').progress === 1 &&
+      goal('hosting').progress === 1 &&
+      goal('growth').current === goal('customers').current &&
+      goal('districts').current === goal('expansion').current,
+  );
+  // A real starter data centre on its own tile, with the workload every centre is given.
+  const hostCell = g.districts
+    .find((d) => d.unlocked)!
+    .cells.find((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy))!;
+  const hosted: GameState = {
+    ...g,
+    nodes: [
+      ...g.nodes,
+      {
+        ...g.nodes.find((n) => n.kind === 'pop')!,
+        id: 'hosting-site',
+        kind: 'datacenter',
+        tier: 0,
+        gx: hostCell.gx,
+        gy: hostCell.gy,
+      },
+    ],
+    dataCenterModes: { ...g.dataCenterModes, 'hosting-site': 'colocation' },
+    dataCenterModeChangedAt: { ...g.dataCenterModeChangedAt, 'hosting-site': 0 },
+  };
+  const hosting = claimMilestone(hosted, 'hosting');
+  check(
+    'a mid-game goal pays once and survives a save',
+    !!hosting &&
+      hosting.money === originalCash + 300000 &&
+      migrate(JSON.parse(JSON.stringify(hosting)), SAVE_VERSION)?.claimedMilestones.includes('hosting') === true &&
+      claimMilestone(hosting, 'hosting') === null,
+  );
 }
 
 group('Atomic network planning and strategy persistence');

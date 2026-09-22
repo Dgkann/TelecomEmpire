@@ -383,11 +383,11 @@ test('development rewards persist and cannot be claimed again', async ({ page },
   const cash = await page.evaluate(() => (window as any).__game.getState().game.money);
   await goals.getByRole('button', { name: 'Claim reward' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__game.getState().game.money)).toBe(cash + 70000);
-  await expect(goals.getByRole('button', { name: 'Connect your city 1/7 +' })).toBeVisible();
+  await expect(goals.getByRole('button', { name: 'Connect your city 1/13 +' })).toBeVisible();
   await page.getByRole('button', { name: 'Save and exit' }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
   if (testInfo.project.name !== 'desktop') await page.getByRole('button', { name: /^Actions/ }).click();
-  await expect(goals.getByRole('button', { name: 'Connect your city 1/7 +' })).toBeVisible();
+  await expect(goals.getByRole('button', { name: 'Connect your city 1/13 +' })).toBeVisible();
   await expect(goals.getByRole('button', { name: 'Claim reward' })).toHaveCount(0);
 });
 

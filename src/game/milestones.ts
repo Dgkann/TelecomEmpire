@@ -3,6 +3,7 @@ import { recordLedger } from './financeLedger';
 import type { GameState } from './types';
 import { line } from './lang';
 
+// Listed in the order players usually reach them; the panel always shows the next one.
 export const MILESTONE_IDS = [
   'connected',
   'customers',
@@ -10,7 +11,13 @@ export const MILESTONE_IDS = [
   'expansion',
   'contract',
   'research',
+  'growth',
+  'districts',
+  'laboratory',
+  'accounts',
+  'protected',
   'mobile',
+  'hosting',
 ] as const;
 export type MilestoneId = (typeof MILESTONE_IDS)[number];
 
@@ -88,6 +95,62 @@ export const MILESTONES: Array<{
     research: 10,
     target: 2,
   },
+  // The middle of the game: goals between the second district and the mobile launch.
+  {
+    id: 'growth',
+    title: ['A growing customer base', 'Büyüyen abone tabanı'],
+    hint: [
+      'Reach 2,000 fixed subscribers. New districts and fair prices both help.',
+      '2.000 sabit internet abonesine ulaş. Yeni ilçeler de makul fiyatlar da yardımcı olur.',
+    ],
+    reward: 200000,
+    research: 15,
+    target: 2000,
+  },
+  {
+    id: 'districts',
+    title: ['Across the city', 'Şehrin dört bir yanında'],
+    hint: [
+      'Operate a connected POP or access site in three licensed districts.',
+      'Üç lisanslı ilçede çekirdeğe bağlı POP veya erişim noktası işlet.',
+    ],
+    reward: 250000,
+    research: 15,
+    target: 3,
+  },
+  {
+    id: 'laboratory',
+    title: ['A research programme', 'Bir araştırma programı'],
+    hint: [
+      'Complete four research projects. Spare research points lower each bill.',
+      'Dört araştırma projesini tamamla. Fazla araştırma puanları her bedeli düşürür.',
+    ],
+    reward: 250000,
+    research: 20,
+    target: 4,
+  },
+  {
+    id: 'accounts',
+    title: ['Trusted by business', 'İş dünyasının güvendiği operatör'],
+    hint: [
+      'Hold three business or enterprise contracts at the same time.',
+      'Aynı anda üç ticari veya kurumsal sözleşme yürüt.',
+    ],
+    reward: 200000,
+    research: 15,
+    target: 3,
+  },
+  {
+    id: 'protected',
+    title: ['No single point of failure', 'Tek noktada çökmeyen ağ'],
+    hint: [
+      'Give four POP or access sites two independent fibre paths to a core.',
+      'Dört POP veya erişim noktasına çekirdeğe ulaşan iki bağımsız fiber yolu sağla.',
+    ],
+    reward: 200000,
+    research: 20,
+    target: 4,
+  },
   {
     id: 'mobile',
     title: ['The city goes mobile', 'Şehir mobile geçiyor'],
@@ -99,23 +162,44 @@ export const MILESTONES: Array<{
     research: 15,
     target: 100,
   },
+  {
+    id: 'hosting',
+    title: ['Hosting the city', 'Şehrin veri merkezi'],
+    hint: [
+      'Build your first data centre; the small starter facility counts.',
+      'İlk veri merkezini kur; küçük başlangıç tesisi de sayılır.',
+    ],
+    reward: 300000,
+    research: 25,
+    target: 1,
+  },
 ];
 
 export function milestoneProgress(state: GameState) {
   const routes = computeRoutes(state);
   const sites = state.nodes.filter((n) => (n.kind === 'pop' || n.kind === 'access') && !n.down && routes[n.id]);
+  const districts = new Set(
+    sites.filter((n) => state.districts.some((d) => d.id === n.districtId && d.unlocked)).map((n) => n.districtId),
+  ).size;
+  const fixedCustomers = state.packages
+    .filter((p) => p.segment === 'residential')
+    .reduce((sum, p) => sum + p.subscribers, 0);
   const values: Record<MilestoneId, number> = {
     connected: sites.filter((n) => n.kind === 'pop').length,
-    customers: state.packages.filter((p) => p.segment === 'residential').reduce((sum, p) => sum + p.subscribers, 0),
+    customers: fixedCustomers,
     resilient: state.claimedMilestones.includes('resilient')
       ? 1
       : Number(sites.some((n) => isRedundant(state, n.id, routes))),
-    expansion: new Set(
-      sites.filter((n) => state.districts.some((d) => d.id === n.districtId && d.unlocked)).map((n) => n.districtId),
-    ).size,
+    expansion: districts,
     contract: state.contracts.length,
     research: state.researchDone.length,
+    growth: fixedCustomers,
+    districts,
+    laboratory: state.researchDone.length,
+    accounts: state.contracts.length,
+    protected: sites.filter((n) => isRedundant(state, n.id, routes)).length,
     mobile: state.districts.reduce((sum, d) => sum + d.mobileSubs, 0),
+    hosting: state.nodes.filter((n) => n.kind === 'datacenter').length,
   };
   return MILESTONES.map((m) => ({
     ...m,

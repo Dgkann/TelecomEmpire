@@ -4,6 +4,10 @@ import { fmtMoney } from '../game/economy';
 import { useGame } from '../store/gameStore';
 import { playSound } from './sound';
 
+// Where each goal's shortcut leads; the rest open the build tools on the map.
+const RESEARCH_GOALS = new Set<string>(['research', 'laboratory', 'mobile', 'hosting']);
+const COMPANY_GOALS = new Set<string>(['contract', 'accounts']);
+
 export default function DevelopmentGoals({ onNavigate }: { onNavigate: () => void }) {
   const game = useGame((s) => s.game)!;
   const locale = useGame((s) => s.locale);
@@ -81,19 +85,19 @@ export default function DevelopmentGoals({ onNavigate }: { onNavigate: () => voi
                       className="btn text-xs"
                       onClick={() => {
                         onNavigate();
-                        if (goal.id === 'research' || goal.id === 'mobile') setScreen('research');
-                        else if (goal.id === 'contract') setScreen('company');
+                        if (RESEARCH_GOALS.has(goal.id)) setScreen('research');
+                        else if (COMPANY_GOALS.has(goal.id)) setScreen('company');
                         else if (goal.id === 'connected')
                           setTool(game.nodes.filter((n) => n.kind === 'pop').length < 2 ? 'pop' : 'fiber');
-                        else if (goal.id === 'resilient') setTool('fiber');
+                        else if (goal.id === 'resilient' || goal.id === 'protected') setTool('fiber');
                         else setTool('access');
                       }}
                     >
-                      {goal.id === 'research' || goal.id === 'mobile'
+                      {RESEARCH_GOALS.has(goal.id)
                         ? tr
                           ? 'Araştırma'
                           : 'Research'
-                        : goal.id === 'contract'
+                        : COMPANY_GOALS.has(goal.id)
                           ? tr
                             ? 'Şirket'
                             : 'Company'
