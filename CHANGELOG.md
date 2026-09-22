@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Early and mid-game research costs about 20% less: FTTH, NOC, GPON, 10G fibre,
+  4G LTE, 100G backbone and edge computing. Later research is unchanged. In the
+  release audit's strongest campaign policy, 5 of 6 seeds finished the campaign
+  instead of 3, and finished runs took 671–785 days instead of 807–998.
+
+### Performance
+
+- The city canvas repaints only buildings whose appearance changed and blends
+  precomputed daylight and night layers instead of repainting every hour.
+- The map draws ground, borders and overlays, buildings and the network as
+  separate layers, so animations and network updates leave the ground alone.
+
 ## 1.0.0 — 2026-09-21
 
 First release. Save schema 26; saves from every earlier development build are
