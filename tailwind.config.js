@@ -17,9 +17,9 @@ export default {
           blue: '#7199bd',
           lime: '#76ad84',
           amber: '#c49a51',
-          orange: '#bd8251',
-          red: '#c9686f',
-          violet: '#9183ad',
+          orange: '#c3895a',
+          red: '#d27980',
+          violet: '#998bb5',
         },
       },
       fontFamily: {

@@ -107,7 +107,7 @@ export default function ResearchGuidance({
               {tr ? 'oyun günü' : plural(edge.days, 'game day')}
             </p>
             {edgePrice.credit > 0 && (
-              <p className="mt-1 text-xs text-neon-lime/80">
+              <p className="mt-1 text-xs text-neon-lime">
                 {tr
                   ? `${edgePrice.creditPoints} fazla araştırma puanı bedeli ${fmtMoneyExact(edgePrice.credit)} düşürüyor.`
                   : `${edgePrice.creditPoints} spare research points take ${fmtMoneyExact(edgePrice.credit)} off the bill.`}
@@ -206,7 +206,7 @@ export default function ResearchGuidance({
       <p className="mt-1 text-xs leading-relaxed text-white/60">{plan.steps.map(name).join(' → ')}</p>
       <p className="mt-2 text-sm text-neon-amber">{status}</p>
       {!!plan.nextPrice?.credit && (
-        <p className="mt-1 text-xs text-neon-lime/80">
+        <p className="mt-1 text-xs text-neon-lime">
           {tr
             ? `${plan.nextPrice.creditPoints} fazla araştırma puanı bedeli ${fmtMoneyExact(plan.nextPrice.credit)} düşürüyor.`
             : `${plan.nextPrice.creditPoints} spare research points take ${fmtMoneyExact(plan.nextPrice.credit)} off the bill.`}

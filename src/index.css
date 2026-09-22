@@ -126,16 +126,28 @@ select:focus-visible,
   overflow: hidden;
 }
 
-.screen-shell .text-white\/35 {
-  color: rgba(227, 234, 238, 0.5);
+/* Faint white text keeps at least 4.5:1 on every panel. The /20 and /25 tiers stay faint for
+   separators, empty rating stars and disabled controls. Plain class selectors keep hover colours working. */
+.text-white\/30,
+.text-white\/\[0\.28\] {
+  color: rgba(227, 234, 238, 0.6);
 }
 
-.screen-shell .text-white\/40 {
-  color: rgba(227, 234, 238, 0.56);
-}
-
-.screen-shell .text-white\/45 {
+.text-white\/35,
+.text-white\/\[0\.34\],
+.text-white\/\[0\.36\],
+.text-white\/\[0\.38\] {
   color: rgba(227, 234, 238, 0.62);
+}
+
+.text-white\/40,
+.text-white\/\[0\.42\] {
+  color: rgba(227, 234, 238, 0.65);
+}
+
+.text-white\/45,
+.text-white\/\[0\.48\] {
+  color: rgba(227, 234, 238, 0.68);
 }
 
 .screen-shell .panel-tone-blue,

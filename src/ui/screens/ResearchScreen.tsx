@@ -231,7 +231,7 @@ export default function ResearchScreen() {
                                   : available
                                     ? `${meta.color}88`
                                     : 'rgba(255,255,255,.14)',
-                                color: done ? '#75df9a' : available ? meta.color : 'rgba(255,255,255,.3)',
+                                color: done ? '#75df9a' : available ? meta.color : 'rgba(255,255,255,.5)',
                               }}
                             >
                               {done ? '✓' : r.tier}
@@ -260,7 +260,7 @@ export default function ResearchScreen() {
                                 {tr ? 'gün' : plural(r.days, 'day')}
                               </div>
                               {!done && !activeHere && available && price.credit > 0 && (
-                                <div className="num mt-0.5 text-[10px] text-neon-lime/80">
+                                <div className="num mt-0.5 text-[10px] text-neon-lime">
                                   {tr
                                     ? `${price.creditPoints} fazla AP ile ${fmtMoneyExact(price.cash)}`
                                     : `${fmtMoneyExact(price.cash)} with ${price.creditPoints} spare RP`}
@@ -309,7 +309,7 @@ export default function ResearchScreen() {
                               </button>
                             ) : (
                               <div className="mt-3 rounded-md border border-white/[0.055] bg-black/20 px-2.5 py-2 text-[10px] leading-snug text-white/[0.34]">
-                                <span className="mr-1 font-semibold uppercase tracking-wider text-white/25">
+                                <span className="mr-1 font-semibold uppercase tracking-wider text-white/50">
                                   {t(locale, 'locked')}
                                 </span>{' '}
                                 {tr ? 'Önce tamamla:' : 'Requires'} {requirements}
