@@ -13,7 +13,7 @@ import {
   type SmartPauseNotice,
 } from '../game/smartPause';
 import { updateCompanyIdentity } from '../game/identity';
-import { STAFF_ROLE_INFO } from '../game/staff';
+import { CREW_HIRE_COST, STAFF_HIRE_COST, STAFF_ROLE_INFO, STAFF_SALARY } from '../game/staff';
 import { buildSolar, setEnergyPlan as applyEnergyPlan } from '../game/energy';
 import { launchDistrict as buildDistrictLaunch, type ExpansionKind } from '../game/expansion';
 import type { FailureTarget } from '../game/failureDrill';
@@ -1493,7 +1493,7 @@ export const useGame = create<Store>((set, get) => ({
     const s = get();
     const g = s.game;
     if (!g) return;
-    const cost = 80000;
+    const cost = CREW_HIRE_COST;
     if (g.money < cost) {
       s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
@@ -1528,21 +1528,14 @@ export const useGame = create<Store>((set, get) => ({
     const s = get();
     const g = s.game;
     if (!g) return;
-    const cost = 120000;
+    const cost = STAFF_HIRE_COST;
     if (g.money < cost) {
       s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
     withGame(set, (draft) => {
       const rng = makeRng(Math.floor(Math.random() * 1e9));
-      const salary = {
-        network_engineer: 92000,
-        noc_engineer: 84000,
-        field_tech: 52000,
-        support: 50000,
-        sales: 76000,
-        security: 104000,
-      }[role];
+      const salary = STAFF_SALARY[role];
       draft.money -= cost;
       recordLedger(
         draft,

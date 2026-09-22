@@ -1,5 +1,5 @@
 import { fmtMoney } from '../../../game/economy';
-import { STAFF_ROLE_INFO } from '../../../game/staff';
+import { CREW_HIRE_COST, STAFF_HIRE_COST, STAFF_ROLE_INFO, STAFF_SALARY } from '../../../game/staff';
 import { t } from '../../i18n';
 import { HIRE_ROLES } from './shared';
 import type { CompanyModel } from './model';
@@ -81,7 +81,7 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
 
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary text-xs" onClick={vm.hireTechnician}>
-          {t(vm.locale, 'hireFieldCrew')} · 4k ₺
+          {t(vm.locale, 'hireFieldCrew')} · {fmtMoney(CREW_HIRE_COST)}
         </button>
         {HIRE_ROLES.map((role) => (
           <button
@@ -91,8 +91,8 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
             onClick={() => vm.hireEmployee(role)}
           >
             {tr
-              ? `${STAFF_ROLE_INFO[role].labelTr} işe al · 6k ₺`
-              : `Hire ${STAFF_ROLE_INFO[role].label.toLowerCase()} · 6k ₺`}
+              ? `${STAFF_ROLE_INFO[role].labelTr} işe al · ${fmtMoney(STAFF_HIRE_COST)} + ${fmtMoney(STAFF_SALARY[role])}/ay`
+              : `Hire ${STAFF_ROLE_INFO[role].label.toLowerCase()} · ${fmtMoney(STAFF_HIRE_COST)} + ${fmtMoney(STAFF_SALARY[role])}/mo`}
           </button>
         ))}
       </div>

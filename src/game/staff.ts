@@ -41,6 +41,18 @@ export const STAFF_ROLE_INFO: Record<StaffRole, { label: string; labelTr: string
     },
   };
 
+// One-off recruitment fees and the monthly salary each role is hired at.
+export const CREW_HIRE_COST = 80000;
+export const STAFF_HIRE_COST = 120000;
+export const STAFF_SALARY: Record<StaffRole, number> = {
+  network_engineer: 92000,
+  noc_engineer: 84000,
+  field_tech: 52000,
+  support: 50000,
+  sales: 76000,
+  security: 104000,
+};
+
 function rolePower(state: GameState, role: StaffRole) {
   return state.employees
     .filter((employee) => employee.role === role)
