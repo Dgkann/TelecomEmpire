@@ -4093,6 +4093,18 @@ group('smart pause catches events between accelerated steps');
     'game over takes precedence over smart pause',
     smartPauseEvents(g, { ...after, gameOver: { reason: 'Test closure', at: g.minutes } }, enabled).length === 0,
   );
+  const capacity = transitHeadroom(g).capacity;
+  const saturated = { ...g, stats: { ...g.stats, transitGbps: capacity * 1.2 } };
+  const nearlyFull = { ...g, stats: { ...g.stats, transitGbps: capacity * 0.9 } };
+  const transitPrefs = { ...DEFAULT_SMART_PAUSE, transit: true };
+  check(
+    'filling upstream transit pauses once, when it first runs out',
+    smartPauseEvents(nearlyFull, saturated, transitPrefs)
+      .map((e) => e.kind)
+      .join(',') === 'transit' &&
+      smartPauseEvents(saturated, saturated, transitPrefs).length === 0 &&
+      smartPauseEvents(nearlyFull, saturated, DEFAULT_SMART_PAUSE).length === 0,
+  );
   check(
     'invalid stored preferences are ignored without enabling a category',
     !parseSmartPausePreferences({ research: 'true', incidents: 1 }).research &&

@@ -3,31 +3,59 @@ import { TENDER_PROGRAMMES } from './procurement';
 import type { GameState, Speed } from './types';
 import { RANKS } from './progression';
 import { researchById } from './research';
+import { transitHeadroom } from './operations';
 
 export const SMART_PAUSE_KEY = 'telecom-empire-smart-pause';
 export const SMART_PAUSE_OPTIONS = [
   {
     id: 'market',
     label: 'Market competition',
+    labelTr: 'Pazar rekabeti',
     detail: 'Pause for rival offensives and completed commercial operations.',
+    detailTr: 'Rakip saldırılarında ve biten ticari operasyonlarda duraklat.',
   },
   {
     id: 'tenders',
     label: 'City project updates',
+    labelTr: 'Şehir projesi gelişmeleri',
     detail: 'Pause for a new call, an award, completed delivery or a missed deadline.',
+    detailTr: 'Yeni çağrı, ihale sonucu, tamamlanan teslim veya kaçırılan süre olduğunda duraklat.',
   },
   {
     id: 'incidents',
     label: 'New network incidents',
+    labelTr: 'Yeni şebeke arızaları',
     detail: 'Stop before the outage continues through more simulation steps.',
+    detailTr: 'Kesinti daha fazla simülasyon adımı sürmeden dur.',
+  },
+  {
+    id: 'transit',
+    label: 'Upstream transit full',
+    labelTr: 'Üst bağlantı doldu',
+    detail: 'Stop when upstream transit runs out, before every district loses satisfaction.',
+    detailTr: 'Üst bağlantı dolduğunda, tüm ilçelerin memnuniyeti düşmeden önce dur.',
   },
   {
     id: 'offers',
     label: 'New contract offers',
+    labelTr: 'Yeni sözleşme teklifleri',
     detail: 'Give yourself time to inspect the terms and service requirements.',
+    detailTr: 'Şartları ve hizmet gereksinimlerini incelemek için zaman kazan.',
   },
-  { id: 'research', label: 'Research completed', detail: 'Choose the next technology or use your new capability.' },
-  { id: 'promotion', label: 'Operator promotion', detail: 'Review your new standing and the next growth target.' },
+  {
+    id: 'research',
+    label: 'Research completed',
+    labelTr: 'Araştırma tamamlandı',
+    detail: 'Choose the next technology or use your new capability.',
+    detailTr: 'Sıradaki teknolojiyi seç ya da yeni yeteneğini kullan.',
+  },
+  {
+    id: 'promotion',
+    label: 'Operator promotion',
+    labelTr: 'Operatör terfisi',
+    detail: 'Review your new standing and the next growth target.',
+    detailTr: 'Yeni konumunu ve sıradaki büyüme hedefini gözden geçir.',
+  },
 ] as const;
 export type SmartPauseKind = (typeof SMART_PAUSE_OPTIONS)[number]['id'];
 export type SmartPausePreferences = Record<SmartPauseKind, boolean>;
@@ -35,6 +63,7 @@ export const DEFAULT_SMART_PAUSE: SmartPausePreferences = {
   market: false,
   tenders: false,
   incidents: false,
+  transit: false,
   offers: false,
   research: false,
   promotion: false,
@@ -79,6 +108,8 @@ export function smartPauseEvents(
       if (!incident.resolved && !known.has(incident.id))
         events.push({ kind: 'incidents', id: incident.id, title: incident.title });
   }
+  if (preferences.transit && transitHeadroom(before).use < 1 && transitHeadroom(after).use >= 1)
+    events.push({ kind: 'transit', id: String(after.minutes), title: 'Upstream transit is full' });
   if (preferences.offers) {
     const known = new Set(before.offers.map((o) => o.id));
     for (const offer of after.offers)
