@@ -1,4 +1,4 @@
-import { RESEARCH, researchById } from './research';
+import { RESEARCH, researchById, researchPrice } from './research';
 import type { GameState, ResearchNode } from './types';
 
 // Advice only: derive the next prerequisite without persisting a second research queue.
@@ -21,13 +21,21 @@ export function researchPlan(state: Pick<GameState, 'researchDone' | 'researchAc
   visit(target);
   const unpaid = steps.filter((node) => node.id !== state.researchActive?.id);
   const next = unpaid[0] ?? null;
+  // Spare points only lower the next bill; later steps are quoted at their list price.
+  const nextPrice = next ? researchPrice(state.researchPoints, next) : null;
   return {
     target,
     steps,
     next,
-    remainingCost: unpaid.reduce((sum, node) => sum + node.cost, 0),
-    cashMissing: next ? Math.max(0, next.cost - state.money) : 0,
+    nextPrice,
+    remainingCost: unpaid.reduce((sum, node) => sum + node.cost, 0) - (nextPrice?.credit ?? 0),
+    cashMissing: nextPrice ? Math.max(0, nextPrice.cash - state.money) : 0,
     pointsMissing: next ? Math.max(0, next.points - state.researchPoints) : 0,
-    ready: !!next && !state.researchActive && next.cost <= state.money && next.points <= state.researchPoints,
+    ready:
+      !!next &&
+      !!nextPrice &&
+      !state.researchActive &&
+      nextPrice.cash <= state.money &&
+      next.points <= state.researchPoints,
   };
 }

@@ -87,7 +87,14 @@ import {
   servingCapacity,
 } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
-import { RESEARCH, researchById, researchModifiers } from '../src/game/research';
+import {
+  POINT_CREDIT,
+  POINT_CREDIT_SHARE,
+  RESEARCH,
+  researchById,
+  researchModifiers,
+  researchPrice,
+} from '../src/game/research';
 import { makeRegulation, networkResilience, pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
 import { cacheRatio, mobileServingTowers, tickMaintenance } from '../src/game/simulation';
@@ -2494,6 +2501,36 @@ group('phase-two staff, research points and finance ledger');
   useGame.setState({ game: { ...researchState, researchPoints: 11, researchActive: null } });
   useGame.getState().startResearch('ftth');
   check('research cannot start without enough research points', useGame.getState().game?.researchActive === null);
+
+  const ftth = researchById('ftth')!;
+  useGame.setState({ game: { ...researchState, researchPoints: ftth.points + 18, researchActive: null } });
+  useGame.getState().startResearch('ftth');
+  const credited = useGame.getState().game!;
+  check(
+    'spare research points pay part of the research bill',
+    credited.money === 2000000 - (ftth.cost - 18 * POINT_CREDIT) &&
+      credited.researchPoints === 0 &&
+      credited.ledger.some(
+        (entry) => entry.category === 'research' && entry.amount === -(ftth.cost - 18 * POINT_CREDIT),
+      ),
+  );
+  const edgeNode = researchById('edge_compute')!;
+  const exact = researchPrice(edgeNode.points, edgeNode);
+  const flush = researchPrice(100000, edgeNode);
+  check(
+    'research without spare points costs the list price',
+    exact.cash === edgeNode.cost && exact.credit === 0 && exact.points === edgeNode.points,
+  );
+  check(
+    'the point credit never covers more than its share of the price',
+    flush.credit <= edgeNode.cost * POINT_CREDIT_SHARE &&
+      flush.cash === edgeNode.cost - flush.credit &&
+      flush.points === edgeNode.points + flush.credit / POINT_CREDIT,
+  );
+  check(
+    'fractional or missing points never earn credit',
+    researchPrice(edgeNode.points + 0.9, edgeNode).credit === 0 && researchPrice(0, edgeNode).credit === 0,
+  );
 
   useGame.setState({ game: { ...g, money: 1_000_000, ledger: [] } });
   useGame.getState().takeLoan(10000, 12);

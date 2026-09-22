@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { plural } from '../../game/util';
 import { fmtMoneyExact } from '../../game/economy';
-import { RESEARCH, isAvailable } from '../../game/research';
+import { POINT_CREDIT, POINT_CREDIT_SHARE, RESEARCH, isAvailable, researchPrice } from '../../game/research';
 import { totalCustomers } from '../../game/simulation';
 import { staffModifiers } from '../../game/staff';
 import { useGame } from '../../store/gameStore';
@@ -45,6 +45,11 @@ export default function ResearchScreen() {
               {tr
                 ? 'Şebekeni büyüten araştırmaları seç. Kilitli araştırmalarda önce tamamlanması gereken çalışmalar yazılıdır.'
                 : 'Follow each branch from field infrastructure to city-scale capability. Cross-branch requirements are named on locked nodes.'}
+            </p>
+            <p className="mt-1 max-w-xl text-[12px] text-white/40">
+              {tr
+                ? `Gerekenin üstündeki her araştırma puanı bedelden ${fmtMoneyExact(POINT_CREDIT)} düşer (en fazla %${POINT_CREDIT_SHARE * 100}). Mühendisler puan üretir.`
+                : `Every research point beyond the requirement takes ${fmtMoneyExact(POINT_CREDIT)} off the bill (up to ${POINT_CREDIT_SHARE * 100}%). Engineers produce points.`}
             </p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
@@ -154,7 +159,8 @@ export default function ResearchScreen() {
                     const done = game.researchDone.includes(r.id);
                     const available = isAvailable(r, game.researchDone);
                     const busy = !!game.researchActive;
-                    const affordableMoney = game.money >= r.cost;
+                    const price = researchPrice(game.researchPoints, r);
+                    const affordableMoney = game.money >= price.cash;
                     const affordablePoints = game.researchPoints >= r.points;
                     const affordable = affordableMoney && affordablePoints;
                     const activeHere = active?.id === r.id;
@@ -253,6 +259,13 @@ export default function ResearchScreen() {
                                 {fmtMoneyExact(r.cost)} · {r.points} {tr ? 'AP' : 'RP'} · {r.days}{' '}
                                 {tr ? 'gün' : plural(r.days, 'day')}
                               </div>
+                              {!done && !activeHere && available && price.credit > 0 && (
+                                <div className="num mt-0.5 text-[10px] text-neon-lime/80">
+                                  {tr
+                                    ? `${price.creditPoints} fazla AP ile ${fmtMoneyExact(price.cash)}`
+                                    : `${fmtMoneyExact(price.cash)} with ${price.creditPoints} spare RP`}
+                                </div>
+                              )}
                             </div>
                           </div>
                           <p
@@ -284,8 +297,8 @@ export default function ResearchScreen() {
                                     : 'Research slot occupied'
                                   : !affordableMoney
                                     ? tr
-                                      ? `${fmtMoneyExact(r.cost - game.money)} daha gerekiyor`
-                                      : `Need ${fmtMoneyExact(r.cost - game.money)} more`
+                                      ? `${fmtMoneyExact(price.cash - game.money)} daha gerekiyor`
+                                      : `Need ${fmtMoneyExact(price.cash - game.money)} more`
                                     : !affordablePoints
                                       ? tr
                                         ? `${r.points - game.researchPoints} araştırma puanı daha gerekiyor`

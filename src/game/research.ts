@@ -198,6 +198,22 @@ export const RESEARCH: ResearchNode[] = [
 
 export const researchById = (id: string) => RESEARCH.find((r) => r.id === id);
 
+// Research points beyond a project's requirement pay part of its bill, so engineers, exercises and
+// grants keep their value once the requirement is met. Cash still has to cover most of each project.
+export const POINT_CREDIT = 1200;
+export const POINT_CREDIT_SHARE = 0.4;
+
+export function researchPrice(researchPoints: number, node: Pick<ResearchNode, 'cost' | 'points'>) {
+  const spare = Math.max(0, Math.floor(researchPoints) - node.points);
+  const creditPoints = Math.min(spare, Math.floor((node.cost * POINT_CREDIT_SHARE) / POINT_CREDIT));
+  return {
+    cash: node.cost - creditPoints * POINT_CREDIT,
+    credit: creditPoints * POINT_CREDIT,
+    creditPoints,
+    points: node.points + creditPoints,
+  };
+}
+
 export function isAvailable(node: ResearchNode, done: string[]) {
   return node.requires.every((r) => done.includes(r));
 }

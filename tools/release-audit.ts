@@ -4,7 +4,7 @@ import { useGame } from '../src/store/gameStore';
 import { createNewGame, step, totalCustomers } from '../src/game/simulation';
 import { MINUTES_PER_DAY, NODE_SPECS, TRANSIT_TIERS } from '../src/game/constants';
 import { monthlyBreakdown } from '../src/game/economy';
-import { RESEARCH, researchModifiers } from '../src/game/research';
+import { RESEARCH, researchModifiers, researchPrice } from '../src/game/research';
 import { connectedSiteEstimate } from '../src/game/connectedBuild';
 import { expansionQuote } from '../src/game/expansion';
 import { fixedCoverageTarget } from '../src/game/reach';
@@ -62,6 +62,8 @@ const manageService = process.env.AUDIT_MANAGE_SERVICE === '1';
 const reviewPricing = process.env.AUDIT_REVIEW_PRICING === '1';
 const resetResearch = process.env.AUDIT_RESET_RESEARCH === '1';
 const exercises = process.env.AUDIT_EXERCISES === '1';
+// Hire network engineers beyond the starting one, up to this many, when cash allows.
+const engineers = Number(process.env.AUDIT_ENGINEERS ?? 0);
 const output =
   process.env.AUDIT_OUTPUT ?? (campaign ? 'reports/release-campaign.json' : 'reports/release-balance.json');
 const results: unknown[] = [];
@@ -179,6 +181,11 @@ function policy(day: number) {
   )
     actions().upgradeNode(smallCentre.id);
   if (
+    live().employees.filter((e) => e.role === 'network_engineer').length < 1 + engineers &&
+    live().money > reserve + 120000 + 6 * 92000
+  )
+    actions().hireEmployee('network_engineer');
+  if (
     !live().researchActive &&
     !(
       goalFunding &&
@@ -194,7 +201,9 @@ function policy(day: number) {
       live().researchPoints >= target.points &&
       live().districts.filter((d) => d.unlocked).length >= 2
     ) {
-      const gap = Math.ceil(Math.max(0, target.cost + reserve - live().money) / 10000) * 10000;
+      const gap =
+        Math.ceil(Math.max(0, researchPrice(live().researchPoints, target).cash + reserve - live().money) / 10000) *
+        10000;
       const recentPenalties = live()
         .ledger.filter(
           (e) =>
@@ -209,7 +218,10 @@ function policy(day: number) {
       )
         actions().takeLoan(gap, 24);
     }
-    const next = eligible.find((r) => live().money >= r.cost + reserve && live().researchPoints >= r.points);
+    const next = eligible.find(
+      (r) =>
+        live().money >= researchPrice(live().researchPoints, r).cash + reserve && live().researchPoints >= r.points,
+    );
     if (next && (!saving || next.id === target?.id)) actions().startResearch(next.id);
   }
   // Preserve the second-district launch; reserve research cash only after a viable initial footprint.
@@ -423,6 +435,7 @@ for (const seed of seeds) {
     reviewPricing,
     resetResearch,
     exercises,
+    engineers,
     exercisesCompleted,
     exerciseResearchDaysSaved,
     campaignComplete,

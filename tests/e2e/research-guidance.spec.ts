@@ -36,7 +36,8 @@ test('research roadmap explains both shortfalls, starts once and survives saving
     const game = store.getState().game;
     return { money: game.money, points: game.researchPoints, active: game.researchActive };
   });
-  expect(persisted).toEqual({ money: 400000, points: 8, active: { id: 'ftth', daysLeft: 12 } });
+  // Eight spare points pay 9,600 of the 600,000 bill and are spent with the requirement.
+  expect(persisted).toEqual({ money: 409600, points: 0, active: { id: 'ftth', daysLeft: 12 } });
   await page.evaluate(() => {
     const store = (window as any).__game;
     store.getState().setLocale('en');
@@ -67,7 +68,8 @@ test('4G guidance charges the revised budget once and restores the active resear
   });
   const roadmap = page.getByRole('region', { name: 'Araştırma yol haritası' });
   await expect(roadmap.getByRole('heading')).toHaveText('Sonraki araştırma: 4G LTE');
-  await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 3.800.000 ₺');
+  await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 3.794.000 ₺');
+  await expect(roadmap).toContainText('5 fazla araştırma puanı bedeli 6.000 ₺ düşürüyor.');
   await roadmap.getByRole('button', { name: 'Önerilen araştırmayı başlat' }).click();
   await expect(roadmap).toContainText('Hedef araştırması sürüyor');
   await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 0 ₺');
@@ -78,5 +80,5 @@ test('4G guidance charges the revised budget once and restores the active resear
     const game = store.getState().game;
     return { money: game.money, points: game.researchPoints, active: game.researchActive };
   });
-  expect(result).toEqual({ money: 100000, points: 5, active: { id: 'mobile_4g', daysLeft: 30 } });
+  expect(result).toEqual({ money: 106000, points: 0, active: { id: 'mobile_4g', daysLeft: 30 } });
 });

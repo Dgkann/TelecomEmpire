@@ -39,7 +39,7 @@ import { createLoan, creditLimit } from '../game/finance';
 import { recordLedger } from '../game/financeLedger';
 import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
 import { clearSave, loadGame, saveGame, SAVE_SLOT_COUNT } from '../game/saveStorage';
-import { researchById, researchModifiers } from '../game/research';
+import { researchById, researchModifiers, researchPrice } from '../game/research';
 import { CAMPAIGN_STAGES } from '../game/scenarios';
 import { claimMilestone as grantMilestone, MILESTONES } from '../game/milestones';
 import { fmtMoneyExact } from '../game/economy';
@@ -1314,7 +1314,8 @@ export const useGame = create<Store>((set, get) => ({
       s.toast(say(s.locale, 'Prerequisites missing.', 'Ön koşullar eksik.'), 'bad');
       return;
     }
-    if (g.money < node.cost) {
+    const price = researchPrice(g.researchPoints, node);
+    if (g.money < price.cash) {
       s.toast(say(s.locale, 'Not enough money.', 'Yeterli para yok.'), 'bad');
       return;
     }
@@ -1326,14 +1327,14 @@ export const useGame = create<Store>((set, get) => ({
       return;
     }
     withGame(set, (draft) => {
-      draft.money -= node.cost;
-      draft.researchPoints -= node.points;
+      draft.money -= price.cash;
+      draft.researchPoints -= price.points;
       draft.researchActive = { id, daysLeft: node.days };
       recordLedger(
         draft,
         'research',
         line(`Research: ${node.name}`, `Araştırma: ${researchCopy(node, 'tr').name}`),
-        -node.cost,
+        -price.cash,
       );
       pushLog(
         draft,
@@ -1341,7 +1342,17 @@ export const useGame = create<Store>((set, get) => ({
         'info',
       );
     });
-    s.toast(say(s.locale, `Researching ${node.name}`, `${researchCopy(node, 'tr').name} araştırılıyor`), 'good');
+    const credit = price.credit
+      ? say(
+          s.locale,
+          ` · ${price.creditPoints} spare RP saved ${fmtMoneyExact(price.credit)}`,
+          ` · ${price.creditPoints} fazla AP ${fmtMoneyExact(price.credit)} düşürdü`,
+        )
+      : '';
+    s.toast(
+      say(s.locale, `Researching ${node.name}${credit}`, `${researchCopy(node, 'tr').name} araştırılıyor${credit}`),
+      'good',
+    );
   },
 
   acceptOffer: (id, mode = 'standard') => {

@@ -1,7 +1,7 @@
 import { fmtMoneyExact } from '../game/economy';
 import { plural } from '../game/util';
 import { researchPlan } from '../game/researchPlanning';
-import { researchById } from '../game/research';
+import { researchById, researchPrice } from '../game/research';
 import { useGame } from '../store/gameStore';
 import { researchCopy } from '../game/researchCopy';
 import { NODE_SPECS, DATACENTER_PILOT_COST, nodeUpgradeCost } from '../game/constants';
@@ -30,6 +30,7 @@ export default function ResearchGuidance({
   const needsDataCenter =
     game.researchDone.includes('backbone100g') && !game.nodes.some((n) => n.kind === 'datacenter');
   const edge = researchById('edge_compute')!;
+  const edgePrice = researchPrice(game.researchPoints, edge);
   if (needsDataCenter || needsExpansion)
     return (
       <section
@@ -101,11 +102,23 @@ export default function ResearchGuidance({
                 : 'A small centre earns hosting income early. Choosing edge research first reserves your cash for research and leaves construction for later.'}
             </p>
             <p className="mt-2 text-xs text-white/60">
-              {fmtMoneyExact(edge.cost)} · {edge.points}{' '}
+              {fmtMoneyExact(edgePrice.cash)} · {edge.points}{' '}
               {tr ? 'araştırma puanı' : plural(edge.points, 'research point')} · {edge.days}{' '}
               {tr ? 'oyun günü' : plural(edge.days, 'game day')}
             </p>
-            <GoalWait cost={edge.cost} points={edge.points} activeOnly={game.researchActive?.id === edge.id} compact />
+            {edgePrice.credit > 0 && (
+              <p className="mt-1 text-xs text-neon-lime/80">
+                {tr
+                  ? `${edgePrice.creditPoints} fazla araştırma puanı bedeli ${fmtMoneyExact(edgePrice.credit)} düşürüyor.`
+                  : `${edgePrice.creditPoints} spare research points take ${fmtMoneyExact(edgePrice.credit)} off the bill.`}
+              </p>
+            )}
+            <GoalWait
+              cost={edgePrice.cash}
+              points={edge.points}
+              activeOnly={game.researchActive?.id === edge.id}
+              compact
+            />
             {game.researchActive && game.researchActive.id !== edge.id && (
               <p className="mt-2 text-xs text-neon-amber">
                 {tr
@@ -116,7 +129,10 @@ export default function ResearchGuidance({
             <button
               className="btn mt-3 whitespace-normal text-xs"
               disabled={
-                !!game.researchActive || !!game.gameOver || game.money < edge.cost || game.researchPoints < edge.points
+                !!game.researchActive ||
+                !!game.gameOver ||
+                game.money < edgePrice.cash ||
+                game.researchPoints < edge.points
               }
               onClick={() => startResearch(edge.id)}
             >
@@ -166,7 +182,7 @@ export default function ResearchGuidance({
           {tr ? 'Sonraki araştırma' : 'Next research'} · {name(plan.next ?? plan.target)}
         </span>
         <span className="mt-1 block text-[11px] text-white/60">{status} →</span>
-        <GoalWait cost={plan.next?.cost ?? 0} points={plan.next?.points} activeOnly={!plan.next} compact />
+        <GoalWait cost={plan.nextPrice?.cash ?? 0} points={plan.next?.points} activeOnly={!plan.next} compact />
       </button>
     );
   return (
@@ -189,7 +205,14 @@ export default function ResearchGuidance({
       </h2>
       <p className="mt-1 text-xs leading-relaxed text-white/60">{plan.steps.map(name).join(' → ')}</p>
       <p className="mt-2 text-sm text-neon-amber">{status}</p>
-      <GoalWait cost={plan.next?.cost ?? 0} points={plan.next?.points} activeOnly={!plan.next} />
+      {!!plan.nextPrice?.credit && (
+        <p className="mt-1 text-xs text-neon-lime/80">
+          {tr
+            ? `${plan.nextPrice.creditPoints} fazla araştırma puanı bedeli ${fmtMoneyExact(plan.nextPrice.credit)} düşürüyor.`
+            : `${plan.nextPrice.creditPoints} spare research points take ${fmtMoneyExact(plan.nextPrice.credit)} off the bill.`}
+        </p>
+      )}
+      <GoalWait cost={plan.nextPrice?.cash ?? 0} points={plan.next?.points} activeOnly={!plan.next} />
       {plan.cashMissing > 0 && plan.pointsMissing > 0 && (
         <p className="mt-1 text-xs text-white/60">
           {plan.pointsMissing}{' '}
