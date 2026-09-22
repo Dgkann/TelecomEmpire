@@ -61,7 +61,10 @@ export default function SidePanel() {
                   key={section.id}
                   type="button"
                   role="tab"
+                  id={`side-tab-${section.id}`}
                   aria-selected={selected}
+                  aria-controls="side-tabpanel"
+                  aria-label={`${section.label} (${section.count})`}
                   onClick={() => setActiveSection(section.id)}
                   className={`relative rounded-md border px-1 py-1.5 text-center transition-colors ${
                     selected
@@ -81,7 +84,12 @@ export default function SidePanel() {
             })}
           </div>
         </div>
-        <div className="scroll-thin pointer-events-auto min-h-0 flex-1 overflow-y-auto pr-1" role="tabpanel">
+        <div
+          id="side-tabpanel"
+          className="scroll-thin pointer-events-auto min-h-0 flex-1 overflow-y-auto pr-1"
+          role="tabpanel"
+          aria-labelledby={`side-tab-${activeSection}`}
+        >
           <div className="flex flex-col gap-2">
             <LiveSection sp={sp} />
 

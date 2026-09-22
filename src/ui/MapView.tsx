@@ -819,7 +819,7 @@ export default function MapView() {
         }}
       />
 
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute inset-0" aria-live="polite" aria-atomic="false">
         <AnimatePresence>
           {toasts
             .filter((t) => t.gx !== undefined)
