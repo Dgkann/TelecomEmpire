@@ -6,8 +6,10 @@ export const STAFF_ROLE_INFO: Record<StaffRole, { label: string; labelTr: string
     network_engineer: {
       label: 'Network engineer',
       labelTr: 'Şebeke mühendisi',
-      effect: 'Reduces maintenance costs, improves equipment recovery, and generates research points.',
-      effectTr: 'Bakım maliyetlerini düşürür, ekipmanın toparlanmasını hızlandırır ve araştırma puanı üretir.',
+      effect:
+        'Generates research points, whose surplus lowers research bills; also cuts maintenance costs and speeds equipment recovery. Worth it while research keeps running.',
+      effectTr:
+        'Araştırma puanı üretir; fazla puanlar araştırma bedelini düşürür. Bakım maliyetini de azaltır, ekipmanın toparlanmasını hızlandırır. Araştırma sürekli dönerken kârlıdır.',
     },
     noc_engineer: {
       label: 'NOC engineer',
@@ -41,11 +43,12 @@ export const STAFF_ROLE_INFO: Record<StaffRole, { label: string; labelTr: string
     },
   };
 
-// One-off recruitment fees and the monthly salary each role is hired at.
+// One-off recruitment fees and the monthly salary each role is hired at. A network engineer's
+// spare research points lower research bills, which repays an average engineer while research runs.
 export const CREW_HIRE_COST = 80000;
 export const STAFF_HIRE_COST = 120000;
 export const STAFF_SALARY: Record<StaffRole, number> = {
-  network_engineer: 92000,
+  network_engineer: 64000,
   noc_engineer: 84000,
   field_tech: 52000,
   support: 50000,
