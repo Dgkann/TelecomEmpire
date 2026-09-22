@@ -59,13 +59,23 @@ Drag to pan, scroll to zoom, click things to inspect them. Space pauses,
 
 ### Building a stronger operator
 
-The live operations panel now includes seven development goals. Connect two
-POPs, reach 400 fixed subscribers, protect a serving site with an independent
-path, operate in two districts, sign a contract, finish two research projects,
-and reach 100 mobile subscribers. Each goal has a one-time cash and research
-grant; claim it in the panel when its conditions are met. On phones, open
-Actions to see the goals. Grants are recorded separately from operating income,
-survive saving/loading, and reset when a campaign moves to a new city.
+The live operations panel includes thirteen development goals, shown one at a
+time in the order players usually reach them. The first six cover the opening:
+connect two POPs, reach 400 fixed subscribers, protect a serving site with an
+independent path, operate in two districts, sign a contract and finish two
+research projects. Five more carry the middle of the game: 2,000 fixed
+subscribers, three districts, four research projects, three contracts at once
+and four protected sites. The last two are 100 mobile subscribers and a first
+data centre. Each goal has a one-time cash and research grant; claim it in the
+panel when its conditions are met. On phones, open Actions to see the goals.
+Grants are recorded separately from operating income, survive saving/loading,
+and reset when a campaign moves to a new city.
+
+Research needs both cash and research points. Points beyond a project's
+requirement take 1,200 ₺ each off its bill, up to 40% of the price, and are
+spent with it. Network engineers produce most points: a new hire costs 120,000 ₺
+plus 64,000 ₺ a month, and while research runs, an engineer of average skill
+earns about that much back in credit.
 
 Selecting a construction tool shows extra monthly power/maintenance expense,
 cash remaining and an approximate runway at current revenue, including loan

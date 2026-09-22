@@ -9,6 +9,20 @@
   release audit's strongest campaign policy, 5 of 6 seeds finished the campaign
   instead of 3, and finished runs took 671–785 days instead of 807–998.
 
+- Research points beyond a project's requirement now take 1,200 ₺ each off its
+  bill, up to 40%, so engineers, exercises and grants keep their value. Audits
+  showed points blocked research on only 2–3 days a year before this change.
+- New network engineers are hired at 64,000 ₺ a month instead of 92,000 ₺.
+- Six new development goals fill the middle of the game: 2,000 fixed
+  subscribers, three districts, four research projects, three contracts at once,
+  four protected sites and a first data centre.
+
+### Fixed
+
+- Staff hiring buttons showed 4k ₺ and 6k ₺, left over from before money was
+  rescaled; they now show the real 80,000 ₺ and 120,000 ₺ fees and each role's
+  monthly salary.
+
 ### Performance
 
 - The city canvas repaints only buildings whose appearance changed and blends
