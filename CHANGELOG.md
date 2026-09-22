@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-09-22
+
+Save schema 26, unchanged: 1.0.0 saves load as they are.
+
+### Added
+
+- A red banner under the top bar says when upstream transit is full, shows
+  traffic against capacity and buys the next transit tier in one click; at the
+  top tier it links to the interconnect options instead.
+- Smart pause can stop the game the moment upstream transit fills.
+- The Staff panel shows whether another network engineer pays for itself at the
+  company's current research position.
 
 ### Changed
 
@@ -8,7 +19,6 @@
   4G LTE, 100G backbone and edge computing. Later research is unchanged. In the
   release audit's strongest campaign policy, 5 of 6 seeds finished the campaign
   instead of 3, and finished runs took 671–785 days instead of 807–998.
-
 - Research points beyond a project's requirement now take 1,200 ₺ each off its
   bill, up to 40%, so engineers, exercises and grants keep their value. Audits
   showed points blocked research on only 2–3 days a year before this change.
@@ -16,12 +26,28 @@
 - Six new development goals fill the middle of the game: 2,000 fixed
   subscribers, three districts, four research projects, three contracts at once,
   four protected sites and a first data centre.
+- Smart pause settings, notices and event titles appear in Turkish.
+
+With all of these changes, the release audit's six-seed campaign run finished
+every seed with the strongest policy, in 595–747 days. A careful policy that
+skips goal grants, price reviews and exercises finished 2 of 6, the other four
+missing Karadeniz's 450-day deadline, and the baseline policy finished none.
 
 ### Fixed
 
 - Staff hiring buttons showed 4k ₺ and 6k ₺, left over from before money was
   rescaled; they now show the real 80,000 ₺ and 120,000 ₺ fees and each role's
   monthly salary.
+- Accessibility, from a WCAG 2.1 AA review:
+  - Faint captions and labels, and red, orange and violet accents, reach 4.5:1
+    contrast on every panel, not only on full screens.
+  - Staff release buttons have spoken names and 24-pixel targets. Sliders,
+    package toggles, the goals header and rival move links are at least 24
+    pixels tall.
+  - Interface animations follow the system's reduced-motion setting, and the map
+    does not ring new connections while it is on.
+  - Map notices are announced to screen readers, and the action centre tabs read
+    out their counts.
 
 ### Performance
 
@@ -29,6 +55,11 @@
   precomputed daylight and night layers instead of repainting every hour.
 - The map draws ground, borders and overlays, buildings and the network as
   separate layers, so animations and network updates leave the ground alone.
+
+### Quality
+
+- 744 headless simulation checks, up from 731, and the same 138 browser test
+  cases.
 
 ## 1.0.0 — 2026-09-21
 
