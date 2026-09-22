@@ -1,5 +1,23 @@
 # City rendering benchmark
 
+## September 22, 2026: ground layer experiment (no change)
+
+Drawing the ground tiles on a canvas, like the buildings, was the next candidate.
+To bound the possible gain, a temporary test ran the same 10-second pan (40 sites,
+4x game speed, 4x CPU throttling, GPU enabled) with the ground layer shown and
+with it removed entirely (`display: none` on its 735 tiles), in four interleaved
+pairs:
+
+| Frames in 10 s | Pair 1 | Pair 2 | Pair 3 | Pair 4 | Median |
+| -------------- | -----: | -----: | -----: | -----: | -----: |
+| Ground shown   |    346 |    293 |    326 |    317 |  321.5 |
+| Ground hidden  |    319 |    302 |    337 |    318 |  318.5 |
+
+Removing the ground did not raise the frame count, so a canvas could not help and
+the ground stays SVG. In a profiled sample of the same pan, the Performance domain
+reported 9.1 s of main-thread task time, of which page script was 2.3 s, style
+0.8 s and layout 0.3 s.
+
 ## September 22, 2026: map layers and the graphics card
 
 By default Playwright's Chromium draws with SwiftShader, a software renderer, so
