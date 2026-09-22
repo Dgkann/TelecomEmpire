@@ -8,7 +8,7 @@ test('research roadmap explains both shortfalls, starts once and survives saving
       .getState()
       .newGame({ companyName: 'Research route', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 12345 });
     const game = store.getState().game;
-    store.setState({ game: { ...game, speed: 0, tutorialDone: true, money: 600000, researchPoints: 10 } });
+    store.setState({ game: { ...game, speed: 0, tutorialDone: true, money: 400000, researchPoints: 10 } });
     store.getState().setLocale('tr');
     store.getState().setScreen('research');
   });
@@ -36,7 +36,7 @@ test('research roadmap explains both shortfalls, starts once and survives saving
     const game = store.getState().game;
     return { money: game.money, points: game.researchPoints, active: game.researchActive };
   });
-  expect(persisted).toEqual({ money: 200000, points: 8, active: { id: 'ftth', daysLeft: 12 } });
+  expect(persisted).toEqual({ money: 400000, points: 8, active: { id: 'ftth', daysLeft: 12 } });
   await page.evaluate(() => {
     const store = (window as any).__game;
     store.getState().setLocale('en');
@@ -58,7 +58,7 @@ test('4G guidance charges the revised budget once and restores the active resear
         speed: 0,
         tutorialDone: true,
         researchDone: ['ftth', 'fiber10g'],
-        money: 4900000,
+        money: 3900000,
         researchPoints: 60,
       },
     });
@@ -67,7 +67,7 @@ test('4G guidance charges the revised budget once and restores the active resear
   });
   const roadmap = page.getByRole('region', { name: 'Araştırma yol haritası' });
   await expect(roadmap.getByRole('heading')).toHaveText('Sonraki araştırma: 4G LTE');
-  await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 4.800.000 ₺');
+  await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 3.800.000 ₺');
   await roadmap.getByRole('button', { name: 'Önerilen araştırmayı başlat' }).click();
   await expect(roadmap).toContainText('Hedef araştırması sürüyor');
   await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 0 ₺');

@@ -13,7 +13,7 @@ test('edge research can precede construction and respects cash, points and labor
     store.setState({
       game: {
         ...game,
-        money: 6300000,
+        money: 4900000,
         researchPoints: 60,
         researchDone: ['ftth', 'fiber10g', 'backbone100g'],
         speed: 0,
@@ -26,7 +26,7 @@ test('edge research can precede construction and respects cash, points and labor
   });
   const option = page.getByRole('region', { name: 'Önce araştırma seçeneği' });
   const start = option.getByRole('button', { name: 'Önce Edge araştırmasını başlat' });
-  await expect(option).toContainText('6.400.000 ₺ · 60 araştırma puanı · 28 oyun günü');
+  await expect(option).toContainText('5.000.000 ₺ · 60 araştırma puanı · 28 oyun günü');
   await expect(start).toBeDisabled();
   await page.evaluate(() => {
     const store = (window as any).__game;
@@ -55,7 +55,7 @@ test('edge research can precede construction and respects cash, points and labor
       const game = (window as any).__game.getState().game;
       return { money: game.money, points: game.researchPoints, active: game.researchActive, nodes: game.nodes };
     }),
-  ).toEqual({ money: 1600000, points: 0, active: { id: 'edge_compute', daysLeft: 28 }, nodes: originalNodes });
+  ).toEqual({ money: 3000000, points: 0, active: { id: 'edge_compute', daysLeft: 28 }, nodes: originalNodes });
   await expect(option.getByRole('button', { name: 'Edge araştırması sürüyor' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Veri merkezi yerini seç' })).toBeEnabled();
   await page.evaluate(() => (window as any).__game.getState().setLocale('en'));

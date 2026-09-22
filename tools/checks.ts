@@ -87,7 +87,7 @@ import {
   servingCapacity,
 } from '../src/game/network';
 import { GRACE_DAYS, chargeLoans, createLoan, creditLimit, totalDebt } from '../src/game/finance';
-import { RESEARCH, researchModifiers } from '../src/game/research';
+import { RESEARCH, researchById, researchModifiers } from '../src/game/research';
 import { makeRegulation, networkResilience, pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
 import { cacheRatio, mobileServingTowers, tickMaintenance } from '../src/game/simulation';
@@ -2485,10 +2485,10 @@ group('phase-two staff, research points and finance ledger');
   useGame.getState().startResearch('ftth');
   const researching = useGame.getState().game!;
   check('research consumes its research-point cost', researching.researchPoints === 0);
-  check('research still consumes its cash cost', researching.money === 1200000);
+  check('research still consumes its cash cost', researching.money === 2000000 - researchById('ftth')!.cost);
   check(
     'research spending appears in the finance ledger',
-    researching.ledger.some((entry) => entry.category === 'research' && entry.amount === -800000),
+    researching.ledger.some((entry) => entry.category === 'research' && entry.amount === -researchById('ftth')!.cost),
   );
 
   useGame.setState({ game: { ...researchState, researchPoints: 11, researchActive: null } });
@@ -4884,12 +4884,14 @@ group('Research roadmap');
   const active = researchPlan({ ...g, researchActive: { id: 'ftth', daysLeft: 5 } })!;
   check(
     'paid active research is excluded from the remaining bill',
-    active.remainingCost === plan.remainingCost - 800000 && active.next?.id === 'fiber10g' && !active.ready,
+    active.remainingCost === plan.remainingCost - researchById('ftth')!.cost &&
+      active.next?.id === 'fiber10g' &&
+      !active.ready,
   );
   const negative = researchPlan({ ...g, money: -100000, researchPoints: 0 })!;
   check(
     'negative balances and missing points are both accounted for',
-    negative.cashMissing === 900000 && negative.pointsMissing === 12 && !negative.ready,
+    negative.cashMissing === researchById('ftth')!.cost + 100000 && negative.pointsMissing === 12 && !negative.ready,
   );
   const mobile = researchPlan({ ...g, researchDone: ['ftth', 'fiber10g', 'mobile_4g'] })!;
   check(
