@@ -1,4 +1,6 @@
 import { clamp } from './util';
+import { POINT_CREDIT, POINT_CREDIT_SHARE, RESEARCH, isAvailable } from './research';
+import { researchPlan } from './researchPlanning';
 import type { Employee, GameState, StaffRole, Technician } from './types';
 
 export const STAFF_ROLE_INFO: Record<StaffRole, { label: string; labelTr: string; effect: string; effectTr: string }> =
@@ -55,6 +57,30 @@ export const STAFF_SALARY: Record<StaffRole, number> = {
   sales: 76000,
   security: 104000,
 };
+
+// A new hire's skill is 1–4 at random, so an average network engineer adds about this many points a day.
+export const AVERAGE_ENGINEER_POINTS = 2.5;
+
+// What one more network engineer is worth where the company stands now: points turn into research
+// credit only while there is research left to spend them on.
+export function engineerOutlook(
+  state: Pick<GameState, 'researchDone' | 'researchActive' | 'researchPoints' | 'money'>,
+) {
+  const creditPerMonth = AVERAGE_ENGINEER_POINTS * 30 * POINT_CREDIT;
+  const salary = STAFF_SALARY.network_engineer;
+  const next =
+    researchPlan(state)?.next ??
+    RESEARCH.find(
+      (r) =>
+        !state.researchDone.includes(r.id) && r.id !== state.researchActive?.id && isAvailable(r, state.researchDone),
+    );
+  const advice: 'worth' | 'stocked' | 'finished' = !next
+    ? 'finished'
+    : state.researchPoints >= next.points + Math.floor((next.cost * POINT_CREDIT_SHARE) / POINT_CREDIT)
+      ? 'stocked'
+      : 'worth';
+  return { creditPerMonth, salary, advice };
+}
 
 function rolePower(state: GameState, role: StaffRole) {
   return state.employees

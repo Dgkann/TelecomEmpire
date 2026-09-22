@@ -1,10 +1,49 @@
 import { fmtMoney } from '../../../game/economy';
-import { CREW_HIRE_COST, STAFF_HIRE_COST, STAFF_ROLE_INFO, STAFF_SALARY } from '../../../game/staff';
+import {
+  AVERAGE_ENGINEER_POINTS,
+  CREW_HIRE_COST,
+  STAFF_HIRE_COST,
+  STAFF_ROLE_INFO,
+  STAFF_SALARY,
+  engineerOutlook,
+} from '../../../game/staff';
 import { t } from '../../i18n';
 import { HIRE_ROLES } from './shared';
 import type { CompanyModel } from './model';
 
 const CREW_STATE_TR = { idle: 'boşta', driving: 'yolda', working: 'çalışıyor', returning: 'dönüyor' } as const;
+
+// Spells out whether another network engineer pays back at the company's current research position.
+function EngineerOutlook({ vm }: { vm: CompanyModel }) {
+  const tr = vm.locale === 'tr';
+  const outlook = engineerOutlook(vm.game);
+  const points = AVERAGE_ENGINEER_POINTS.toLocaleString(tr ? 'tr-TR' : 'en-GB');
+  return (
+    <section
+      aria-label={tr ? 'Şebeke mühendisi hesabı' : 'Network engineer maths'}
+      className="mt-3 rounded-lg border border-white/10 bg-black/15 p-3 text-xs"
+    >
+      <p className="text-white/70">
+        {tr
+          ? `Ortalama bir şebeke mühendisi günde ~${points} AP üretir: araştırma sürerken ayda ~${fmtMoney(outlook.creditPerMonth)} kredi, maaşı ${fmtMoney(outlook.salary)}.`
+          : `An average network engineer adds ~${points} RP a day: about ${fmtMoney(outlook.creditPerMonth)} of research credit a month while research runs, against a ${fmtMoney(outlook.salary)} salary.`}
+      </p>
+      <p className={`mt-1 ${outlook.advice === 'worth' ? 'text-neon-lime' : 'text-neon-amber'}`}>
+        {outlook.advice === 'worth'
+          ? tr
+            ? 'Araştırma sürdükçe kendini öder.'
+            : 'Pays for itself while research keeps running.'
+          : outlook.advice === 'stocked'
+            ? tr
+              ? 'Biriken puanların sıradaki araştırmanın kredisini zaten dolduruyor; yeni mühendis bekleyebilir.'
+              : "Your banked points already cover the next project's full credit; another engineer can wait."
+            : tr
+              ? 'Araştırılacak teknoloji kalmadı; bir mühendis artık yalnızca bakım tasarrufu sağlar.'
+              : 'No research is left, so another engineer would only trim maintenance.'}
+      </p>
+    </section>
+  );
+}
 
 export default function StaffPanel({ vm }: { vm: CompanyModel }) {
   const tr = vm.locale === 'tr';
@@ -96,6 +135,7 @@ export default function StaffPanel({ vm }: { vm: CompanyModel }) {
           </button>
         ))}
       </div>
+      <EngineerOutlook vm={vm} />
       <p className="mt-2 text-[11px] leading-snug text-white/35">{t(vm.locale, 'staffBlurb')}</p>
     </div>
   );

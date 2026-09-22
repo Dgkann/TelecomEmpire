@@ -116,7 +116,13 @@ import {
   totalCustomers,
 } from '../src/game/simulation';
 import { makeRng } from '../src/game/rng';
-import { staffModifiers, trainEmployee } from '../src/game/staff';
+import {
+  AVERAGE_ENGINEER_POINTS,
+  STAFF_SALARY,
+  engineerOutlook,
+  staffModifiers,
+  trainEmployee,
+} from '../src/game/staff';
 import { contractProfile, negotiatedTerms, premiumCounterChance, resolveNegotiation } from '../src/game/contracts';
 import {
   fibreConnectionCost,
@@ -2530,6 +2536,21 @@ group('phase-two staff, research points and finance ledger');
   check(
     'fractional or missing points never earn credit',
     researchPrice(edgeNode.points + 0.9, edgeNode).credit === 0 && researchPrice(0, edgeNode).credit === 0,
+  );
+  const fresh = { ...g, researchDone: [], researchActive: null, researchPoints: 0 };
+  check(
+    'an engineer is worth hiring while research is left to fund',
+    engineerOutlook(fresh).advice === 'worth' &&
+      engineerOutlook(fresh).creditPerMonth === AVERAGE_ENGINEER_POINTS * 30 * POINT_CREDIT &&
+      engineerOutlook(fresh).salary === STAFF_SALARY.network_engineer,
+  );
+  check(
+    'banked points that already fill the next credit make another engineer premature',
+    engineerOutlook({ ...fresh, researchPoints: 100000 }).advice === 'stocked',
+  );
+  check(
+    'a finished technology tree leaves engineers nothing to fund',
+    engineerOutlook({ ...fresh, researchDone: RESEARCH.map((r) => r.id) }).advice === 'finished',
   );
 
   useGame.setState({ game: { ...g, money: 1_000_000, ledger: [] } });
