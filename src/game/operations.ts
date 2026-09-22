@@ -1,10 +1,22 @@
 import { BASELINE_ARPU, TRANSIT_TIERS } from './constants';
 import { priceIndex } from './economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil, servingCapacity } from './network';
-import { INTERCONNECT_CONFIG, interconnectOperational } from './strategy';
+import { interconnectOperational, transitCapacity } from './strategy';
 import type { EnterpriseContract, GameState } from './types';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity';
+
+// How much of the shared upstream the last step used. Above 1 every district is losing satisfaction.
+export function transitHeadroom(state: GameState, routes = computeRoutes(state)) {
+  const capacity = transitCapacity(state, routes);
+  const peak = state.stats.transitGbps;
+  return {
+    peak,
+    capacity,
+    use: peak / Math.max(0.01, capacity),
+    next: TRANSIT_TIERS[state.transitTier + 1] ?? null,
+  };
+}
 
 export interface OperationsInsight {
   id: string;
@@ -79,14 +91,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
 
   // The one bottleneck the map cannot draw.
   const routesForTransit = computeRoutes(state);
-  const interconnect = interconnectOperational(state, routesForTransit)
-    ? INTERCONNECT_CONFIG[state.interconnectPlan]
-    : INTERCONNECT_CONFIG.transit;
-  const transitCap =
-    TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1) + interconnect.capacityBonus;
-  const peak = state.stats.transitGbps;
-  const transitUse = peak / Math.max(0.01, transitCap);
-  const nextTransit = TRANSIT_TIERS[state.transitTier + 1];
+  const { peak, capacity: transitCap, use: transitUse, next: nextTransit } = transitHeadroom(state, routesForTransit);
   if (transitUse >= 0.75 && nextTransit) {
     const over = transitUse >= 1;
     insights.push({

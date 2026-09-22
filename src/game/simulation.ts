@@ -20,7 +20,6 @@ import {
   SAVE_VERSION,
   SPECTRUM_BANDS,
   START_DATE,
-  TRANSIT_TIERS,
   nodeCapacity,
   towerRadius,
 } from './constants';
@@ -72,6 +71,7 @@ import {
   activeCampaign,
   dataCenterMode,
   interconnectOperational,
+  transitCapacity,
   operationalDataCenters,
   wholesaleDemand,
   maintenanceCost,
@@ -754,11 +754,10 @@ export function step(prev: GameState): GameState {
   } = offeredTraffic(s, curve);
   const load = loadServices(s, services, routes, mods.hasAutoBalance);
 
-  const transit = TRANSIT_TIERS[s.transitTier];
   const activeInterconnect = interconnectOperational(s, routes)
     ? INTERCONNECT_CONFIG[s.interconnectPlan]
     : INTERCONNECT_CONFIG.transit;
-  const transitCap = transit.capacity * (s.backupTransit ? 1.35 : 1) + activeInterconnect.capacityBonus;
+  const transitCap = transitCapacity(s, routes);
   const transitRaw = load.totalServed / Math.max(0.01, transitCap);
   const serviceDemandGbps = emptyServiceTraffic();
   const serviceOfferedUpstream = emptyServiceTraffic();

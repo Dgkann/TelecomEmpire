@@ -1,4 +1,4 @@
-import { MINUTES_PER_DAY } from './constants';
+import { MINUTES_PER_DAY, TRANSIT_TIERS } from './constants';
 import { computeRoutes, type RouteInfo } from './network';
 import { clamp } from './util';
 import type {
@@ -257,6 +257,18 @@ export function activeCampaign(
 
 export function dataCenterMode(state: Pick<GameState, 'dataCenterModes'>, nodeId: string): DataCenterMode {
   return state.dataCenterModes[nodeId] ?? 'colocation';
+}
+
+// Upstream capacity is shared by every district: the transit tier, the backup contract and any
+// working interconnect all add to it.
+export function transitCapacity(
+  state: Pick<GameState, 'transitTier' | 'backupTransit' | 'interconnectPlan' | 'nodes' | 'links'>,
+  routes: Record<string, RouteInfo>,
+) {
+  const interconnect = interconnectOperational(state as GameState, routes)
+    ? INTERCONNECT_CONFIG[state.interconnectPlan]
+    : INTERCONNECT_CONFIG.transit;
+  return TRANSIT_TIERS[state.transitTier].capacity * (state.backupTransit ? 1.35 : 1) + interconnect.capacityBonus;
 }
 
 export function operationalDataCenters(

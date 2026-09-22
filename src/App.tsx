@@ -1,4 +1,5 @@
 import { SmartPauseBanner } from './ui/SmartPause';
+import TransitBanner from './ui/TransitBanner';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STEP_MS } from './game/constants';
@@ -184,6 +185,7 @@ function GameShell() {
     <div className="flex h-full flex-col">
       <TopBar />
       <SmartPauseBanner />
+      <TransitBanner />
       {persistenceError && (
         <div
           className="z-50 border-b border-neon-red/40 bg-[#35151d] px-3 py-2 text-center text-xs font-medium text-neon-red"

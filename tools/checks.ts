@@ -98,7 +98,7 @@ import {
 import { makeRegulation, networkResilience, pendingRegulations, regulationProgress } from '../src/game/regulator';
 import { RANKS, checkPromotion, cityShare, customerCount, meetsRank, rankOf } from '../src/game/progression';
 import { cacheRatio, mobileServingTowers, tickMaintenance } from '../src/game/simulation';
-import { contractRisk, operationsInsights } from '../src/game/operations';
+import { contractRisk, operationsInsights, transitHeadroom } from '../src/game/operations';
 import { repairCost, repairOptions, dispatchCandidates, pendingIncidents } from '../src/game/incidents';
 import { hostingRevenue, potentialHostingRevenue } from '../src/game/economy';
 import { currentMonthCashFlow } from '../src/game/financeLedger';
@@ -4953,6 +4953,22 @@ group('Short fault finding exercises');
   check(
     'unknown exercise modes cannot be imported',
     !validSignalTraining({ ...training, active: { ...training.active, mode: 'unknown' } }),
+  );
+}
+
+group('Upstream transit headroom');
+{
+  const g = newGame(2024);
+  const stepped = step({ ...g, minutes: 19 * 60 });
+  const headroom = transitHeadroom(stepped);
+  check(
+    'the warning reads the same capacity the simulation throttled against',
+    headroom.capacity === TRANSIT_TIERS[stepped.transitTier].capacity &&
+      Math.abs(headroom.use - stepped.stats.transitGbps / headroom.capacity) < 1e-9,
+  );
+  check(
+    'the top transit tier offers no further upgrade',
+    transitHeadroom({ ...stepped, transitTier: TRANSIT_TIERS.length - 1 }).next === null,
   );
 }
 
