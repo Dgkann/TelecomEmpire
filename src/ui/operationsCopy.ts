@@ -1,8 +1,21 @@
 import type { OperationsInsight } from '../game/operations';
 import type { GameState } from '../game/types';
+import { scenarioStatus } from '../game/scenarios';
 
 export function operationsCopy(item: OperationsInsight, game: GameState, tr: boolean) {
   if (!tr) return item;
+  if (item.id.startsWith('mission-')) {
+    const mission = scenarioStatus(game);
+    const objective = mission.objectives.find((entry) => `mission-${entry.id}` === item.id);
+    return objective
+      ? {
+          ...item,
+          title: `${objective.labelTr}: ${objective.detailTr}`,
+          detail: `Kampanya için ${mission.daysLeft} gün kaldı. En gerideki hedef bu.`,
+          action: 'Hedef üzerinde çalış',
+        }
+      : item;
+  }
   const district = game.districts.find((d) => d.id === item.target.id);
   const pct = item.title.match(/\d+%/)?.[0] ?? '';
   const copies: Array<[string, string, string, string]> = [

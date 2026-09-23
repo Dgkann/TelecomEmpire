@@ -3319,6 +3319,25 @@ group('scenarios and the multi-city campaign');
   rapid.districts[0].mobileSubs = 0;
   check('scenario deadlines detect a missed objective', scenarioStatus(rapid).expired);
 
+  const paced = {
+    ...rapid,
+    minutes: MINUTES_PER_DAY * 100,
+    competitors: [],
+    incidents: [],
+    campaigns: [],
+    contracts: [],
+    maintenanceOrders: [],
+    nodes: rapid.nodes.map((node) => ({ ...node, trafficGbps: 0 })),
+    links: rapid.links.map((link) => ({ ...link, trafficGbps: 0 })),
+    districts: rapid.districts.map((district, index) => ({ ...district, unlocked: index === 0, mobileSubs: 0 })),
+  };
+  const paceWarning = operationsInsights(paced).find((insight) => insight.id === 'mission-customers');
+  check(
+    'campaign pace points to the least complete objective',
+    paceWarning?.target.type === 'screen' && paceWarning.target.id === 'company',
+    paceWarning?.id,
+  );
+
   const campaign = createNewGame({
     companyName: 'Campaign Test',
     logo: 'C',

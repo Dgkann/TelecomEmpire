@@ -7,13 +7,27 @@ import ResearchGuidance from '../ResearchGuidance';
 import ExerciseShortcut from '../ExerciseShortcut';
 import { scrollToAnchor } from './shared';
 import type { SideModel } from './model';
+import OperatorBriefing, { INSIGHT_TONE } from '../OperatorBriefing';
 
 export default function LiveSection({ sp }: { sp: SideModel }) {
   const { locale, game, tr, openIncident, focus, select, setScreen, activeSection, setMobileOpen, insights } = sp;
+  const activate = (item: (typeof insights)[number]) => {
+    setMobileOpen(false);
+    if (item.target.type === 'screen') {
+      const { id, anchor } = item.target;
+      setScreen(id);
+      if (anchor) scrollToAnchor(anchor);
+      return;
+    }
+    focus(item.target.gx, item.target.gy);
+    select({ type: item.target.type, id: item.target.id });
+    if (item.id.startsWith('incident-')) openIncident(item.id.slice('incident-'.length));
+  };
   return (
     <>
       {activeSection === 'live' && (
         <>
+          {insights[0] && <OperatorBriefing item={insights[0]} tr={tr} onActivate={() => activate(insights[0])} />}
           <button
             className="btn mb-2 w-full text-xs"
             onClick={() => {
@@ -62,7 +76,7 @@ export default function LiveSection({ sp }: { sp: SideModel }) {
             )}
           </AnimatePresence>
 
-          {insights.length > 0 && (
+          {insights.length > 1 && (
             <div className="pointer-events-auto panel p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[10px] uppercase tracking-widest text-neon-cyan">
@@ -71,26 +85,13 @@ export default function LiveSection({ sp }: { sp: SideModel }) {
                 <span className="num text-[9px] text-white/35">{tr ? 'Öncelik sırası' : 'Live priorities'}</span>
               </div>
               <div className="flex flex-col gap-1.5">
-                {insights.map((item) => {
-                  const tone =
-                    item.severity === 'critical' ? '#ff5d73' : item.severity === 'warning' ? '#ffc857' : '#7ee787';
+                {insights.slice(1).map((item) => {
+                  const tone = INSIGHT_TONE[item.severity];
                   return (
                     <button
                       key={item.id}
                       className="group rounded-lg border border-white/[0.08] bg-white/[0.035] p-2.5 text-left transition-colors hover:bg-white/[0.075]"
-                      onClick={() => {
-                        setMobileOpen(false);
-                        if (item.target.type === 'screen') {
-                          const { id, anchor } = item.target;
-                          setScreen(id);
-                          // The target screen has not mounted yet.
-                          if (anchor) scrollToAnchor(anchor);
-                          return;
-                        }
-                        focus(item.target.gx, item.target.gy);
-                        select({ type: item.target.type, id: item.target.id });
-                        if (item.id.startsWith('incident-')) openIncident(item.id.slice('incident-'.length));
-                      }}
+                      onClick={() => activate(item)}
                     >
                       <div className="flex items-center gap-2">
                         <span

@@ -4,10 +4,12 @@ import { cityShare, customerCount } from './progression';
 import type { GameState, ScenarioId } from './types';
 
 export interface ScenarioObjective {
+  id: 'customers' | 'districts' | 'reputation' | 'debt' | 'market-share' | 'mobile' | 'data-centre';
   label: string;
   labelTr: string;
   progress: (state: GameState) => number;
   detail: (state: GameState) => string;
+  detailTr: (state: GameState) => string;
 }
 
 export interface ScenarioDefinition {
@@ -23,27 +25,35 @@ export interface ScenarioDefinition {
 const bounded = (value: number) => Math.max(0, Math.min(1, value));
 
 const customers = (target: number): ScenarioObjective => ({
+  id: 'customers',
   label: `${target.toLocaleString()} ${plural(target, 'customer')}`,
   labelTr: `${target.toLocaleString('tr-TR')} müşteri`,
   progress: (state) => bounded(customerCount(state) / target),
   detail: (state) => `${Math.round(customerCount(state)).toLocaleString()} / ${target.toLocaleString()}`,
+  detailTr: (state) =>
+    `${Math.round(customerCount(state)).toLocaleString('tr-TR')} / ${target.toLocaleString('tr-TR')}`,
 });
 
 const districts = (target: number): ScenarioObjective => ({
+  id: 'districts',
   label: `${target} ${plural(target, 'district')} licensed`,
   labelTr: `${target} ilçe lisansı`,
   progress: (state) => bounded(state.districts.filter((district) => district.unlocked).length / target),
   detail: (state) => `${state.districts.filter((district) => district.unlocked).length} / ${target}`,
+  detailTr: (state) => `${state.districts.filter((district) => district.unlocked).length} / ${target}`,
 });
 
 const reputation = (target: number): ScenarioObjective => ({
+  id: 'reputation',
   label: `${target} reputation`,
   labelTr: `${target} itibar`,
   progress: (state) => bounded(state.reputation / target),
   detail: (state) => `${Math.round(state.reputation)} / ${target}`,
+  detailTr: (state) => `${Math.round(state.reputation)} / ${target}`,
 });
 
 const debtFree: ScenarioObjective = {
+  id: 'debt',
   label: 'No outstanding loans',
   labelTr: 'Ödenmemiş kredi yok',
   progress: (state) => (state.loans.length === 0 && state.money >= 0 ? 1 : 0),
@@ -51,23 +61,30 @@ const debtFree: ScenarioObjective = {
     state.loans.length === 0 && state.money >= 0
       ? 'clear'
       : `${state.loans.length} ${plural(state.loans.length, 'loan')}`,
+  detailTr: (state) =>
+    state.loans.length === 0 && state.money >= 0 ? 'temiz' : `${state.loans.length} ödenmemiş kredi`,
 };
 
 const marketShare = (target: number): ScenarioObjective => ({
+  id: 'market-share',
   label: `${Math.round(target * 100)}% city share`,
   labelTr: `%${Math.round(target * 100)} şehir payı`,
   progress: (state) => bounded(cityShare(state) / target),
   detail: (state) => `${Math.round(cityShare(state) * 100)}% / ${Math.round(target * 100)}%`,
+  detailTr: (state) => `%${Math.round(cityShare(state) * 100)} / %${Math.round(target * 100)}`,
 });
 
 const mobile: ScenarioObjective = {
+  id: 'mobile',
   label: 'Launch mobile service',
   labelTr: 'Mobil hizmeti başlat',
   progress: (state) => (state.researchDone.includes('mobile_4g') ? 1 : 0),
   detail: (state) => (state.researchDone.includes('mobile_4g') ? 'launched' : 'not launched'),
+  detailTr: (state) => (state.researchDone.includes('mobile_4g') ? 'başlatıldı' : 'başlatılmadı'),
 };
 
 const dataCentre: ScenarioObjective = {
+  id: 'data-centre',
   label: 'Build a full data centre',
   labelTr: 'Tam kapasiteli veri merkezi kur',
   progress: (state) =>
@@ -77,6 +94,7 @@ const dataCentre: ScenarioObjective = {
         ? 0.25
         : 0,
   detail: (state) => `${state.nodes.filter((node) => node.kind === 'datacenter' && node.tier >= 1).length} / 1`,
+  detailTr: (state) => `${state.nodes.filter((node) => node.kind === 'datacenter' && node.tier >= 1).length} / 1`,
 };
 
 export const SCENARIOS: ScenarioDefinition[] = [
@@ -138,9 +156,11 @@ export const scenarioById = (id: ScenarioId) => SCENARIOS.find((scenario) => sce
 export function scenarioStatus(state: GameState) {
   const scenario = scenarioById(state.scenarioId);
   const objectives = scenario.objectives.map((objective) => ({
+    id: objective.id,
     label: objective.label,
     labelTr: objective.labelTr,
     detail: objective.detail(state),
+    detailTr: objective.detailTr(state),
     progress: objective.progress(state),
   }));
   const complete = objectives.length > 0 && objectives.every((objective) => objective.progress >= 1);

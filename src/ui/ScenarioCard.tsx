@@ -36,7 +36,9 @@ export default function ScenarioCard({ game }: { game: GameState }) {
           <div key={objective.label} className="rounded-sm border border-white/[0.08] bg-black/10 p-2.5">
             <div className="flex justify-between gap-2 text-[11px]">
               <span className="text-white/65">{locale === 'tr' ? objective.labelTr : objective.label}</span>
-              <span className={objective.progress >= 1 ? 'text-neon-lime' : 'text-white/45'}>{objective.detail}</span>
+              <span className={objective.progress >= 1 ? 'text-neon-lime' : 'text-white/45'}>
+                {locale === 'tr' ? objective.detailTr : objective.detail}
+              </span>
             </div>
             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
               <div

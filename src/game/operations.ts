@@ -2,7 +2,8 @@ import { BASELINE_ARPU, TRANSIT_TIERS } from './constants';
 import { priceIndex } from './economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil, servingCapacity } from './network';
 import { interconnectOperational, transitCapacity } from './strategy';
-import type { EnterpriseContract, GameState } from './types';
+import { scenarioStatus } from './scenarios';
+import type { EnterpriseContract, GameState, Screen } from './types';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity';
 
@@ -26,7 +27,7 @@ export interface OperationsInsight {
   action: string;
   target:
     | { type: 'node' | 'link' | 'district' | 'building'; id: string; gx: number; gy: number }
-    | { type: 'screen'; id: 'network' | 'company'; anchor?: string };
+    | { type: 'screen'; id: Screen; anchor?: string };
 }
 
 // Shown as a price relative to the market reference, which reads better than an index.
@@ -204,6 +205,35 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
         ? { type: 'building', id: building.id, gx: building.gx, gy: building.gy }
         : { type: 'screen', id: 'company' },
     });
+  }
+
+  const mission = scenarioStatus(state);
+  if (mission.scenario.deadlineDays !== null && !mission.complete && mission.daysLeft !== null) {
+    const elapsedShare = 1 - mission.daysLeft / mission.scenario.deadlineDays;
+    const lagging = [...mission.objectives]
+      .filter((objective) => objective.progress < 1)
+      .sort((a, b) => a.progress - b.progress)[0];
+    const urgent = mission.daysLeft <= Math.max(60, Math.round(mission.scenario.deadlineDays * 0.18));
+    const behind = elapsedShare >= 0.25 && !!lagging && lagging.progress + 0.12 < elapsedShare;
+    if (lagging && (urgent || behind)) {
+      const targetByObjective: Record<typeof lagging.id, Extract<OperationsInsight['target'], { type: 'screen' }>> = {
+        customers: { type: 'screen', id: 'company' },
+        districts: { type: 'screen', id: 'map' },
+        reputation: { type: 'screen', id: 'company', anchor: 'reputation' },
+        debt: { type: 'screen', id: 'company', anchor: 'borrowing' },
+        'market-share': { type: 'screen', id: 'market' },
+        mobile: { type: 'screen', id: 'research' },
+        'data-centre': { type: 'screen', id: 'research' },
+      };
+      insights.push({
+        id: `mission-${lagging.id}`,
+        severity: urgent && lagging.progress < 0.7 ? 'critical' : 'warning',
+        title: `${lagging.label}: ${lagging.detail}`,
+        detail: `${mission.daysLeft} days remain. This is the least complete campaign objective.`,
+        action: 'Work on objective',
+        target: targetByObjective[lagging.id],
+      });
+    }
   }
 
   const growth = [...state.districts]
