@@ -6,16 +6,14 @@ async function setup(page: Page) {
   await page.getByPlaceholder('Company name').fill('Signal Test');
   await page.getByRole('button', { name: 'Start building' }).click();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, speed: 0, tutorialDone: true } });
   });
   await page.getByRole('button', { name: 'Projects', exact: true }).click();
 }
 
 async function solve(page: Page, tr = false) {
-  const turns: number[] = await page.evaluate(
-    () => (window as any).__game.getState().game.signalTraining.active.rotations,
-  );
+  const turns: number[] = await page.evaluate(() => window.__game.getState().game.signalTraining.active.rotations);
   const board = page.getByRole('group', { name: tr ? 'Kablo panosu' : 'Cable board' });
   for (let i = 0; i < turns.length; i++) {
     for (let count = 0; count < (4 - turns[i]) % 4; count++) await board.getByRole('button').nth(i).click();
@@ -27,7 +25,7 @@ test('routing exercise saves progress, protects the clock and awards once', asyn
   test.slow(browserName === 'webkit', 'WebKit works through the cable board far more slowly');
   await setup(page);
   const baseline = await page.evaluate(() => {
-    const g = (window as any).__game.getState().game;
+    const g = window.__game.getState().game;
     return { money: g.money, points: g.researchPoints, minutes: g.minutes, nodes: JSON.stringify(g.nodes) };
   });
   await page.getByRole('button', { name: 'Play · 4×4', exact: true }).click();
@@ -38,7 +36,7 @@ test('routing exercise saves progress, protects the clock and awards once', asyn
   await tile.focus();
   await tile.press('Space');
   const saved = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.getState().setSpeed(4);
     store.getState().tick();
     return { training: store.getState().game.signalTraining, minutes: store.getState().game.minutes };
@@ -51,13 +49,13 @@ test('routing exercise saves progress, protects the clock and awards once', asyn
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
   dialog = page.getByRole('dialog', { name: 'Signal routing', exact: true });
   await expect(dialog).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining)).toEqual(saved.training);
+  expect(await page.evaluate(() => window.__game.getState().game.signalTraining)).toEqual(saved.training);
   await solve(page);
   await expect(dialog.getByRole('button', { name: 'Verify route' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Verify route' }).click();
   await expect(dialog.getByText(/Connection complete! Reward received/)).toBeVisible();
   const after = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const duplicate = store.getState().submitSignalTraining();
     const g = store.getState().game;
     return { duplicate, money: g.money, points: g.researchPoints, nodes: JSON.stringify(g.nodes) };
@@ -70,7 +68,7 @@ test('routing exercise saves progress, protects the clock and awards once', asyn
   });
   await page.screenshot({ path: testInfo.outputPath('signal-route-complete.png') });
   await dialog.getByRole('button', { name: 'Return to company' }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
 });
 
 test('Turkish challenge is playable on touch and practice cannot farm rewards', async ({
@@ -80,7 +78,7 @@ test('Turkish challenge is playable on touch and practice cannot farm rewards', 
   test.slow(browserName === 'webkit', 'WebKit works through the cable board far more slowly');
   await setup(page);
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, signalTraining: { ...g.signalTraining, nextRewardAt: g.minutes + 10080 } } });
     store.getState().setLocale('tr');
@@ -94,11 +92,11 @@ test('Turkish challenge is playable on touch and practice cannot farm rewards', 
   await expect(launch).toBeFocused();
   await launch.click();
   dialog = page.getByRole('dialog', { name: 'Sinyal rotası', exact: true });
-  const cash = await page.evaluate(() => (window as any).__game.getState().game.money);
+  const cash = await page.evaluate(() => window.__game.getState().game.money);
   await solve(page, true);
   await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
   await expect(dialog.getByText('Alıştırma tamamlandı! Bu tur ödülsüzdü.')).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(cash);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(cash);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(
     true,
   );

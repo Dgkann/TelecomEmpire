@@ -6,9 +6,9 @@ test('energy desk reaches every site and previews a tariff without spending cash
   await page.getByPlaceholder('Company name').fill('Energy Test');
   await page.getByRole('button', { name: 'Start building' }).click();
   const initial = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
-    const template = g.nodes.find((n: any) => n.kind === 'pop');
+    const template = g.nodes.find((n) => n.kind === 'pop');
     store.setState({
       game: {
         ...g,
@@ -30,7 +30,7 @@ test('energy desk reaches every site and previews a tariff without spending cash
   await expect(desk.getByText(/One-time exit fee/)).toHaveCount(2);
   await expect(desk.getByRole('group', { name: 'Carbon levy outlook' })).toContainText('at month close');
   await expect(desk.getByRole('group', { name: 'Fixed contract', exact: true })).toContainText('Monthly extra cost');
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(initial);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(initial);
   await desk.getByRole('button', { name: /Show all sites/ }).click();
   await expect(desk.getByRole('button', { name: 'Install generation: Extra site 6', exact: true })).toBeVisible();
   await desk.getByRole('searchbox', { name: 'Search sites' }).fill('Extra site 6');
@@ -39,10 +39,10 @@ test('energy desk reaches every site and previews a tariff without spending cash
   await expect(site).toContainText('Estimated payback');
   await expect(site).toContainText('Cash after installation');
   await desk.getByRole('button', { name: 'Install generation: Extra site 6', exact: true }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.energy.solarNodeIds)).toContain('extra-6');
+  expect(await page.evaluate(() => window.__game.getState().game.energy.solarNodeIds)).toContain('extra-6');
   await desk.getByRole('searchbox').fill('missing-site');
   await expect(desk.getByText('No matching sites. Try another name.')).toBeVisible();
-  await page.evaluate(() => (window as any).__game.getState().setLocale('tr'));
+  await page.evaluate(() => window.__game.getState().setLocale('tr'));
   await expect(page.getByRole('tab', { name: /Enerji ve bağlantı/ })).toBeVisible();
   await expect(desk).toHaveCount(0);
   const turkishDesk = page.getByRole('region', { name: 'Enerji masası', exact: true });

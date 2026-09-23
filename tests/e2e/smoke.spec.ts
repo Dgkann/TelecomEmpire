@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { Incident } from '../../src/game/types';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -39,7 +40,7 @@ test('city canvas paints architecture and refreshes its night lighting', async (
   await startOperator(page, 'Canvas Test');
   const setTime = (minutes: number) =>
     page.evaluate((time) => {
-      const store = (window as any).__game;
+      const store = window.__game;
       store.setState({ game: { ...store.getState().game, speed: 0, minutes: time, tutorialDone: true } });
     }, minutes);
   await setTime(720);
@@ -60,7 +61,7 @@ test('city canvas paints architecture and refreshes its night lighting', async (
   const site = page.locator('svg.map-surface g.map-interactive:not([aria-label*=" fibre, tier "])').first();
   await site.focus();
   await site.press('Enter');
-  await expect.poll(() => page.evaluate(() => (window as any).__game.getState().selection?.type)).toBe('node');
+  await expect.poll(() => page.evaluate(() => window.__game.getState().selection?.type)).toBe('node');
 });
 
 test('keyboard shortcuts do not fire while a form control has focus', async ({ page }) => {
@@ -74,7 +75,7 @@ test('keyboard shortcuts do not fire while a form control has focus', async ({ p
 test('network lab rehearses a surge and commissions a saved capacity programme', async ({ page }, testInfo) => {
   await startOperator(page, 'Capacity Programme');
   const before = await page.evaluate(() => {
-    const store = (window as any).__game,
+    const store = window.__game,
       g = store.getState().game;
     store.setState({
       game: {
@@ -82,12 +83,12 @@ test('network lab rehearses a surge and commissions a saved capacity programme',
         speed: 0,
         money: 40000000,
         tutorialDone: true,
-        buildings: g.buildings.map((b: any) => ({ ...b, connected: 0.8 })),
+        buildings: g.buildings.map((b) => ({ ...b, connected: 0.8 })),
       },
     });
-    const pop = g.nodes.find((n: any) => n.kind === 'pop'),
-      fibre = g.links[0];
-    const names = [fibre.aId, fibre.bId].map((id: string) => g.nodes.find((n: any) => n.id === id).name);
+    const pop = g.nodes.find((n) => n.kind === 'pop')!,
+      fibre = g.links[0]!;
+    const names = [fibre.aId, fibre.bId].map((id: string) => g.nodes.find((n) => n.id === id)!.name);
     return { pop, fibre, fibreName: names.join(' / '), snapshot: JSON.stringify(store.getState().game) };
   });
   await page.getByRole('button', { name: 'Network', exact: true }).click();
@@ -100,7 +101,7 @@ test('network lab rehearses a surge and commissions a saved capacity programme',
   await lab.getByLabel('Lab fibre failure').selectOption('');
   await lab.getByRole('button', { name: `Add upgrade ${before.pop.name}`, exact: true }).click();
   await lab.getByRole('button', { name: `Add upgrade ${before.fibreName}`, exact: true }).click();
-  expect(await page.evaluate(() => JSON.stringify((window as any).__game.getState().game))).toBe(before.snapshot);
+  expect(await page.evaluate(() => JSON.stringify(window.__game.getState().game))).toBe(before.snapshot);
   await expect(lab.getByRole('button', { name: 'Commission 2 upgrades', exact: true })).toBeEnabled();
   await page.evaluate(() => document.querySelector('.screen-shell')?.scrollTo(0, 0));
   await expect(lab.getByRole('heading', { name: 'Network Lab', exact: true })).toBeInViewport();
@@ -113,8 +114,8 @@ test('network lab rehearses a surge and commissions a saved capacity programme',
   const readTiers = () =>
     page.evaluate(
       ({ node, link }) => {
-        const g = (window as any).__game.getState().game;
-        return [g.nodes.find((n: any) => n.id === node).tier, g.links.find((l: any) => l.id === link).tier];
+        const g = window.__game.getState().game;
+        return [g.nodes.find((n) => n.id === node)!.tier, g.links.find((l) => l.id === link)!.tier];
       },
       { node: before.pop.id, link: before.fibre.id },
     );
@@ -127,7 +128,7 @@ test('network lab rehearses a surge and commissions a saved capacity programme',
 test('map panning preserves controls and performance preference survives reload', async ({ page }) => {
   await startOperator(page, 'Smooth Map');
   await page.evaluate(() => {
-    const s = (window as any).__game;
+    const s = window.__game;
     s.getState().setSpeed(0);
     s.getState().cancelBuild();
   });
@@ -261,7 +262,7 @@ test('dispatches a field crew from a live incident', async ({ page }) => {
   await startOperator(page, 'Incident Test');
 
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const state = store.getState();
     const game = state.game;
     const target = game.nodes[0];
@@ -271,7 +272,7 @@ test('dispatches a field crew from a live incident', async ({ page }) => {
         // Keep the injected incident independent of random live simulation events.
         speed: 0,
         tutorialDone: true,
-        nodes: game.nodes.map((node: any) => (node.id === target.id ? { ...node, down: true } : node)),
+        nodes: game.nodes.map((node) => (node.id === target.id ? { ...node, down: true } : node)),
         incidents: [
           {
             id: 'e2e-incident',
@@ -304,8 +305,8 @@ test('dispatches a field crew from a live incident', async ({ page }) => {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const game = (window as any).__game.getState().game;
-        return game.incidents[0].assignedTechId !== null && game.technicians.some((tech: any) => tech.incidentId);
+        const game = window.__game.getState().game;
+        return game.incidents[0].assignedTechId !== null && game.technicians.some((tech) => tech.incidentId);
       }),
     )
     .toBe(true);
@@ -315,7 +316,7 @@ test('submits and settles a spectrum auction bid', async ({ page }) => {
   await startOperator(page, 'Auction Test');
 
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const state = store.getState();
     store.setState({
       game: {
@@ -339,7 +340,7 @@ test('submits and settles a spectrum auction bid', async ({ page }) => {
   await expect(dialog).toBeHidden();
 
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const state = store.getState();
     const bid = state.game.auction.playerBid;
     store.setState({
@@ -361,28 +362,28 @@ test('submits and settles a spectrum auction bid', async ({ page }) => {
   await expect(dialog.getByText('You won the lot')).toBeVisible();
   await dialog.getByRole('button', { name: 'Done' }).click();
   await expect(dialog).toBeHidden();
-  await expect.poll(() => page.evaluate(() => (window as any).__game.getState().game.auction)).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.__game.getState().game.auction)).toBeNull();
 });
 
 test('development rewards persist and cannot be claimed again', async ({ page }, testInfo) => {
   await startOperator(page, 'Development Test');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const game = store.getState().game;
-    const first = game.packages.find((p: any) => p.segment === 'residential').id;
+    const first = game.packages.find((p) => p.segment === 'residential')!.id;
     store.setState({
       game: {
         ...game,
         speed: 0,
-        packages: game.packages.map((p: any) => ({ ...p, subscribers: p.id === first ? 450 : 0 })),
+        packages: game.packages.map((p) => ({ ...p, subscribers: p.id === first ? 450 : 0 })),
       },
     });
   });
   if (testInfo.project.name !== 'desktop') await page.getByRole('button', { name: /^Actions/ }).click();
   const goals = page.getByRole('region', { name: 'Development goals' });
-  const cash = await page.evaluate(() => (window as any).__game.getState().game.money);
+  const cash = await page.evaluate(() => window.__game.getState().game.money);
   await goals.getByRole('button', { name: 'Claim reward' }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__game.getState().game.money)).toBe(cash + 70000);
+  await expect.poll(() => page.evaluate(() => window.__game.getState().game.money)).toBe(cash + 70000);
   await expect(goals.getByRole('button', { name: 'Connect your city 1/13 +' })).toBeVisible();
   await page.getByRole('button', { name: 'Save and exit' }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
@@ -411,35 +412,35 @@ test('network blueprint previews and commissions an atomic connected plan', asyn
   const panel = page.getByRole('region', { name: 'Network blueprint' });
   await expect(panel).toBeVisible();
   const before = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
-    const d = g.districts.find((d: any) => d.unlocked);
-    const c = d.cells.find((c: any) => !g.nodes.some((n: any) => n.gx === c.gx && n.gy === c.gy));
+    const d = g.districts.find((d) => d.unlocked)!;
+    const c = d.cells.find((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy))!;
     store.getState().placeNode('pop', c.gx, c.gy);
     return { money: g.money, nodes: g.nodes.length, minutes: g.minutes };
   });
   await expect(panel.getByRole('button', { name: 'Build all' })).toBeDisabled();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(before.money);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(before.money);
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const s = store.getState();
-    const core = s.game.nodes.find((n: any) => n.kind === 'core');
+    const core = s.game.nodes.find((n) => n.kind === 'core')!;
     store.getState().clickNodeForLink(core.id);
     store.getState().clickNodeForLink(s.blueprint[0].id);
   });
   await expect(panel.getByRole('button', { name: 'Build all' })).toBeEnabled();
   await panel.getByRole('button', { name: 'Build all' }).click();
   await expect(panel).toBeHidden();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.nodes.length)).toBe(before.nodes + 1);
+  expect(await page.evaluate(() => window.__game.getState().game.nodes.length)).toBe(before.nodes + 1);
   await page.getByRole('button', { name: 'Save and exit' }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.nodes.length)).toBe(before.nodes + 1);
+  expect(await page.evaluate(() => window.__game.getState().game.nodes.length)).toBe(before.nodes + 1);
 });
 
 test('strategy decisions persist and acquisition is reviewed before purchase', async ({ page }) => {
   await startOperator(page, 'Strategy Test');
   const before = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({
       game: {
@@ -447,9 +448,9 @@ test('strategy decisions persist and acquisition is reviewed before purchase', a
         speed: 0,
         rank: 2,
         money: 1000000000,
-        competitors: g.competitors.map((c: any) => ({
+        competitors: g.competitors.map((c) => ({
           ...c,
-          coverage: { ...c.coverage, [g.districts.find((d: any) => d.unlocked).id]: 0.5 },
+          coverage: { ...c.coverage, [g.districts.find((d) => d.unlocked)!.id]: 0.5 },
         })),
         strategy: {
           ...g.strategy,
@@ -465,15 +466,15 @@ test('strategy decisions persist and acquisition is reviewed before purchase', a
     .locator('article')
     .filter({ has: page.getByRole('heading', { name: 'Sponsor the lab', exact: true }) });
   await lab.getByRole('button', { name: 'Choose this option' }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.researchPoints)).toBe(before + 30);
+  expect(await page.evaluate(() => window.__game.getState().game.researchPoints)).toBe(before + 30);
   await expect(desk.getByText('Engineering fellowship', { exact: true })).toBeHidden();
   await desk.getByRole('button', { name: 'Competition', exact: true }).click();
   await desk.getByRole('button', { name: 'Review acquisition' }).first().click();
   const quote = desk.getByRole('article', { name: 'Acquisition quote' });
   await expect(quote.getByText('Network integration', { exact: true })).toBeVisible();
-  const count = await page.evaluate(() => (window as any).__game.getState().game.competitors.length);
+  const count = await page.evaluate(() => window.__game.getState().game.competitors.length);
   await quote.getByRole('button', { name: /Acquire and integrate/ }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.competitors.length)).toBe(count - 1);
+  expect(await page.evaluate(() => window.__game.getState().game.competitors.length)).toBe(count - 1);
   await desk.getByRole('button', { name: 'City & charters' }).click();
   await expect(desk.getByRole('heading', { name: 'Growing neighbourhoods' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(
@@ -481,7 +482,7 @@ test('strategy decisions persist and acquisition is reviewed before purchase', a
   );
   await page.getByRole('button', { name: 'Save and exit' }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.strategy.acquisitions.length)).toBe(1);
+  expect(await page.evaluate(() => window.__game.getState().game.strategy.acquisitions.length)).toBe(1);
 });
 
 test('connected construction and district exploration are available from the map', async ({ page }, testInfo) => {
@@ -490,29 +491,29 @@ test('connected construction and district exploration are available from the map
   const auto = page.getByRole('checkbox', { name: /Include fibre to nearest live site/ });
   await auto.check();
   const before = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
-    const d = g.districts.find((d: any) => d.unlocked);
-    const cell = d.cells.find((c: any) => !g.nodes.some((n: any) => n.gx === c.gx && n.gy === c.gy));
+    const d = g.districts.find((d) => d.unlocked)!;
+    const cell = d.cells.find((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy))!;
     store.getState().placeNode('pop', cell.gx, cell.gy);
     return { nodes: g.nodes.length, links: g.links.length };
   });
-  expect(await page.evaluate(() => (window as any).__game.getState().game.nodes.length)).toBe(before.nodes + 1);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.links.length)).toBe(before.links + 1);
+  expect(await page.evaluate(() => window.__game.getState().game.nodes.length)).toBe(before.nodes + 1);
+  expect(await page.evaluate(() => window.__game.getState().game.links.length)).toBe(before.links + 1);
   await page.keyboard.press('Escape');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.getState().select({ type: 'node', id: g.nodes[g.nodes.length - 1].id });
   });
   await page.getByRole('button', { name: /Build backup fibre/ }).click();
   await expect(page.getByText('Protected', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  const district = await page.evaluate(() => (window as any).__game.getState().game.districts[0]);
+  const district = await page.evaluate(() => window.__game.getState().game.districts[0]);
   if (testInfo.project.name === 'desktop')
     await page.getByRole('button', { name: 'Explore ' + district.name, exact: true }).click();
   else await page.getByRole('combobox', { name: 'Explore district', exact: true }).selectOption(district.id);
-  expect(await page.evaluate(() => (window as any).__game.getState().selection.id)).toBe(district.id);
+  expect(await page.evaluate(() => window.__game.getState().selection!.id)).toBe(district.id);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(
     true,
   );
@@ -521,7 +522,7 @@ test('connected construction and district exploration are available from the map
 test('failure drill previews a cut and restores the real network', async ({ page }) => {
   await startOperator(page, 'Failure Drill Test');
   const before = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.getState().setSpeed(0);
     store.getState().select({ type: 'link', id: g.links[0].id });
@@ -532,10 +533,10 @@ test('failure drill previews a cut and restores the real network', async ({ page
   await expect(drill).toBeVisible();
   await expect(drill.getByText('Paused · hypothetical', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^POP/ })).toHaveCount(0);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.links.some((l: any) => l.down))).toBe(false);
+  expect(await page.evaluate(() => window.__game.getState().game.links.some((l) => l.down))).toBe(false);
   await drill.getByRole('button', { name: 'End drill' }).click();
   await expect(drill).toBeHidden();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(before.money);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(before.money);
   await page.getByRole('button', { name: 'Test fibre cut', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(drill).toBeHidden();
@@ -548,10 +549,10 @@ test('failure drill previews a cut and restores the real network', async ({ page
 test('compares field crews and dispatches the chosen repair response', async ({ page }, testInfo) => {
   await startOperator(page, 'Field Response');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
-    const site = g.nodes.find((n: any) => n.kind === 'pop');
-    const fault = {
+    const site = g.nodes.find((n) => n.kind === 'pop')!;
+    const fault: Incident = {
       id: 'crew-preview',
       kind: 'router_failure',
       title: 'Router failure',
@@ -575,7 +576,7 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
         money: 200000,
         autoDispatch: false,
         incidents: [fault],
-        nodes: g.nodes.map((n: any) => (n.id === site.id ? { ...n, down: true } : n)),
+        nodes: g.nodes.map((n) => (n.id === site.id ? { ...n, down: true } : n)),
         technicians: [
           { ...g.technicians[0], id: 'far-expert', name: 'Distant Expert', skill: 5, gx: site.gx + 10, gy: site.gy },
           { ...g.technicians[1], id: 'near-trainee', name: 'Nearby Crew', skill: 1, gx: site.gx, gy: site.gy },
@@ -590,7 +591,7 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
   await dialog.getByRole('radio', { name: /Emergency/ }).check();
   await expect(dialog.getByText('~35m', { exact: true }).first()).toBeVisible();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, money: 0 } });
   });
   await expect(dialog.getByRole('button', { name: /Dispatch crew/ })).toBeDisabled();
@@ -598,7 +599,7 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
   await expect(dialog.getByRole('button', { name: /Dispatch crew/ })).toBeEnabled();
   await expect(dialog.getByText(/Scheduled repairs can proceed with negative cash/)).toBeVisible();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, money: 200000 } });
   });
   await dialog.getByRole('radio', { name: /Emergency/ }).check();
@@ -614,11 +615,11 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
   await dialog.getByRole('button', { name: /Dispatch crew/ }).click();
   await expect(dialog).toBeHidden();
   const result = await page.evaluate(() => {
-    const g = (window as any).__game.getState().game;
+    const g = window.__game.getState().game;
     return { assigned: g.incidents[0].assignedTechId, money: g.money, work: g.incidents[0].repairMinutesLeft };
   });
   expect(result).toEqual({ assigned: 'far-expert', money: 166000, work: 30 });
-  await page.evaluate(() => (window as any).__game.getState().openIncident('crew-preview'));
+  await page.evaluate(() => window.__game.getState().openIncident('crew-preview'));
   await expect(dialog.getByText('Distant Expert is on the way')).toBeVisible();
   await expect(dialog.getByText('Estimated restoration', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /Dispatch crew/ })).toHaveCount(0);
@@ -632,14 +633,14 @@ test('compares field crews and dispatches the chosen repair response', async ({ 
 test('compares and commissions an atomic district starter network', async ({ page }, testInfo) => {
   await startOperator(page, 'District Launch');
   const before = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, speed: 0, money: 20000000 } });
     return {
-      district: g.districts.find((d: any) => !d.unlocked),
+      district: g.districts.find((d) => !d.unlocked)!,
       nodes: g.nodes.length,
       links: g.links.length,
-      customers: g.packages.reduce((sum: number, p: any) => sum + p.subscribers, 0),
+      customers: g.packages.reduce((sum: number, p) => sum + p.subscribers, 0),
     };
   });
   await page.getByRole('button', { name: 'Company', exact: true }).click();
@@ -659,13 +660,13 @@ test('compares and commissions an atomic district starter network', async ({ pag
   expect(popCost).toBeGreaterThan(accessCost);
   await expect(quote.getByText(/Customer sign-ups take time/)).toBeVisible();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, money: 0 } });
   });
   await expect(quote.getByRole('button', { name: /Commission starter network/ })).toBeDisabled();
   await expect(quote.getByText(/Insufficient cash/)).toBeVisible();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, money: 20000000 } });
   });
   expect(await planner.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -675,7 +676,7 @@ test('compares and commissions an atomic district starter network', async ({ pag
   await expect(checklist).toBeVisible();
   await expect(checklist.getByText('0 / 100', { exact: true })).toBeVisible();
   const after = await page.evaluate(() => {
-    const store = (window as any).__game,
+    const store = window.__game,
       g = store.getState().game;
     return {
       money: g.money,
@@ -683,8 +684,8 @@ test('compares and commissions an atomic district starter network', async ({ pag
       links: g.links.length,
       kind: g.nodes[g.nodes.length - 1].kind,
       speed: g.speed,
-      selected: store.getState().selection.id,
-      customers: g.packages.reduce((sum: number, p: any) => sum + p.subscribers, 0),
+      selected: store.getState().selection!.id,
+      customers: g.packages.reduce((sum: number, p) => sum + p.subscribers, 0),
     };
   });
   expect(after).toEqual({
@@ -700,11 +701,11 @@ test('compares and commissions an atomic district starter network', async ({ pag
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
   expect(
     await page.evaluate(
-      (id) => (window as any).__game.getState().game.districts.find((d: any) => d.id === id).unlocked,
+      (id) => window.__game.getState().game.districts.find((d) => d.id === id)!.unlocked,
       before.district.id,
     ),
   ).toBe(true);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.nodes.length)).toBe(before.nodes + 1);
+  expect(await page.evaluate(() => window.__game.getState().game.nodes.length)).toBe(before.nodes + 1);
 });
 
 test('edits company identity and follows the operator journey', async ({ page }, testInfo) => {
@@ -713,7 +714,7 @@ test('edits company identity and follows the operator journey', async ({ page },
   await opener.click();
   const dialog = page.getByRole('dialog', { name: 'Company profile', exact: true });
   await expect(dialog).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   const levels = dialog.getByRole('group', { name: 'Operator levels' });
   await expect(levels.getByRole('button', { name: /City Operator/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.getByRole('progressbar', { name: '1,500 customers', exact: true })).toBeVisible();
@@ -731,7 +732,7 @@ test('edits company identity and follows the operator journey', async ({ page },
   await name.fill('Aurora Telecom');
   await name.press('1');
   await expect(name).toHaveValue('Aurora Telecom1');
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   await name.fill('Aurora Telecom');
   await dialog.getByRole('radio', { name: 'Rocket', exact: true }).check();
   await dialog.getByRole('button', { name: 'Apply identity', exact: true }).click();
@@ -742,7 +743,7 @@ test('edits company identity and follows the operator journey', async ({ page },
   await expect(opener).toBeFocused();
   expect(
     await page.evaluate(() => {
-      const g = (window as any).__game.getState().game;
+      const g = window.__game.getState().game;
       return { name: g.companyName, logo: g.logo };
     }),
   ).toEqual({ name: 'Aurora Telecom', logo: '🚀' });
@@ -750,13 +751,13 @@ test('edits company identity and follows the operator journey', async ({ page },
   await levels.getByRole('button', { name: /National Operator/ }).click();
   await dialog.getByRole('button', { name: 'Research edge compute', exact: true }).click();
   await expect(dialog).toBeHidden();
-  expect(await page.evaluate(() => (window as any).__game.getState().screen)).toBe('research');
+  expect(await page.evaluate(() => window.__game.getState().screen)).toBe('research');
   await page.getByRole('button', { name: 'Save and exit', exact: true }).click();
   await expect(page.getByRole('button', { name: /Continue · Slot 1 Aurora Telecom/ })).toBeVisible();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
   expect(
     await page.evaluate(() => {
-      const g = (window as any).__game.getState().game;
+      const g = window.__game.getState().game;
       return { name: g.companyName, logo: g.logo };
     }),
   ).toEqual({ name: 'Aurora Telecom', logo: '🚀' });
@@ -777,7 +778,7 @@ test('smart pause stops accelerated play and remembers event preferences', async
   await settings.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(settingsButton).toBeFocused();
   const before = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, speed: 0, researchDone: [], researchActive: { id: 'ftth', daysLeft: 0.0001 } } });
     return g.minutes;
@@ -785,15 +786,15 @@ test('smart pause stops accelerated play and remembers event preferences', async
   await page.getByRole('button', { name: '4x speed', exact: true }).click();
   const notice = page.getByRole('region', { name: 'Smart pause notification' });
   await expect(notice).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.minutes)).toBe(before + 5);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.minutes)).toBe(before + 5);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   await page.screenshot({ path: testInfo.outputPath('smart-pause-event.png') });
   await notice.getByRole('button', { name: 'Review Research complete: FTTH Rollout', exact: true }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().screen)).toBe('research');
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().screen)).toBe('research');
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   await notice.getByRole('button', { name: 'Resume 4×', exact: true }).click();
   await expect(notice).toBeHidden();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(4);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(4);
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('button', { name: 'Save and exit', exact: true }).click();
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -812,9 +813,9 @@ test('smart pause stops accelerated play and remembers event preferences', async
 test('smart pause opens the specific offer in the action center', async ({ page }, testInfo) => {
   await startOperator(page, 'Offer Review');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
-    const building = g.buildings.find((b: any) => b.segment === 'business');
+    const building = g.buildings.find((b) => b.segment === 'business')!;
     const offers = ['Older Client', 'Another Client', 'Priority Client'].map((clientName, i) => ({
       id: 'notice-offer-' + i,
       clientName,
@@ -846,23 +847,23 @@ test('smart pause opens the specific offer in the action center', async ({ page 
   await expect(actions.getByText('Priority Client', { exact: true })).toBeVisible();
   await expect(actions.getByRole('tab', { name: /Deals/ })).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: testInfo.outputPath('smart-pause-offer.png') });
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   await actions.getByRole('tab', { name: /Live/ }).click();
   await expect(actions.getByRole('tab', { name: /Live/ })).toHaveAttribute('aria-selected', 'true');
-  expect(await page.evaluate(() => (window as any).__game.getState().inspectedOfferId)).toBeNull();
+  expect(await page.evaluate(() => window.__game.getState().inspectedOfferId)).toBeNull();
   if (testInfo.project.name !== 'desktop') {
     await actions.getByRole('button', { name: 'Close action center', exact: true }).click();
     await expect(actions).toBeHidden();
   }
   await notice.getByRole('button', { name: 'Dismiss', exact: true }).click();
   await expect(notice).toBeHidden();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
 });
 
 test('bids for a city project, builds its network and collects verified payment', async ({ page }, testInfo) => {
   await startOperator(page, 'Civic Fibre');
   const quote = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, speed: 0, money: 20000000, reputation: 100 } });
     const t = g.procurement.tenders[0];
@@ -876,9 +877,9 @@ test('bids for a city project, builds its network and collects verified payment'
   await brief.getByRole('button', { name: 'Submit sealed bid', exact: true }).click();
   await expect(brief.getByRole('status')).toContainText('Sealed bid submitted');
   const bond = Math.ceil(quote.price * 0.1);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(20000000 - bond);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(20000000 - bond);
   await brief.getByRole('button', { name: 'Withdraw bid & recover bond', exact: true }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(20000000);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(20000000);
   await brief.getByRole('button', { name: 'Submit sealed bid', exact: true }).click();
   expect(await brief.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('city-tender-bid.png') });
@@ -886,9 +887,9 @@ test('bids for a city project, builds its network and collects verified payment'
   await page.screenshot({ path: testInfo.outputPath('city-project-overview.png') });
   await page.getByRole('button', { name: 'Save and exit', exact: true }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.procurement.tenders[0].bond)).toBe(bond);
+  expect(await page.evaluate(() => window.__game.getState().game.procurement.tenders[0].bond)).toBe(bond);
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, speed: 0, minutes: g.procurement.tenders[0].closesAt - 5 } });
     store.getState().setSmartPause('tenders', true);
@@ -897,10 +898,8 @@ test('bids for a city project, builds its network and collects verified payment'
   });
   const notice = page.getByRole('region', { name: 'Smart pause notification' });
   await expect(notice).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.procurement.tenders[0].status)).toBe(
-    'delivery',
-  );
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.procurement.tenders[0].status)).toBe('delivery');
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   await notice.getByRole('button', { name: /Review School fibre programme/ }).click();
   await expect(page.getByRole('heading', { name: 'Prove the network' })).toBeVisible();
   await notice.getByRole('button', { name: 'Dismiss', exact: true }).click();
@@ -911,10 +910,10 @@ test('bids for a city project, builds its network and collects verified payment'
   await page.getByRole('button', { name: /^Access/ }).click();
   await page.getByRole('checkbox', { name: /Include fibre to nearest live site/ }).check();
   const built = await page.evaluate((districtId) => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
-    const d = g.districts.find((d: any) => d.id === districtId);
-    const c = d.cells.find((c: any) => !g.nodes.some((n: any) => n.gx === c.gx && n.gy === c.gy));
+    const d = g.districts.find((d) => d.id === districtId)!;
+    const c = d.cells.find((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy))!;
     store.getState().placeNode('access', c.gx, c.gy);
     return (
       store.getState().game.nodes.length === g.nodes.length + 1 &&
@@ -931,20 +930,20 @@ test('bids for a city project, builds its network and collects verified payment'
   );
   await page.screenshot({ path: testInfo.outputPath('city-project-delivery.png') });
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.getState().setSpeed(4);
     for (let i = 0; i < 18; i++) store.getState().tick();
     store.getState().setSpeed(0);
   });
   await expect(brief.getByRole('heading', { name: 'Infrastructure accepted', exact: true })).toBeVisible();
   const settlement = await page.evaluate(() => {
-    const g = (window as any).__game.getState().game;
+    const g = window.__game.getState().game;
     const t = g.procurement.tenders[0];
     return {
       status: t.status,
       bond: t.bond,
       accepted: t.qualifyingMinutes,
-      payments: g.ledger.filter((e: any) => e.category === 'tender_payment').map((e: any) => e.amount),
+      payments: g.ledger.filter((e) => e.category === 'tender_payment').map((e) => e.amount),
     };
   });
   expect(settlement).toEqual({ status: 'completed', bond: 0, accepted: 360, payments: [quote.price] });
@@ -961,13 +960,13 @@ test('bids for a city project, builds its network and collects verified payment'
 test('market control launches, saves and settles a paid district operation', async ({ page }, testInfo) => {
   await startOperator(page, 'Market Operator');
   const districts = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, speed: 0, money: 2000000, reputation: 60 } });
     return {
-      home: g.districts.find((d: any) => d.unlocked),
-      locked: g.districts.find((d: any) => !d.unlocked),
-      customers: g.packages.reduce((n: number, p: any) => n + p.subscribers, 0),
+      home: g.districts.find((d) => d.unlocked)!,
+      locked: g.districts.find((d) => !d.unlocked)!,
+      customers: g.packages.reduce((n: number, p) => n + p.subscribers, 0),
     };
   });
   await page.getByRole('button', { name: 'Company', exact: true }).click();
@@ -986,11 +985,11 @@ test('market control launches, saves and settles a paid district operation', asy
   await operation.getByRole('button', { name: 'Launch Switcher programme', exact: true }).click();
   await expect(operation.getByText('Operation in progress', { exact: true })).toBeVisible();
   const launched = await page.evaluate(() => {
-    const g = (window as any).__game.getState().game;
+    const g = window.__game.getState().game;
     return {
       money: g.money,
       operation: g.competition.operations[0],
-      customers: g.packages.reduce((n: number, p: any) => n + p.subscribers, 0),
+      customers: g.packages.reduce((n: number, p) => n + p.subscribers, 0),
     };
   });
   expect(launched.money).toBe(2000000 - launched.operation.cost);
@@ -998,11 +997,11 @@ test('market control launches, saves and settles a paid district operation', asy
   await page.screenshot({ path: testInfo.outputPath('market-operation.png') });
   await page.getByRole('button', { name: 'Save and exit', exact: true }).click();
   await page.getByRole('button', { name: /Continue · Slot 1/ }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.competition.operations[0].id)).toBe(
+  expect(await page.evaluate(() => window.__game.getState().game.competition.operations[0].id)).toBe(
     launched.operation.id,
   );
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, minutes: g.competition.operations[0].endsAt - 5, speed: 0 } });
     store.getState().setSmartPause('market', true);
@@ -1014,11 +1013,11 @@ test('market control launches, saves and settles a paid district operation', asy
   const results = page.getByRole('region', { name: 'Operation results', exact: true });
   await expect(results.getByText(/Completed · Day/)).toBeVisible();
   const settled = await page.evaluate(() => {
-    const g = (window as any).__game.getState().game;
+    const g = window.__game.getState().game;
     return {
       active: g.competition.operations.length,
       history: g.competition.history.length,
-      charges: g.ledger.filter((e: any) => e.category === 'market_operation').length,
+      charges: g.ledger.filter((e) => e.category === 'market_operation').length,
     };
   });
   expect(settled).toEqual({ active: 0, history: 1, charges: 1 });
@@ -1036,7 +1035,7 @@ test('rival offensive pauses play and service promises carry cancellation risk',
   await settings.getByRole('checkbox', { name: 'Market competition', exact: true }).check();
   await settings.getByRole('button', { name: 'Done', exact: true }).click();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({
       game: {
@@ -1052,7 +1051,7 @@ test('rival offensive pauses play and service promises carry cancellation risk',
   });
   const notice = page.getByRole('region', { name: 'Smart pause notification', exact: true });
   await expect(notice).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.speed)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.speed)).toBe(0);
   await notice.getByRole('button', { name: /Review .*Local price offensive/ }).click();
   await notice.getByRole('button', { name: 'Dismiss', exact: true }).click();
   const desk = page.getByRole('region', { name: 'District competition desk', exact: true });
@@ -1061,13 +1060,13 @@ test('rival offensive pauses play and service promises carry cancellation risk',
   await desk.getByRole('button', { name: 'Launch Service promise', exact: true }).click();
   await expect(desk.getByText('Service standard not met', { exact: true })).toBeVisible();
   const before = await page.evaluate(() => ({
-    money: (window as any).__game.getState().game.money,
-    reputation: (window as any).__game.getState().game.reputation,
+    money: window.__game.getState().game.money,
+    reputation: window.__game.getState().game.reputation,
   }));
   await page.screenshot({ path: testInfo.outputPath('market-service-risk.png') });
   await desk.getByRole('button', { name: /End operation · no refund · −3 reputation/ }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(before.money);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.reputation)).toBe(before.reputation - 3);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(before.money);
+  expect(await page.evaluate(() => window.__game.getState().game.reputation)).toBe(before.reputation - 3);
   await expect(
     page.getByRole('region', { name: 'Operation results', exact: true }).getByText(/Ended early/),
   ).toBeVisible();

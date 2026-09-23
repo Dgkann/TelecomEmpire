@@ -5,7 +5,7 @@ test('edge research can precede construction and respects cash, points and labor
 }, testInfo) => {
   await page.goto('/');
   const originalNodes = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store
       .getState()
       .newGame({ companyName: 'Research first', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 811 });
@@ -29,12 +29,12 @@ test('edge research can precede construction and respects cash, points and labor
   await expect(option).toContainText('5.000.000 ₺ · 60 araştırma puanı · 28 oyun günü');
   await expect(start).toBeDisabled();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, money: 8000000, researchPoints: 59 } });
   });
   await expect(start).toBeDisabled();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({
       game: { ...store.getState().game, researchPoints: 60, researchActive: { id: 'mobile_4g', daysLeft: 4 } },
     });
@@ -42,7 +42,7 @@ test('edge research can precede construction and respects cash, points and labor
   await expect(start).toBeDisabled();
   await expect(option).toContainText('Önce süren araştırmanın tamamlanmasını bekle.');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, researchActive: null } });
   });
   await expect(start).toBeEnabled();
@@ -52,12 +52,12 @@ test('edge research can precede construction and respects cash, points and labor
   await start.click();
   expect(
     await page.evaluate(() => {
-      const game = (window as any).__game.getState().game;
+      const game = window.__game.getState().game;
       return { money: game.money, points: game.researchPoints, active: game.researchActive, nodes: game.nodes };
     }),
   ).toEqual({ money: 3000000, points: 0, active: { id: 'edge_compute', daysLeft: 28 }, nodes: originalNodes });
   await expect(option.getByRole('button', { name: 'Edge araştırması sürüyor' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Veri merkezi yerini seç' })).toBeEnabled();
-  await page.evaluate(() => (window as any).__game.getState().setLocale('en'));
+  await page.evaluate(() => window.__game.getState().setLocale('en'));
   await expect(page.getByRole('region', { name: 'Research first option' })).toContainText('Edge research in progress');
 });

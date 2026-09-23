@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 async function setup(page: Page) {
   await page.goto('/');
   return page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store
       .getState()
       .newGame({ companyName: 'Restoration', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 811 });
@@ -22,21 +22,21 @@ test('restoration saves, repairs three faults and rewards without changing the l
   await page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' }).click();
   const dialog = page.getByRole('dialog', { name: 'Kesintiyi gider', exact: true });
   await expect(dialog.getByRole('button', { name: 'Rotayı doğrula' })).toBeDisabled();
-  const initial = await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active);
+  const initial = await page.evaluate(() => window.__game.getState().game.signalTraining.active);
   expect(initial.rotations.filter(Boolean)).toHaveLength(3);
   const board = dialog.getByRole('group', { name: 'Kablo panosu' });
   await board
     .getByRole('button')
     .nth(initial.rotations.findIndex((r: number) => r !== 0))
     .click();
-  const saved = await page.evaluate(() => (window as any).__game.getState().game.signalTraining);
+  const saved = await page.evaluate(() => window.__game.getState().game.signalTraining);
   await dialog.getByRole('button', { name: 'İlerlemeyi kaydet' }).click();
   await page.reload();
   await page.evaluate(() => {
-    if (!(window as any).__game.getState().continueGame()) throw new Error('Could not load restoration');
+    if (!window.__game.getState().continueGame()) throw new Error('Could not load restoration');
   });
   await expect(dialog).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining)).toEqual(saved);
+  expect(await page.evaluate(() => window.__game.getState().game.signalTraining)).toEqual(saved);
   for (let i = 0; i < saved.active.rotations.length; i++) {
     for (let j = 0; j < (4 - saved.active.rotations[i]) % 4; j++) await board.getByRole('button').nth(i).click();
   }
@@ -44,7 +44,7 @@ test('restoration saves, repairs three faults and rewards without changing the l
   await expect(dialog).toContainText('Bağlantı tamamlandı! Ödül alındı');
   expect(
     await page.evaluate(() => {
-      const store = (window as any).__game;
+      const store = window.__game;
       store.getState().setSpeed(4);
       store.getState().tick();
       store.getState().submitSignalTraining();
@@ -61,7 +61,7 @@ test('restoration saves, repairs three faults and rewards without changing the l
   expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('restoration-complete-tr.png') });
   await dialog.getByRole('button', { name: 'Şirkete dön' }).click();
-  await page.evaluate(() => (window as any).__game.getState().setLocale('en'));
+  await page.evaluate(() => window.__game.getState().setLocale('en'));
   await page.getByRole('button', { name: 'Projects', exact: true }).click();
   await page.getByRole('button', { name: 'Restore service · 3 faults' }).click();
   await expect(page.getByRole('dialog', { name: 'Restore service', exact: true })).toContainText(
@@ -72,7 +72,7 @@ test('restoration saves, repairs three faults and rewards without changing the l
 test('the dialog distinguishes actual research bonuses from practice without rewards', async ({ page }) => {
   const original = await setup(page);
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, researchActive: { id: 'ftth', daysLeft: 0.25 } } });
   });
   await page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' }).click();
@@ -81,18 +81,18 @@ test('the dialog distinguishes actual research bonuses from practice without rew
   await expect(preview).toContainText('30k ₺ + 3 AP');
   await expect(preview).toContainText('0,25 oyun günü');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, researchActive: null } });
   });
   await expect(preview).toContainText('araştırma bonusu birikmez');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({ game: { ...g, signalTraining: { ...g.signalTraining, nextRewardAt: g.minutes + 1441 } } });
   });
   await expect(preview).toContainText('Ödülsüz alıştırma · Yeni ödüle 2 oyun günü');
   await expect(preview).not.toContainText('30k');
-  const rotations = await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.rotations);
+  const rotations = await page.evaluate(() => window.__game.getState().game.signalTraining.active.rotations);
   const tiles = dialog.getByRole('group', { name: 'Kablo panosu' }).getByRole('button');
   for (let i = 0; i < rotations.length; i++) {
     for (let j = 0; j < (4 - rotations[i]) % 4; j++) await tiles.nth(i).click();
@@ -100,7 +100,7 @@ test('the dialog distinguishes actual research bonuses from practice without rew
   await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
   await expect(dialog).toContainText('Alıştırma tamamlandı! Bu tur ödülsüzdü.');
   await expect(preview).toHaveCount(0);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(original.money);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(original.money);
 });
 
 test('keyboard navigation stays within the board and only rotation keys spend moves', async ({ page }) => {
@@ -126,10 +126,10 @@ test('keyboard navigation stays within the board and only rotation keys spend mo
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   await expect(tiles.nth(15)).toBeFocused();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.moves)).toBe(0);
+  expect(await page.evaluate(() => window.__game.getState().game.signalTraining.active.moves)).toBe(0);
   await page.keyboard.press('Space');
   await page.keyboard.press('Enter');
-  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.moves)).toBe(2);
+  expect(await page.evaluate(() => window.__game.getState().game.signalTraining.active.moves)).toBe(2);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(launch).toBeFocused();
@@ -140,22 +140,22 @@ test('optional hints identify a cable without spending moves or rewards', async 
   const launch = page.getByRole('button', { name: 'Kesintiyi gider · 3 arıza' });
   await launch.click();
   const dialog = page.getByRole('dialog', { name: 'Kesintiyi gider', exact: true });
-  const before = await page.evaluate(() => (window as any).__game.getState().game.signalTraining);
+  const before = await page.evaluate(() => window.__game.getState().game.signalTraining);
   await dialog.getByRole('button', { name: 'İpucu göster' }).click();
   await expect(dialog.getByText(/İpucu: .*Ödülün değişmez/)).toBeVisible();
   const tile = dialog.getByRole('button', { name: /, ipucu$/ });
   await expect(tile).toHaveCount(1);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining)).toEqual(before);
+  expect(await page.evaluate(() => window.__game.getState().game.signalTraining)).toEqual(before);
   expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('restoration-hint-tr.png') });
   await tile.click();
   await expect(dialog.getByText(/İpucu: .*Ödülün değişmez/)).toHaveCount(0);
-  expect(await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.moves)).toBe(1);
+  expect(await page.evaluate(() => window.__game.getState().game.signalTraining.active.moves)).toBe(1);
   await dialog.getByRole('button', { name: 'İpucu göster' }).click();
   await dialog.press('Escape');
   await launch.click();
   await expect(dialog.getByRole('button', { name: /, ipucu$/ })).toHaveCount(0);
-  const rotations = await page.evaluate(() => (window as any).__game.getState().game.signalTraining.active.rotations);
+  const rotations = await page.evaluate(() => window.__game.getState().game.signalTraining.active.rotations);
   const board = dialog.getByRole('group', { name: 'Kablo panosu' });
   await dialog.getByRole('button', { name: 'İpucu göster' }).click();
   for (let i = 0; i < rotations.length; i++) {
@@ -163,5 +163,5 @@ test('optional hints identify a cable without spending moves or rewards', async 
   }
   await expect(dialog.getByRole('button', { name: 'İpucu göster' })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Rotayı doğrula' }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.money)).toBe(original.money + 30000);
+  expect(await page.evaluate(() => window.__game.getState().game.money)).toBe(original.money + 30000);
 });

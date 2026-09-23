@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "@playwright/test", "node"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["tests/global.d.ts", "tests/e2e/**/*.ts", "tests/performance/**/*.ts"]
+}

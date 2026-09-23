@@ -1,22 +1,13 @@
 import { startMarketOperation, cancelMarketOperation } from '../game/competition';
 import { initialNodeTier, nodeCapitalCost } from '../game/constants';
-import { commissionCapacityPlan, type CapacityUpgrade } from '../game/capacityLab';
-import type { MarketTactic, PackageSegment } from '../game/types';
+import { commissionCapacityPlan } from '../game/capacityLab';
+import type { PackageSegment } from '../game/types';
 import { submitTenderBid, withdrawTenderBid } from '../game/procurement';
-import {
-  SMART_PAUSE_KEY,
-  SMART_PAUSE_OPTIONS,
-  loadSmartPausePreferences,
-  smartPauseEvents,
-  type SmartPausePreferences,
-  type SmartPauseKind,
-  type SmartPauseNotice,
-} from '../game/smartPause';
+import { SMART_PAUSE_KEY, SMART_PAUSE_OPTIONS, loadSmartPausePreferences, smartPauseEvents } from '../game/smartPause';
 import { updateCompanyIdentity } from '../game/identity';
 import { CREW_HIRE_COST, STAFF_HIRE_COST, STAFF_ROLE_INFO, STAFF_SALARY } from '../game/staff';
 import { buildSolar, setEnergyPlan as applyEnergyPlan } from '../game/energy';
-import { launchDistrict as buildDistrictLaunch, type ExpansionKind } from '../game/expansion';
-import type { FailureTarget } from '../game/failureDrill';
+import { launchDistrict as buildDistrictLaunch } from '../game/expansion';
 import { buildBackupRoute } from '../game/redundancyBuild';
 import { grantStarterSpectrum } from '../game/spectrum';
 import { buildConnectedSite } from '../game/connectedBuild';
@@ -32,9 +23,9 @@ import {
   nodeUpgradeCost,
 } from '../game/constants';
 import { effectiveNodeCapacity } from '../game/capacity';
-import { resolveNegotiation, type NegotiationMode } from '../game/contracts';
+import { resolveNegotiation } from '../game/contracts';
 import { computeRoutes, districtRedundancy } from '../game/network';
-import { dispatchCandidates, repairCost, type RepairMode } from '../game/incidents';
+import { dispatchCandidates, repairCost } from '../game/incidents';
 import { createLoan, creditLimit } from '../game/finance';
 import { recordLedger } from '../game/financeLedger';
 import { fibreConnectionCost, fibreConnectionIssue, nodePlacementCost, nodePlacementIssue } from '../game/placement';
@@ -54,7 +45,6 @@ import {
   redistributePackages,
   residentialSubs,
   step,
-  type NewGameOptions,
 } from '../game/simulation';
 import { uid } from '../game/rng';
 import { personName } from '../game/names';
@@ -70,159 +60,13 @@ import {
   maintenanceStart,
   dataCenterModeChangeCost,
 } from '../game/strategy';
-import type {
-  CampaignKind,
-  EnergyPlan,
-  DataCenterMode,
-  GameState,
-  InterconnectPlan,
-  MaintenanceMode,
-  NodeKind,
-  OverlayMode,
-  Screen,
-  Speed,
-  StaffRole,
-  TrafficPolicy,
-} from '../game/types';
+import type { GameState } from '../game/types';
 import type { Locale } from '../ui/i18n';
 import { researchCopy } from '../game/researchCopy';
 import { line, setGameLanguage } from '../game/lang';
+import type { Store, UiState } from './types';
 
-export type BuildTool = NodeKind | 'fiber' | null;
-
-export interface Selection {
-  type: 'node' | 'link' | 'district' | 'building';
-  id: string;
-}
-
-export interface Toast {
-  id: string;
-  text: string;
-  tone: 'good' | 'bad' | 'info';
-  // Grid position for floating map toasts; omitted for corner toasts.
-  gx?: number;
-  gy?: number;
-}
-
-interface UiState {
-  inspectedOfferId: string | null;
-  smartPauseNotice: SmartPauseNotice | null;
-  drillTarget: FailureTarget | null;
-  autoConnect: boolean;
-  planning: boolean;
-  blueprint: BuildStep[];
-  screen: Screen;
-  overlay: OverlayMode;
-  tool: BuildTool;
-  // First endpoint chosen while drawing fibre.
-  linkFrom: string | null;
-  selection: Selection | null;
-  focusOn: { gx: number; gy: number; at: number } | null;
-  openIncidentId: string | null;
-  toasts: Toast[];
-  soundOn: boolean;
-  showHelp: boolean;
-  showSaveManager: boolean;
-  activeSaveSlot: number;
-  persistenceError: string | null;
-  locale: Locale;
-}
-
-interface Store extends UiState {
-  commissionUpgrades: (items: CapacityUpgrade[]) => boolean;
-  launchMarketOperation: (districtId: string, kind: MarketTactic) => boolean;
-  endMarketOperation: (id: string) => boolean;
-  bidOnTender: (id: string, price: number) => boolean;
-  withdrawTender: (id: string) => boolean;
-  inspectOffer: (id: string | null) => void;
-  smartPause: SmartPausePreferences;
-  setSmartPause: (kind: SmartPauseKind, enabled: boolean) => boolean;
-  dismissSmartPause: () => void;
-  beginFailureDrill: (target: FailureTarget) => void;
-  endFailureDrill: () => void;
-  setAutoConnect: (value: boolean) => void;
-  addBackupRoute: (nodeId: string) => void;
-  beginBlueprint: () => void;
-  discardBlueprint: () => void;
-  undoBlueprint: () => void;
-  commitBlueprint: () => void;
-  game: GameState | null;
-  started: boolean;
-
-  newGame: (opts: NewGameOptions, slot?: number) => boolean;
-  continueGame: (slot?: number) => boolean;
-  resetSave: () => void;
-  save: () => boolean;
-  updateIdentity: (name: string, logo: string) => boolean;
-  quitToMenu: () => boolean;
-  advanceCampaign: () => boolean;
-
-  tick: () => void;
-  startSignalTraining: (size: 4 | 5, mode?: 'routing' | 'fault' | 'restoration') => void;
-  rotateSignalTile: (index: number) => void;
-  submitSignalTraining: () => boolean;
-  closeSignalTraining: () => void;
-  setSpeed: (speed: Speed) => void;
-
-  setScreen: (screen: Screen) => void;
-  setOverlay: (overlay: OverlayMode) => void;
-  setTool: (tool: BuildTool) => void;
-  select: (selection: Selection | null) => void;
-  focus: (gx: number, gy: number) => void;
-  openIncident: (id: string | null) => void;
-  toast: (text: string, tone?: Toast['tone'], gx?: number, gy?: number) => void;
-  dismissToast: (id: string) => void;
-  toggleSound: () => void;
-  setShowHelp: (v: boolean) => void;
-  setShowSaveManager: (v: boolean) => void;
-  setLocale: (locale: Locale) => void;
-  saveToSlot: (slot: number) => boolean;
-
-  placeNode: (kind: NodeKind, gx: number, gy: number) => void;
-  clickNodeForLink: (nodeId: string) => void;
-  cancelBuild: () => void;
-  upgradeNode: (id: string) => void;
-  repairNode: (id: string) => void;
-  scheduleMaintenance: (id: string, mode: MaintenanceMode) => void;
-  cancelMaintenance: (orderId: string) => void;
-  sellNode: (id: string) => void;
-  upgradeLink: (id: string) => void;
-  sellLink: (id: string) => void;
-
-  unlockDistrict: (id: string) => void;
-  launchDistrict: (id: string, kind: ExpansionKind) => void;
-  updatePackage: (id: string, patch: { price?: number; speedMbps?: number; active?: boolean; name?: string }) => void;
-  startResearch: (id: string) => void;
-  acceptOffer: (id: string, mode?: NegotiationMode) => void;
-  declineOffer: (id: string) => void;
-  dispatchTech: (incidentId: string, mode: RepairMode, techId?: string) => void;
-  hireTechnician: () => void;
-  hireEmployee: (role: StaffRole) => void;
-  fireStaff: (id: string) => void;
-  placeBid: (amount: number) => void;
-  dismissAuction: () => void;
-  setMarketing: (value: number) => void;
-  setRetention: (value: number) => void;
-  startCampaign: (districtId: string, kind: CampaignKind) => void;
-  setTrafficPolicy: (policy: TrafficPolicy) => void;
-  setInterconnectPlan: (plan: InterconnectPlan) => void;
-  toggleWholesaleFixed: () => void;
-  toggleMvno: () => void;
-  setDataCenterMode: (nodeId: string, mode: DataCenterMode) => void;
-  takeLoan: (principal: number, termMonths: number) => void;
-  repayLoan: (id: string) => void;
-  setTransitTier: (tier: number) => void;
-  toggleBackupTransit: () => void;
-  setEnergyPlan: (plan: EnergyPlan) => boolean;
-  installSolar: (nodeId: string) => boolean;
-  toggleAutoDispatch: () => void;
-  advanceTutorial: (stepIndex: number) => void;
-  skipTutorial: () => void;
-  claimMilestone: (id: string) => void;
-  resolveBoardDecision: (id: string, option: string) => void;
-  acquireRival: (id: string) => void;
-  claimCharter: () => void;
-}
+export type { BuildTool, Selection, Toast } from './types';
 
 function initialLocale(): Locale {
   try {
@@ -1951,6 +1795,8 @@ export const useGame = create<Store>((set, get) => ({
 
   skipTutorial: () => withGame(set, (draft) => void (draft.tutorialDone = true)),
 }));
+
+export type GameStore = typeof useGame;
 
 if (typeof window !== 'undefined' && import.meta.env.VITE_E2E === 'true') {
   (window as unknown as { __game?: typeof useGame }).__game = useGame;

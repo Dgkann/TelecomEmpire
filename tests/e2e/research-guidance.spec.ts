@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('research roadmap explains both shortfalls, starts once and survives saving', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store
       .getState()
       .newGame({ companyName: 'Research route', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 12345 });
@@ -22,7 +22,7 @@ test('research roadmap explains both shortfalls, starts once and survives saving
   expect(await roadmap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('research-roadmap-tr.png') });
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, money: 1000000, researchPoints: 20 } });
   });
   await expect(start).toBeEnabled();
@@ -30,7 +30,7 @@ test('research roadmap explains both shortfalls, starts once and survives saving
   await expect(roadmap.getByRole('heading')).toHaveText('Sonraki araştırma: 10G fiber');
   await expect(start).toBeDisabled();
   const persisted = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     if (!store.getState().save()) throw new Error('Save failed');
     store.getState().continueGame();
     const game = store.getState().game;
@@ -39,7 +39,7 @@ test('research roadmap explains both shortfalls, starts once and survives saving
   // Eight spare points pay 9,600 of the 600,000 bill and are spent with the requirement.
   expect(persisted).toEqual({ money: 409600, points: 0, active: { id: 'ftth', daysLeft: 12 } });
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.getState().setLocale('en');
     store.getState().setScreen('research');
   });
@@ -49,7 +49,7 @@ test('research roadmap explains both shortfalls, starts once and survives saving
 test('4G guidance charges the revised budget once and restores the active research', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store
       .getState()
       .newGame({ companyName: 'Mobile launch', logo: 'x', difficulty: 'standard', cityName: 'Marmara', seed: 4242 });
@@ -74,7 +74,7 @@ test('4G guidance charges the revised budget once and restores the active resear
   await expect(roadmap).toContainText('Hedef araştırması sürüyor');
   await expect(roadmap).toContainText('Hedefe kadar kalan araştırma bedeli: 0 ₺');
   const result = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.getState().startResearch('mobile_4g');
     if (!store.getState().save() || !store.getState().continueGame()) throw new Error('Save roundtrip failed');
     const game = store.getState().game;

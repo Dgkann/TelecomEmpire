@@ -8,12 +8,12 @@ test('Turkish management screens fit the viewport and research explains its next
   await page.getByPlaceholder('Company name').fill('Release Review');
   await page.getByRole('button', { name: 'Start building' }).click();
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.setState({ game: { ...store.getState().game, speed: 0, tutorialDone: true } });
     store.getState().setLocale('tr');
   });
-  for (const screen of ['network', 'company', 'research', 'projects', 'market']) {
-    await page.evaluate((name) => (window as any).__game.getState().setScreen(name), screen);
+  for (const screen of ['network', 'company', 'research', 'projects', 'market'] as const) {
+    await page.evaluate((name) => window.__game.getState().setScreen(name), screen);
     const shell = page.locator('.screen-shell');
     await expect(shell).toBeVisible();
     expect(await shell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), screen).toBe(true);
@@ -32,24 +32,24 @@ test('onboarding selects the build tool and requires a POP upgrade, not a core u
   await page.getByRole('button', { name: 'Commission new network' }).click();
   await page.getByPlaceholder('Company name').fill('Guide Review');
   await page.getByRole('button', { name: 'Start building' }).click();
-  await page.evaluate(() => (window as any).__game.getState().setSpeed(0));
+  await page.evaluate(() => window.__game.getState().setSpeed(0));
   await page.getByRole('button', { name: 'Select POP', exact: true }).click();
-  expect(await page.evaluate(() => (window as any).__game.getState().tool)).toBe('pop');
+  expect(await page.evaluate(() => window.__game.getState().tool)).toBe('pop');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     const g = store.getState().game;
     store.setState({
       tool: null,
-      game: { ...g, tutorialStep: 3, nodes: g.nodes.map((n: any) => (n.kind === 'core' ? { ...n, tier: 2 } : n)) },
+      game: { ...g, tutorialStep: 3, nodes: g.nodes.map((n) => (n.kind === 'core' ? { ...n, tier: 2 } : n)) },
     });
   });
   await expect(page.getByRole('button', { name: 'Inspect a POP', exact: true })).toBeVisible();
-  expect(await page.evaluate(() => (window as any).__game.getState().game.tutorialStep)).toBe(3);
+  expect(await page.evaluate(() => window.__game.getState().game.tutorialStep)).toBe(3);
   await page.getByRole('button', { name: 'Inspect a POP', exact: true }).click();
   expect(
     await page.evaluate(() => {
-      const s = (window as any).__game.getState();
-      return s.game.nodes.find((n: any) => n.id === s.selection.id).kind;
+      const s = window.__game.getState();
+      return s.game.nodes.find((n) => n.id === s.selection!.id)!.kind;
     }),
   ).toBe('pop');
 });
@@ -57,7 +57,7 @@ test('onboarding selects the build tool and requires a POP upgrade, not a core u
 test('all campaign transitions preserve company identity and survive reload', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.getState().newGame({
       companyName: 'Campaign Review',
       logo: 'x',

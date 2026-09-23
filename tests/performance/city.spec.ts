@@ -7,7 +7,7 @@ test('profiles a seeded city at 4x with a busy network', async ({ page }, testIn
   await page.mouse.click(5, 5);
   const setup = await page.evaluate(
     ({ siteCount, settled }) => {
-      const store = (window as any).__game;
+      const store = window.__game;
       store.getState().newGame({
         companyName: 'Performance lab',
         logo: 'x',
@@ -22,14 +22,14 @@ test('profiles a seeded city at 4x with a busy network', async ({ page }, testIn
           speed: 0,
           money: 100000000,
           tutorialDone: true,
-          districts: g.districts.map((d: any) => ({ ...d, unlocked: true })),
+          districts: g.districts.map((d) => ({ ...d, unlocked: true })),
         },
         autoConnect: true,
       });
       g = store.getState().game;
       const cells = g.districts
-        .flatMap((d: any) => d.cells)
-        .filter((c: any) => !g.nodes.some((n: any) => n.gx === c.gx && n.gy === c.gy));
+        .flatMap((d) => d.cells)
+        .filter((c) => !g.nodes.some((n) => n.gx === c.gx && n.gy === c.gy));
       for (const c of cells.slice(0, siteCount)) store.getState().placeNode('access', c.gx, c.gy);
       store.getState().cancelBuild();
       if (settled) {
@@ -39,8 +39,8 @@ test('profiles a seeded city at 4x with a busy network', async ({ page }, testIn
             ...live,
             minutes: 1430,
             autosaveAt: 0,
-            buildings: live.buildings.map((b: any) => ({ ...b, connected: 0.65 })),
-            districts: live.districts.map((d: any) => ({ ...d, coverage: 0.75 })),
+            buildings: live.buildings.map((b) => ({ ...b, connected: 0.65 })),
+            districts: live.districts.map((d) => ({ ...d, coverage: 0.75 })),
           },
         });
       }
@@ -65,7 +65,7 @@ test('profiles a seeded city at 4x with a busy network', async ({ page }, testIn
   const before = await client.send('Performance.getMetrics');
   const metrics = await page.evaluate(
     async ({ duration, pan }) => {
-      const store = (window as any).__game;
+      const store = window.__game;
       const frames: number[] = [],
         longTasks: number[] = [],
         ticks: number[] = [];
@@ -155,7 +155,8 @@ test('profiles a seeded city at 4x with a busy network', async ({ page }, testIn
     fs.writeFileSync(process.env.PERF_PROFILE, JSON.stringify(profile));
   }
   const after = await client.send('Performance.getMetrics');
-  const metricsByName = (r: any) => Object.fromEntries(r.metrics.map((m: any) => [m.name, m.value]));
+  const metricsByName = (result: typeof after) =>
+    Object.fromEntries(result.metrics.map((metric) => [metric.name, metric.value]));
   const a = metricsByName(after),
     b = metricsByName(before);
   const summary = {

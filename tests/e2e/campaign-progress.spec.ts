@@ -5,7 +5,7 @@ test('campaign victory explains retained research and initializes mobile service
 }, testInfo) => {
   await page.goto('/');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store.getState().newGame({
       companyName: 'Continued research',
       logo: 'x',
@@ -37,7 +37,7 @@ test('campaign victory explains retained research and initializes mobile service
   await page.screenshot({ path: testInfo.outputPath('campaign-carryover-tr.png') });
   await dialog.getByRole('button', { name: 'Karadeniz kampanyasına geç' }).click();
   const result = await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     if (!store.getState().continueGame()) throw new Error('City save failed');
     const game = store.getState().game;
     return {
@@ -64,7 +64,7 @@ test('reputation points to the actual obligation and completed edge research poi
 }, testInfo) => {
   await page.goto('/');
   await page.evaluate(() => {
-    const store = (window as any).__game;
+    const store = window.__game;
     store
       .getState()
       .newGame({ companyName: 'Actionable progress', logo: 'x', difficulty: 'standard', cityName: 'Ege', seed: 7311 });
@@ -103,13 +103,13 @@ test('reputation points to the actual obligation and completed edge research poi
   await page.screenshot({ path: testInfo.outputPath('reputation-tr.png') });
   await reputation.getByRole('button', { name: 'Paket fiyatlarını aç' }).click();
   await expect(page.locator('#pricing')).toBeInViewport();
-  await page.evaluate(() => (window as any).__game.getState().setScreen('research'));
+  await page.evaluate(() => window.__game.getState().setScreen('research'));
   const construction = page.getByRole('region', { name: 'Veri merkezi kurulumu' });
   await expect(construction).toContainText('1.200.000 ₺');
   await construction.getByRole('button', { name: 'Veri merkezi yerini seç' }).click();
   expect(
     await page.evaluate(() => {
-      const s = (window as any).__game.getState();
+      const s = window.__game.getState();
       return { tool: s.tool, screen: s.screen, autoConnect: s.autoConnect };
     }),
   ).toEqual({ tool: 'datacenter', screen: 'map', autoConnect: true });
