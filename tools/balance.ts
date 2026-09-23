@@ -10,7 +10,7 @@ import {
 } from '../src/game/constants';
 import { monthlyBreakdown } from '../src/game/economy';
 import { RESEARCH, researchModifiers } from '../src/game/research';
-import { operationsInsights } from '../src/game/operations';
+import { transitHeadroom } from '../src/game/operations';
 import type { GameState } from '../src/game/types';
 
 (globalThis as any).localStorage = {
@@ -158,10 +158,9 @@ for (let day = 0; day < DAYS; day++) {
     }
   }
   g.offers = [];
-  // 4. buy upstream when the game says so
-  if (operationsInsights(g).some((i) => i.id === 'transit-headroom') && g.transitTier < TRANSIT_TIERS.length - 1) {
-    g.transitTier += 1;
-  }
+  // 4. buy upstream at the same 75% headroom the game warns at
+  const upstream = transitHeadroom(g);
+  if (upstream.use >= 0.75 && upstream.next) g.transitTier += 1;
   // 5. research in order, which is what lifts the coverage ceiling off 75%
   if (!g.researchActive) {
     const next = RESEARCH.find(
