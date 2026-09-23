@@ -122,7 +122,7 @@ export const SCENARIOS: ScenarioDefinition[] = [
     nameTr: 'Hizmet standardı',
     description: 'Grow across the city while keeping the operator trusted.',
     descriptionTr: 'Operatörün itibarını koruyarak şehir genelinde büyü.',
-    deadlineDays: 450,
+    deadlineDays: 540,
     objectives: [customers(5000), districts(4), reputation(75), mobile],
   },
   {

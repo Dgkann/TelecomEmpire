@@ -5060,7 +5060,7 @@ group('Service standard launch window');
   const g = { ...newGame(4242), scenarioId: 'service_standard' as const, minutes: MINUTES_PER_DAY * 400 };
   check(
     'Karadeniz gives a growing operator time beyond its old deadline',
-    !scenarioStatus(g).expired && scenarioStatus(g).daysLeft === 50,
+    !scenarioStatus(g).expired && scenarioStatus(g).daysLeft === 140,
   );
   check(
     'the extension still requires all four service objectives',
@@ -5068,7 +5068,7 @@ group('Service standard launch window');
   );
   check(
     'an unfinished operator still loses after the extended window',
-    scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 451 }).expired,
+    scenarioStatus({ ...g, minutes: MINUTES_PER_DAY * 541 }).expired,
   );
 }
 
