@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased
+
+Save schema 26, unchanged: existing 1.0.0 and 1.1.0 saves load without migration.
+
+### Added
+
+- The operations queue promotes one clear operator briefing above the supporting
+  priorities, with a direct action for the most urgent network or business task.
+- Timed scenarios warn when the least complete objective falls behind the
+  campaign clock and send the player to the screen that can improve it.
+
+### Changed
+
+- Karadeniz's service-standard deadline is 540 days instead of 450. In the
+  release audit's six-seed campaign run with the careful policy, three campaigns
+  finished instead of two; the other three still missed Karadeniz's deadline,
+  90 days later than before.
+- Store contracts live in a dedicated type module, and the browser and
+  performance suites compile against the real store bridge instead of 164
+  untyped window accesses.
+
+### Fixed
+
+- Scenario objective details, such as customer counts and loan status, appeared
+  in English on Turkish screens.
+
+### Performance
+
+- The map reuses site and fibre render inputs until a visible field changes and
+  buckets live load rings to whole percentages. On a 152-site city at 4x CPU
+  throttling, page script fell from 2.3 s to 2.0 s per 10 s and the
+  95th-percentile frame from 67 ms to 50 ms; the single longest frame did not
+  improve.
+
+### Quality
+
+- 745 headless simulation checks, up from 744, and 141 browser test cases, up
+  from 138.
+- `npm run balance` reads transit headroom directly instead of relying on the
+  three-item priority list, which the new campaign warning can fill.
+
 ## 1.1.0 — 2026-09-22
 
 Save schema 26, unchanged: 1.0.0 saves load as they are.
