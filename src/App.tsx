@@ -89,10 +89,6 @@ function useHotkeys() {
       } else if (e.key === '1') setSpeed(1);
       else if (e.key === '2') setSpeed(2);
       else if (e.key === '3') setSpeed(4);
-      else if (e.key === 'Escape') {
-        cancelBuild();
-        select(null);
-      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
