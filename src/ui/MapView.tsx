@@ -42,6 +42,71 @@ interface Camera {
   zoom: number;
 }
 
+interface StableMapEntry<T> {
+  signature: string;
+  value: T;
+}
+
+function sameItems<T>(a: readonly T[], b: readonly T[]) {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
+// Simulation produces fresh objects every tick. Keep map-facing references stable until
+// something the glyphs can actually display changes, and bucket load to whole percentages.
+function useStableMapAssets(nodes: NetNode[], links: NetLink[]) {
+  const nodeCache = useRef(new Map<string, StableMapEntry<NetNode>>());
+  const linkCache = useRef(new Map<string, StableMapEntry<NetLink>>());
+  const last = useRef<{ stableNodes: NetNode[]; stableLinks: NetLink[] } | null>(null);
+
+  return useMemo(() => {
+    const nodeIds = new Set<string>();
+    const stableNodes = nodes.map((node) => {
+      nodeIds.add(node.id);
+      const load = Math.round((node.trafficGbps / Math.max(0.01, node.capacityGbps)) * 100);
+      const signature = [
+        node.kind,
+        node.name,
+        node.gx,
+        node.gy,
+        node.districtId,
+        node.tier,
+        node.capacityGbps,
+        load,
+        Number(node.down),
+      ].join('|');
+      const previous = nodeCache.current.get(node.id);
+      if (previous?.signature === signature) return previous.value;
+      const value = { ...node, trafficGbps: (load / 100) * node.capacityGbps };
+      nodeCache.current.set(node.id, { signature, value });
+      return value;
+    });
+    for (const id of nodeCache.current.keys()) if (!nodeIds.has(id)) nodeCache.current.delete(id);
+
+    const linkIds = new Set<string>();
+    const stableLinks = links.map((link) => {
+      linkIds.add(link.id);
+      const load = Math.round((link.trafficGbps / Math.max(0.01, link.capacityGbps)) * 100);
+      const signature = [link.aId, link.bId, link.tier, link.capacityGbps, link.length, load, Number(link.down)].join(
+        '|',
+      );
+      const previous = linkCache.current.get(link.id);
+      if (previous?.signature === signature) return previous.value;
+      const value = { ...link, trafficGbps: (load / 100) * link.capacityGbps };
+      linkCache.current.set(link.id, { signature, value });
+      return value;
+    });
+    for (const id of linkCache.current.keys()) if (!linkIds.has(id)) linkCache.current.delete(id);
+
+    // When every entry is unchanged the previous arrays are returned too, so lookups built from them are reused.
+    const previous = last.current;
+    last.current = {
+      stableNodes: previous && sameItems(previous.stableNodes, stableNodes) ? previous.stableNodes : stableNodes,
+      stableLinks: previous && sameItems(previous.stableLinks, stableLinks) ? previous.stableLinks : stableLinks,
+    };
+    return last.current;
+  }, [nodes, links]);
+}
+
 export default function MapView() {
   const locale = useGame((s) => s.locale);
   const drillTarget = useGame((s) => s.drillTarget);
@@ -54,6 +119,7 @@ export default function MapView() {
     () => (planning ? projectBlueprint(liveGame, blueprint).state : liveGame),
     [liveGame, planning, blueprint],
   );
+  const { stableNodes: mapNodes, stableLinks: mapLinks } = useStableMapAssets(game.nodes, game.links);
   const drill = useMemo(() => (drillTarget ? failureDrill(liveGame, drillTarget) : null), [liveGame, drillTarget]);
   const developedIds = useMemo(
     () =>
@@ -137,13 +203,13 @@ export default function MapView() {
         24,
       );
     }
-    for (const node of game.nodes) {
+    for (const node of mapNodes) {
       const mast = node.kind === 'tower' ? 26 + node.tier * 3 : 0;
       include(isoX(node.gx, node.gy), isoY(node.gx, node.gy) - mast, 28, 28);
     }
     if (!Number.isFinite(minX)) return { minX: -400, maxX: 400, minY: -220, maxY: 220 };
     return { minX, maxX, minY, maxY };
-  }, [game.districts, game.buildings, game.nodes]);
+  }, [game.districts, game.buildings, mapNodes]);
 
   const fitCamera = useCallback(() => {
     const safe = { left: size.w >= 950 ? 295 : 24, right: 35, top: 118, bottom: 142 };
@@ -208,15 +274,15 @@ export default function MapView() {
   const night = Math.round((1 - daylight(game.minutes)) * lightingSteps) / lightingSteps;
   const nodeById = useMemo(() => {
     const m: Record<string, NetNode> = {};
-    for (const n of game.nodes) m[n.id] = n;
+    for (const n of mapNodes) m[n.id] = n;
     return m;
-  }, [game.nodes]);
+  }, [mapNodes]);
 
   const nodeGrid = useMemo(() => {
     const map = new Map<string, NetNode>();
-    for (const node of game.nodes) map.set(`${node.gx},${node.gy}`, node);
+    for (const node of mapNodes) map.set(`${node.gx},${node.gy}`, node);
     return map;
-  }, [game.nodes]);
+  }, [mapNodes]);
 
   const districtGrid = useMemo(() => {
     const m = new Map<string, District>();
@@ -224,11 +290,17 @@ export default function MapView() {
     return m;
   }, [game.districts]);
 
+  const incidentKey = game.incidents
+    .filter((incident) => !incident.resolved)
+    .map((incident) => `${incident.targetId}:${incident.id}`)
+    .join('|');
   const incidentByTarget = useMemo(() => {
     const m: Record<string, string> = {};
     for (const i of game.incidents) if (!i.resolved) m[i.targetId] = i.id;
     return m;
-  }, [game.incidents]);
+    // The key captures every field this index exposes while preserving callback identity between ticks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incidentKey]);
 
   const handleLinkSelect = useCallback(
     (id: string) => {
@@ -441,7 +513,7 @@ export default function MapView() {
           {!drill && <ProjectFootprint game={game} />}
           {overlay === 'normal' && !economical && <CityTraffic districts={game.districts} />}
           {overlay === 'coverage' && (
-            <CoverageLayer nodes={game.nodes} districts={game.districts} spectrum={game.spectrum} />
+            <CoverageLayer nodes={mapNodes} districts={game.districts} spectrum={game.spectrum} />
           )}
           {overlay === 'rivals' && <RivalsLayer game={game} />}
         </g>
@@ -638,7 +710,7 @@ export default function MapView() {
             </g>
           )}
 
-          {game.links.map((l) => {
+          {mapLinks.map((l) => {
             const a = nodeById[l.aId];
             const b = nodeById[l.bId];
             if (!a || !b) return null;
@@ -659,7 +731,7 @@ export default function MapView() {
             );
           })}
 
-          {[...game.nodes]
+          {[...mapNodes]
             .sort((a, b) => a.gx + a.gy - (b.gx + b.gy))
             .map((n) => (
               <NodeGlyph

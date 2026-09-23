@@ -1,5 +1,32 @@
 # City rendering benchmark
 
+## September 24, 2026: stable map render inputs
+
+The map now keeps each site and fibre object, and the arrays that hold them,
+until something a glyph draws changes, with load bucketed to whole percentages.
+Memoised glyphs therefore skip the ticks where nothing visible moved. Three
+interleaved pairs on the large settled fixture (152 sites, 4x game speed, 4x CPU
+throttling, GPU enabled, 10 s, no panning), switching only `MapView.tsx`:
+
+| Metric (median of 3)            |   Before |    After |
+| ------------------------------- | -------: | -------: |
+| Frames delivered                |      464 |      479 |
+| Frame interval, 95th percentile |  66.6 ms |  50.0 ms |
+| Page script                     | 2,311 ms | 1,968 ms |
+| Long-task time                  | 1,622 ms | 1,016 ms |
+
+Script and long-task ranges did not overlap between the builds (2,230–2,374 ms
+against 1,950–2,028 ms, and 1,368–2,046 ms against 864–1,106 ms). The single
+longest frame was higher with the change (250–283 ms against 183–217 ms), so
+occasional stalls remain. Every run advanced the same 760 game minutes.
+
+```powershell
+$env:PERF_GPU = '1'
+$env:PERF_SITES = '150'
+$env:PERF_SETTLED = '1'
+npm run performance
+```
+
 ## September 22, 2026: ground layer experiment (no change)
 
 Drawing the ground tiles on a canvas, like the buildings, was the next candidate.
