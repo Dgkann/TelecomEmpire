@@ -13,6 +13,18 @@ const FACADES: Record<Building['kind'], string> = {
   university: '#ad9f93',
   park: '#547958',
 };
+// How many window rows in six are lit after dark: homes stay up, offices empty out.
+const LIT_AT_NIGHT: Record<Building['kind'], number> = {
+  house: 4,
+  apartment: 4,
+  office: 2,
+  shop: 3,
+  industrial: 1,
+  hospital: 5,
+  university: 3,
+  park: 0,
+};
+const AWNINGS = ['#b85b58', '#4f8f6b', '#4d6fa8', '#c49a51'];
 interface Paint {
   path: Path2D;
   fill: string;
@@ -109,7 +121,7 @@ export function buildingPaint(b: Building, night: number, dim: boolean, develope
     );
     for (let r = 0; r < Math.min(6, b.floors); r++) {
       const wy = cy - 3 - r * FLOOR_H;
-      const lit = (b.seed >>> r) % 3 !== 0 && !dim;
+      const lit = (b.seed >>> (r * 3)) % 6 < LIT_AT_NIGHT[b.kind] && !dim;
       const warm = lit ? mix('#354f5b', '#ffd694', night) : '#304856';
       path(
         `M${cx - hw + 4} ${wy}l${hw - 8} ${((hw - 8) * hh) / hw}v3l-${hw - 8} -${((hw - 8) * hh) / hw}z`,
@@ -127,6 +139,36 @@ export function buildingPaint(b: Building, night: number, dim: boolean, develope
         `M${cx - hw} ${cy - h}L${cx - 4} ${cy - h - hh - 7}L${cx + hw} ${cy - h}L${cx} ${cy - h + hh}Z`,
         mix('#a77762', '#304559', night * 0.75),
       );
+    // Seeded rooftops, so a street reads as a street rather than a row of identical boxes. Everything
+    // stays within ten pixels of the roof so the partial repaints in layers.tsx still cover it.
+    const variant = (b.seed >>> 17) % 4;
+    if (b.floors >= 5 && b.kind !== 'house') {
+      // A parapet: the roof sits recessed behind a raised rim.
+      path(
+        `M${cx},${cy - hh - h + 2} ${cx + hw - 3},${cy - h} ${cx},${cy + hh - h - 2} ${cx - hw + 3},${cy - h}Z`,
+        shade(top, -14),
+      );
+      if (b.kind === 'office' && b.floors >= 8) {
+        // An antenna whose aviation light shows after dark.
+        const ax = cx + (variant - 1.5) * 3;
+        path(`M${ax} ${cy - h - 1}v-9`, 'none', 1, mix('#9fb3bf', '#50606b', night), 0.8);
+        ellipse(ax, cy - h - 10, 1.1, 1.1, '#ff5d73', 0.25 + night * 0.75);
+      } else if (variant !== 3) {
+        // A water tank on its stand.
+        const tx = cx + (variant - 1) * 5;
+        const ty = cy - h;
+        path(`M${tx - 2.5} ${ty}v-5h5v5z`, shade(mix(body, '#1a2b41', night * 0.7), -30));
+        ellipse(tx, ty - 5, 2.5, 1.2, shade(mix(body, '#263e52', night * 0.66), 5));
+      }
+    }
+    if (b.kind === 'shop' && b.floors <= 2) {
+      // A coloured awning along the shop front.
+      path(
+        `M${cx - hw},${cy - 4.5} ${cx},${cy + hh - 4.5} ${cx},${cy + hh - 2} ${cx - hw},${cy - 2}Z`,
+        mix(AWNINGS[variant], '#1a2b41', night * 0.6),
+        0.9,
+      );
+    }
     if (b.kind === 'hospital') path(`M${cx - 4} ${cy - h}h8m-4 -4v8`, 'none', 1, '#e8efe9', 2.5);
     if (b.kind === 'office' || b.kind === 'industrial')
       path(`M${cx - 6} ${cy - h - 2}l6 -3 7 3 -6 3z`, shade(top, -25), 1, shade(top, 15), 0.5);
