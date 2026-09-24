@@ -32,7 +32,38 @@ export interface RouteInfo {
 // identity: simulation steps replace arrays, and repair/build helpers may mutate them.
 // Keep only four topologies so previews and save-slot changes cannot grow the cache.
 const routeCache = new Map<string, Record<string, RouteInfo>>();
+// The last topology, field by field, so a repeated call can be answered without building its key.
+let lastTopology: {
+  nodes: Array<[string, string, boolean]>;
+  links: Array<[string, string, string, number, boolean]>;
+} | null = null;
+let lastRoutes: Record<string, RouteInfo> | null = null;
+function sameAsLastTopology(state: GameState) {
+  if (!lastTopology) return false;
+  const { nodes, links } = lastTopology;
+  if (nodes.length !== state.nodes.length || links.length !== state.links.length) return false;
+  for (let i = 0; i < nodes.length; i++) {
+    const n = state.nodes[i];
+    const [id, kind, down] = nodes[i];
+    if (n.id !== id || n.kind !== kind || n.down !== down) return false;
+  }
+  for (let i = 0; i < links.length; i++) {
+    const l = state.links[i];
+    const [id, aId, bId, length, down] = links[i];
+    if (l.id !== id || l.aId !== aId || l.bId !== bId || l.length !== length || l.down !== down) return false;
+  }
+  return true;
+}
+function rememberTopology(state: GameState, routes: Record<string, RouteInfo>) {
+  lastTopology = {
+    nodes: state.nodes.map((n) => [n.id, n.kind, n.down]),
+    links: state.links.map((l) => [l.id, l.aId, l.bId, l.length, l.down]),
+  };
+  lastRoutes = routes;
+}
+
 export function computeRoutes(state: GameState, ignoreLinkId?: string): Record<string, RouteInfo> {
+  if (ignoreLinkId === undefined && lastRoutes && sameAsLastTopology(state)) return lastRoutes;
   const key =
     ignoreLinkId === undefined
       ? JSON.stringify([
@@ -45,6 +76,7 @@ export function computeRoutes(state: GameState, ignoreLinkId?: string): Record<s
     if (cached) {
       routeCache.delete(key);
       routeCache.set(key, cached);
+      rememberTopology(state, cached);
       return cached;
     }
   }
@@ -97,6 +129,7 @@ export function computeRoutes(state: GameState, ignoreLinkId?: string): Record<s
   if (key !== null) {
     if (routeCache.size >= 4) routeCache.delete(routeCache.keys().next().value!);
     routeCache.set(key, routes);
+    rememberTopology(state, routes);
   }
   return routes;
 }

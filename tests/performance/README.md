@@ -1,5 +1,27 @@
 # City rendering benchmark
 
+## September 24, 2026: fewer repeated calculations per simulation step
+
+A profile of the large settled city (unminified build, 4x CPU throttling) found two calculations
+repeated inside every simulation step. The solvency check worked out the credit limit, and with it
+a second full monthly breakdown, even when cash was positive and the limit could not matter. Every
+route lookup also rebuilt a JSON key of the whole topology to find its cached result, dozens of times
+a step. The solvency check now skips the limit while cash is positive, and a repeated route lookup
+first compares the topology field by field against the previous one.
+
+Browser samples on this host were too noisy to show the difference: one run of the new build was the
+slowest of all six. Stepping the same 152-site city 2,000 times in Node, six interleaved pairs:
+
+| 2,000 simulation steps |         Before |      After |
+| ---------------------- | -------------: | ---------: |
+| Median                 |       1,094 ms |     940 ms |
+| Range                  | 1,044–1,111 ms | 894–959 ms |
+
+Every pair improved and both versions ended in the same game state, and a 700-day campaign audit
+produced identical output. Single steps in that run peaked at about 2.5 ms, none of them on a day
+boundary, so the browser's longest frames (about 200–350 ms at 4x throttling) come from rendering
+rather than the simulation.
+
 ## September 24, 2026: stable map render inputs
 
 The map now keeps each site and fibre object, and the arrays that hold them,

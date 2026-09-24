@@ -85,8 +85,8 @@ export function chargeLoans(s: GameState) {
 
 // Called every step. Returns a game over reason once the grace period runs out.
 export function checkSolvency(s: GameState): string | null {
-  const limit = creditLimit(s);
-  if (s.money >= -limit) {
+  // The limit is never negative, so positive cash skips a second monthly breakdown every step.
+  if (s.money >= 0 || s.money >= -creditLimit(s)) {
     s.insolventSince = null;
     return null;
   }
