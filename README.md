@@ -14,7 +14,7 @@ npm run dev
 
 Use Node.js 20.19+, 22.13+, or 24+ and npm, matching the lint tooling's supported
 Node releases. Open http://localhost:5173.
-The current release is 1.0.0 (see [CHANGELOG.md](CHANGELOG.md)); the save schema is 26.
+The current release is 1.1.0 (see [CHANGELOG.md](CHANGELOG.md)); the save schema is 26.
 
 The game runs entirely in the browser. Save slots and preferences use this
 browser's local storage; use the save manager's export/import controls to move
