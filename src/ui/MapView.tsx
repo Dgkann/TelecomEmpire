@@ -24,6 +24,8 @@ import {
   DistrictOutlines,
   CityTraffic,
   BuildingsLayer,
+  StarField,
+  StreetLights,
   ConnectionRings,
   RivalsLayer,
   CoverageLayer,
@@ -273,6 +275,8 @@ export default function MapView() {
   // Quantised so the day/night value only changes a few dozen times per game day.
   const lightingSteps = economical ? 4 : 16;
   const night = Math.round((1 - daylight(game.minutes)) * lightingSteps) / lightingSteps;
+  // Strongest at dawn and dusk, gone by noon and by the middle of the night.
+  const dusk = Math.max(0, 1 - Math.abs(night - 0.5) * 2.5);
   const nodeById = useMemo(() => {
     const m: Record<string, NetNode> = {};
     for (const n of mapNodes) m[n.id] = n;
@@ -481,13 +485,15 @@ export default function MapView() {
       <div
         className="pointer-events-none absolute inset-0 transition-colors duration-1000"
         style={{
-          background: `linear-gradient(180deg, ${mix('#294854', '#0c1d30', night)} 0%, ${mix(
+          // Dawn and dusk warm the top of the sky; the middle of the night goes cold and dark.
+          background: `linear-gradient(180deg, ${mix(mix('#294854', '#0c1d30', night), '#5f4a55', dusk * 0.4)} 0%, ${mix(
             '#152b38',
             '#091320',
             night,
           )} 100%)`,
         }}
       />
+      <StarField night={night} />
       <DistrictNavigator />
       {drill && <FailureDrillPanel report={drill} />}
       <svg className="map-layer pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
@@ -524,6 +530,7 @@ export default function MapView() {
         className="map-layer map-buildings pointer-events-none absolute left-0 top-0"
         style={{ transformOrigin: '0 0', transform: cssCamera(cam) }}
       >
+        {!economical && <StreetLights districts={game.districts} night={night} />}
         <BuildingsLayer
           economical={economical}
           developedIds={developedIds}

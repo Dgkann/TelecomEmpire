@@ -44,7 +44,7 @@ test('city canvas paints architecture and refreshes its night lighting', async (
       store.setState({ game: { ...store.getState().game, speed: 0, minutes: time, tutorialDone: true } });
     }, minutes);
   await setTime(720);
-  const canvas = page.locator('.map-buildings canvas');
+  const canvas = page.locator('.map-buildings canvas[data-layer="buildings"]');
   await expect(canvas).toBeVisible();
   const day = await canvas.evaluate((element: HTMLCanvasElement) => {
     const ctx = element.getContext('2d')!;

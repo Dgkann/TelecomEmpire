@@ -100,7 +100,9 @@ connection and quotes its separate fibre cost. Building the site does not
 automatically purchase that connection. Use Fibre to complete the route.
 
 The city uses distinct residential, commercial and public buildings, parks,
-warm night windows and street traffic. Traffic animation pauses with the game,
+seeded rooftops (parapets, water tanks, antennas with aviation lights, shop
+awnings), warm night windows, street lamps that come on at dusk, a night sky
+and street traffic. Traffic animation pauses with the game,
 and reduced-motion preferences are respected: interface animations skip their
 movement and new connections are not ringed on the map. The camera refits after a screen
 resize; zoom controls remain available on touch devices. Construction can be

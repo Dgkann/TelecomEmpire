@@ -4,6 +4,7 @@ import CityFoundation from '../CityFoundation';
 import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import { towerRadius } from '../../game/constants';
 import { isRoad } from '../../game/cityGen';
+import { clamp } from '../../game/util';
 import { leaderOf } from '../../game/competitors';
 import type { Building, District, GameState, NetNode, SpectrumHolding } from '../../game/types';
 import { FLOOR_H, TILE_H, TILE_W, isoX, isoY, mix, tileDiamond } from '../iso';
@@ -425,6 +426,7 @@ export const BuildingsLayer = memo(function BuildingsLayer({
   return (
     <canvas
       ref={canvas}
+      data-layer="buildings"
       aria-hidden="true"
       width={Math.ceil(bounds.width * resolution)}
       height={Math.ceil(bounds.height * resolution)}
@@ -437,6 +439,93 @@ export const BuildingsLayer = memo(function BuildingsLayer({
         display: 'block',
       }}
     />
+  );
+});
+
+// Warm street lamps every other cell along the roads, drawn once per city on their own canvas. The map
+// only changes the canvas opacity with the hour, so lamps cost nothing while panning or at noon.
+export const StreetLights = memo(function StreetLights({ districts, night }: { districts: District[]; night: number }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  // Districts are replaced every tick; the lamps only depend on the cells, which never change.
+  const layout = districts.map((d) => `${d.id}:${d.cells.length}`).join('|');
+  const lamps = useMemo(() => {
+    const points: Array<[number, number]> = [];
+    for (const d of districts)
+      for (const c of d.cells) {
+        const across = c.gx % 5 === 0,
+          along = c.gy % 5 === 0;
+        if (across === along) continue;
+        if ((across ? c.gy : c.gx) % 2 !== 0) continue;
+        points.push([isoX(c.gx, c.gy), isoY(c.gx, c.gy)]);
+      }
+    return points;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout]);
+  const bounds = useMemo(() => {
+    if (!lamps.length) return { x: 0, y: 0, width: 1, height: 1 };
+    const xs = lamps.map(([x]) => x),
+      ys = lamps.map(([, y]) => y);
+    const x = Math.min(...xs) - 12,
+      y = Math.min(...ys) - 12;
+    return { x, y, width: Math.max(...xs) + 12 - x, height: Math.max(...ys) + 12 - y };
+  }, [lamps]);
+  const resolution = Math.min(window.devicePixelRatio || 1, 2, 4096 / bounds.width, 4096 / bounds.height);
+  useLayoutEffect(() => {
+    const view = canvas.current?.getContext('2d');
+    if (!view) return;
+    view.setTransform(resolution, 0, 0, resolution, -bounds.x * resolution, -bounds.y * resolution);
+    view.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
+    for (const [x, y] of lamps) {
+      view.globalAlpha = 0.16;
+      view.fillStyle = '#ffc978';
+      view.beginPath();
+      view.ellipse(x, y, 8, 4.5, 0, 0, Math.PI * 2);
+      view.fill();
+      view.globalAlpha = 0.95;
+      view.fillStyle = '#ffe7b8';
+      view.beginPath();
+      view.ellipse(x, y - 0.5, 1.2, 1.2, 0, 0, Math.PI * 2);
+      view.fill();
+    }
+    view.globalAlpha = 1;
+  }, [lamps, bounds, resolution]);
+  // On from dusk, full strength by the middle of the night.
+  const opacity = clamp((night - 0.25) / 0.5, 0, 1);
+  return (
+    <canvas
+      ref={canvas}
+      data-layer="street-lights"
+      aria-hidden="true"
+      width={Math.ceil(bounds.width * resolution)}
+      height={Math.ceil(bounds.height * resolution)}
+      style={{
+        position: 'absolute',
+        left: bounds.x,
+        top: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        opacity,
+        display: opacity > 0 ? 'block' : 'none',
+      }}
+    />
+  );
+});
+
+// A fixed star field in screen space, seeded so it never shimmers between frames. Only drawn after dark.
+const STARS = Array.from({ length: 90 }, (_, i) => {
+  const r = (n: number) => (((Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1) + 1) % 1;
+  return { x: r(1) * 100, y: r(2) * 100, size: 0.5 + r(3) * 0.9, glow: 0.35 + r(4) * 0.65 };
+});
+
+export const StarField = memo(function StarField({ night }: { night: number }) {
+  const opacity = clamp((night - 0.55) / 0.35, 0, 1);
+  if (opacity <= 0) return null;
+  return (
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" style={{ opacity }}>
+      {STARS.map((s, i) => (
+        <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.size} fill="#dfe9f5" opacity={s.glow} />
+      ))}
+    </svg>
   );
 });
 
