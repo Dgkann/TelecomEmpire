@@ -23,7 +23,9 @@ export function scrollToAnchor(id: string) {
     if (networkView) window.dispatchEvent(new CustomEvent('network:view', { detail: networkView }));
     const el = document.getElementById(id);
     const shell = el?.closest('.screen-shell') as HTMLElement | null;
-    if (el && shell && shell.clientHeight > 0) {
+    // A panel of another network view is in the page but hidden until the view event lands, which can
+    // be before the freshly mounted screen listens; keep asking until the target is actually shown.
+    if (el && shell && shell.clientHeight > 0 && el.getClientRects().length > 0) {
       requestAnimationFrame(() => {
         if (!el.isConnected) return;
         shell.scrollTo({
