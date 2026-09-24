@@ -4,6 +4,9 @@ A browser tycoon game about running an ISP. You start with one core router, one
 POP and 200 customers in a single district, and grow from there by laying fibre,
 placing sites and keeping the whole thing standing up under load.
 
+Play it in the browser at https://dgkann.github.io/TelecomEmpire/. Every push
+to `main` that passes CI is published there. To run it locally instead:
+
 ```bash
 npm ci
 npm run dev
