@@ -172,6 +172,7 @@ test('Turkish screens show no English copy or English number formats', async ({ 
   await expect(page.getByRole('dialog')).toBeVisible();
   await scan('smart pause');
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Şirket profili' }).click();
   await expect(page.getByRole('dialog', { name: 'Şirket profili' })).toBeVisible();
   await scan('company profile');
