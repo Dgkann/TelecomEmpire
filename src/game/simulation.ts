@@ -1,5 +1,11 @@
 import { initialCompetition, tickCompetition, marketEffects } from './competition';
-import { REPUTATION_PER_DAY, averageSatisfaction, reputationOutlook, satisfactionTarget } from './reputation';
+import {
+  REPUTATION_PER_DAY,
+  averageSatisfaction,
+  pressurePenalty,
+  reputationOutlook,
+  satisfactionTarget,
+} from './reputation';
 import { initialProcurement, tickProcurement } from './procurement';
 import { fixedCoverageTarget } from './reach';
 import { initialStrategy, tickBoard, developDistrict } from './board';
@@ -879,10 +885,13 @@ export function step(prev: GameState): GameState {
       retention: !!activeCampaign(s, d.id, 'retention'),
     });
     const satisfaction = approach(d.satisfaction, satTarget, outage ? 0.5 * dayFrac * 24 : 1.6 * dayFrac);
+    const penalty = pressurePenalty(dPressure);
+    const loadPenalty =
+      d.loadPenalty === undefined ? penalty : d.loadPenalty + (penalty - d.loadPenalty) * Math.min(1, dayFrac);
 
     const mobileCoverage = approach(d.mobileCoverage, mobileCoverageTarget(s, d, liveTowers), 0.06 * dayFrac * 24);
 
-    return { ...d, coverage, satisfaction, mobileCoverage };
+    return { ...d, coverage, satisfaction, mobileCoverage, loadPenalty };
   });
 
   growCustomers(s, diff, dayFrac, rng);

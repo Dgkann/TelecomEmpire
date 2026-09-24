@@ -3,6 +3,7 @@ import { priceIndex } from './economy';
 import { computeRoutes, isRedundant, linkUtil, nodeUtil, servingCapacity } from './network';
 import { interconnectOperational, transitCapacity } from './strategy';
 import { scenarioStatus } from './scenarios';
+import { daysToReach, mainReputationDrag, reputationDrivers, type ReputationCause } from './reputation';
 import type { EnterpriseContract, GameState, Screen } from './types';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity';
@@ -28,7 +29,17 @@ export interface OperationsInsight {
   target:
     | { type: 'node' | 'link' | 'district' | 'building'; id: string; gx: number; gy: number }
     | { type: 'screen'; id: Screen; anchor?: string };
+  // For a lagging reputation objective: where reputation settles and what holds it back most.
+  // `days` is set when reputation will reach the objective in time on its own.
+  reason?: { settle: number; cause: ReputationCause | null; required: number; days: number | null };
 }
+
+const REPUTATION_DRAG: Record<ReputationCause, string> = {
+  price: 'prices above the market',
+  load: 'busy sites',
+  health: 'network health',
+  outages: 'district outages',
+};
 
 // Shown as a price relative to the market reference, which reads better than an index.
 const fmtIndex = (i: number) => `${Math.round(i * BASELINE_ARPU).toLocaleString('tr-TR')} ₺`;
@@ -216,7 +227,7 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
     const urgent = mission.daysLeft <= Math.max(60, Math.round(mission.scenario.deadlineDays * 0.18));
     const behind = elapsedShare >= 0.25 && !!lagging && lagging.progress + 0.12 < elapsedShare;
     if (lagging && (urgent || behind)) {
-      const targetByObjective: Record<typeof lagging.id, Extract<OperationsInsight['target'], { type: 'screen' }>> = {
+      const targetByObjective: Record<typeof lagging.id, OperationsInsight['target']> = {
         customers: { type: 'screen', id: 'company' },
         districts: { type: 'screen', id: 'map' },
         reputation: { type: 'screen', id: 'company', anchor: 'reputation' },
@@ -225,14 +236,45 @@ export function operationsInsights(state: GameState): OperationsInsight[] {
         mobile: { type: 'screen', id: 'research' },
         'data-centre': { type: 'screen', id: 'research' },
       };
-      insights.push({
+      const insight: OperationsInsight = {
         id: `mission-${lagging.id}`,
         severity: urgent && lagging.progress < 0.7 ? 'critical' : 'warning',
         title: `${lagging.label}: ${lagging.detail}`,
         detail: `${mission.daysLeft} days remain. This is the least complete campaign objective.`,
         action: 'Work on objective',
         target: targetByObjective[lagging.id],
-      });
+      };
+      // Reputation moves only through what feeds it, so point at the largest drag instead of the panel.
+      if (lagging.id === 'reputation') {
+        const drivers = reputationDrivers(state);
+        const settle = Math.round(drivers.settle);
+        const required = lagging.target ?? 100;
+        const days = daysToReach(state, required, drivers.settle);
+        const onCourse = days !== null && days <= mission.daysLeft;
+        const cause = onCourse ? null : mainReputationDrag(drivers);
+        insight.reason = { settle, cause, required, days: onCourse ? days : null };
+        insight.detail = onCourse
+          ? `${mission.daysLeft} days remain. Reputation heads toward about ${settle} and should reach ${required} in about ${days} days.`
+          : `${mission.daysLeft} days remain. Reputation heads toward about ${settle}${
+              cause ? `; the biggest drag is ${REPUTATION_DRAG[cause]}` : ''
+            }.`;
+        if (onCourse) {
+          // Nothing to fix: keep it visible without outranking real problems.
+          insight.severity = 'opportunity';
+          insight.action = 'Open reputation';
+        } else if (cause === 'price') {
+          insight.action = 'Review pricing';
+          insight.target = { type: 'screen', id: 'company', anchor: 'pricing' };
+        } else if (cause === 'load' && drivers.busiest) {
+          const { id, gx, gy } = drivers.busiest;
+          insight.action = 'Show the busiest site';
+          insight.target = { type: 'node', id, gx, gy };
+        } else if (cause === 'health' || cause === 'outages') {
+          insight.action = 'Review maintenance';
+          insight.target = { type: 'screen', id: 'network', anchor: 'maintenance' };
+        }
+      }
+      insights.push(insight);
     }
   }
 

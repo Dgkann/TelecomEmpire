@@ -1,6 +1,7 @@
 import { levyOutlook, operatingPowerBill, solarQuote, tariffQuote } from '../src/game/energyPlanning';
 import { researchPlan } from '../src/game/researchPlanning';
-import { reputationOutlook } from '../src/game/reputation';
+import { mainReputationDrag, reputationDrivers, reputationOutlook } from '../src/game/reputation';
+import { operationsCopy } from '../src/ui/operationsCopy';
 import { goalTiming } from '../src/game/goalTiming';
 import { dataCenterOutlook } from '../src/game/dataCenterOutlook';
 import { DATACENTER_PILOT_COST, nodeUpgradeCost, nodeCapitalCost } from '../src/game/constants';
@@ -5410,6 +5411,87 @@ group('Reputation explanations');
   check('maintenance has a measurable effect on the recovery target', reputationOutlook(g).target === 56);
   g.districts = g.districts.map((d) => ({ ...d, unlocked: false }));
   check('an empty service footprint still has a finite outlook', Number.isFinite(reputationOutlook(g).target));
+}
+
+group('Where reputation settles');
+{
+  const g = newGame(4242);
+  g.stats.health = 95;
+  g.stats.outages = {};
+  g.districts = g.districts.map((d) => ({ ...d, loadPenalty: 0 }));
+  const opening = reputationDrivers(g);
+  check('the opening prices sit above the market and cost reputation', opening.premium > 0.15 && opening.price < -3);
+  const market = {
+    ...g,
+    packages: g.packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price / priceIndex(g) } : p)),
+  };
+  const atMarket = reputationDrivers(market);
+  check(
+    'pricing at the market removes the price drag and lifts where reputation settles by as much',
+    Math.abs(atMarket.price) < 0.05 && Math.abs(atMarket.settle - opening.settle + opening.price) < 0.05,
+    `${opening.settle.toFixed(2)} -> ${atMarket.settle.toFixed(2)}`,
+  );
+  const loaded = reputationDrivers({ ...g, districts: g.districts.map((d) => ({ ...d, loadPenalty: 20 })) });
+  check(
+    'a day-averaged load penalty lowers where reputation settles through satisfaction',
+    Math.abs(loaded.load + 20 * opening.perHealthPoint * 0.5) < 0.05 &&
+      Math.abs(opening.settle + loaded.load - loaded.settle) < 0.05,
+    `${loaded.load.toFixed(2)}`,
+  );
+  const worn90 = { ...g, stats: { ...g.stats, health: 90 } };
+  check(
+    'the default prices hold a 90-health network under the 75 Karadeniz asks for, and market prices clear it',
+    reputationDrivers(worn90).settle < 75 && reputationDrivers({ ...worn90, packages: market.packages }).settle > 75,
+  );
+
+  // A Karadeniz operator that has everything but reputation, 90 days before the deadline.
+  const karadeniz = {
+    ...g,
+    scenarioId: 'service_standard' as const,
+    minutes: MINUTES_PER_DAY * 450,
+    reputation: 60,
+    stats: { ...g.stats, health: 93 },
+    packages: g.packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 1.1 } : p)),
+    researchDone: [...g.researchDone, 'mobile_4g'],
+    districts: g.districts.map((d, i) => ({ ...d, unlocked: i < 4, mobileSubs: 2000, loadPenalty: 0 })),
+  };
+  const mission = (state: GameState) => operationsInsights(state).find((i) => i.id === 'mission-reputation');
+  const priced = mission(karadeniz);
+  check(
+    'a price-bound reputation sends the briefing to pricing',
+    priced?.target.type === 'screen' &&
+      priced.target.anchor === 'pricing' &&
+      priced.reason?.cause === 'price' &&
+      operationsCopy(priced, karadeniz, true).action === 'Fiyatları incele',
+    priced?.detail,
+  );
+  const busy = mission({
+    ...karadeniz,
+    packages: market.packages,
+    districts: karadeniz.districts.map((d) => ({ ...d, loadPenalty: 25 })),
+  });
+  check(
+    'a load-bound reputation shows the busiest site',
+    busy?.target.type === 'node' && busy.reason?.cause === 'load',
+  );
+  const recovering = mission({ ...karadeniz, packages: market.packages });
+  check(
+    'a reputation that will reach the objective in time is reported as on course',
+    recovering?.reason?.days === 13 &&
+      recovering.severity === 'opportunity' &&
+      recovering.target.type === 'screen' &&
+      recovering.target.anchor === 'reputation',
+    recovering?.detail,
+  );
+  const worn = mission({ ...karadeniz, packages: market.packages, stats: { ...karadeniz.stats, health: 78 } });
+  check(
+    'a worn network sends the briefing to maintenance',
+    worn?.target.type === 'screen' && worn.target.anchor === 'maintenance' && worn.reason?.cause === 'health',
+  );
+  check(
+    'small drags name no single cause',
+    mainReputationDrag({ ...opening, price: -0.2, load: -0.1, outages: 0, health: 95 }) === null,
+  );
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

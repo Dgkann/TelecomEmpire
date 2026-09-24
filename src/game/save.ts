@@ -588,6 +588,7 @@ function isDistrict(value: unknown, gridSize: number) {
     isNumber(value.mobileCoverage, 0, 1) &&
     isNumber(value.mobileSubs, 0, 100_000_000) &&
     isNumber(value.satisfaction, 0, 100) &&
+    (value.loadPenalty === undefined || isNumber(value.loadPenalty, 0, 70)) &&
     isBool(value.unlocked) &&
     isNumber(value.entryCost, 0) &&
     isPoint(value.center, gridSize)

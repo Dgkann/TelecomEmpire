@@ -1,6 +1,7 @@
 import { fmtMoneyExact } from '../game/economy';
 import { plural } from '../game/util';
-import { reputationOutlook } from '../game/reputation';
+import { daysToReach, reputationDrivers, reputationOutlook } from '../game/reputation';
+import { scenarioStatus } from '../game/scenarios';
 import { regulationProgress } from '../game/regulator';
 import { useGame } from '../store/gameStore';
 import { scrollToAnchor } from './side/shared';
@@ -13,6 +14,41 @@ export default function ReputationGuidance() {
   const focus = useGame((s) => s.focus);
   const select = useGame((s) => s.select);
   const outlook = reputationOutlook(game);
+  const drivers = reputationDrivers(game);
+  const settle = Math.round(drivers.settle);
+  const mission = scenarioStatus(game);
+  // A timed scenario that asks for reputation, including one it currently meets but will not keep.
+  const required =
+    !mission.complete && mission.scenario.deadlineDays !== null
+      ? mission.objectives.find((objective) => objective.id === 'reputation')?.target
+      : undefined;
+  const scenarioName = tr ? mission.scenario.nameTr : mission.scenario.name;
+  const arrives = required === undefined ? null : daysToReach(game, required, drivers.settle);
+  const inTime = arrives !== null && mission.daysLeft !== null && arrives <= mission.daysLeft;
+  const decimal = (value: number) =>
+    value.toLocaleString(tr ? 'tr-TR' : 'en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const points = (value: number) => `${value >= 0 ? '+' : '−'}${decimal(Math.abs(value))}`;
+  // The same price index the strategy desk explains, where 1.00 is the market average.
+  const index = (1 + drivers.premium).toLocaleString(tr ? 'tr-TR' : 'en-GB', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const rows: Array<[string, number]> = [];
+  if (Math.abs(drivers.price) >= 0.5)
+    rows.push([
+      tr ? `Fiyat endeksi ${index} (piyasa 1,00)` : `Price index ${index} (the market is 1.00)`,
+      drivers.price,
+    ]);
+  if (drivers.load <= -0.5)
+    rows.push([tr ? 'Hizmet açıkları: yük ve arızalar' : 'Service shortfalls: load and faults', drivers.load]);
+  if (drivers.outages <= -0.5) rows.push([tr ? 'Kesintili ilçeler' : 'District outages', drivers.outages]);
+  if (drivers.staff >= 0.5)
+    rows.push([
+      tr ? 'Destek ekibi ve elde tutma kampanyaları' : 'Support staff and retention campaigns',
+      drivers.staff,
+    ]);
+  rows.sort((a, b) => a[1] - b[1]);
+  const busiest = drivers.busiest;
   const pending = game.regulations
     .filter((r) => r.status === 'pending' && regulationProgress(game, r) < 1)
     .sort((a, b) => a.dueAt - b.dueAt);
@@ -33,8 +69,8 @@ export default function ReputationGuidance() {
       </div>
       <p className="mt-2 text-xs leading-relaxed text-white/60">
         {tr
-          ? `Mevcut hizmet düzeyinde itibarın yaklaşık ${Math.round(outlook.target)} puana yöneliyor.`
-          : `At the current service level, reputation trends toward approximately ${Math.round(outlook.target)}.`}{' '}
+          ? `Bugünkü fiyat, ağ sağlığı ve yük sürerse itibarın yaklaşık ${settle} puanda dengelenir.`
+          : `If today's prices, network health and load hold, reputation settles near ${settle}.`}{' '}
         {tr
           ? 'Bu bir garanti değil; arızalar ve yükümlülük sonuçları ayrıca etki eder.'
           : 'Faults and regulatory outcomes can also change it.'}
@@ -53,6 +89,40 @@ export default function ReputationGuidance() {
           <div className="num mt-1">{outlook.outages}</div>
         </div>
       </div>
+      {required !== undefined && (
+        <p className={`mt-3 text-xs ${inTime ? 'text-neon-lime' : 'text-neon-amber'}`}>
+          {arrives === null
+            ? tr
+              ? `${scenarioName} ${required} itibar istiyor: bu düzeyde yaklaşık ${Math.max(1, required - settle)} puan eksik kalıyor.`
+              : `${scenarioName} needs ${required} reputation: at this level it falls about ${Math.max(1, required - settle)} short.`
+            : arrives === 0
+              ? tr
+                ? `${scenarioName} ${required} itibar istiyor: bu düzey onu koruyor.`
+                : `${scenarioName} needs ${required} reputation: this level keeps it.`
+              : inTime
+                ? tr
+                  ? `${scenarioName} ${required} itibar istiyor: bu düzeyde yaklaşık ${arrives} günde ulaşır.`
+                  : `${scenarioName} needs ${required} reputation: at this level it arrives in about ${arrives} days.`
+                : tr
+                  ? `${scenarioName} ${required} itibar istiyor: bu düzeyde ancak ${arrives} günde ulaşır, süre ${mission.daysLeft} gün.`
+                  : `${scenarioName} needs ${required} reputation: at this level it takes ${arrives} days, and ${mission.daysLeft} remain.`}
+        </p>
+      )}
+      {rows.length > 0 && (
+        <ul aria-label={tr ? 'İtibarı etkileyenler' : 'What moves reputation'} className="mt-3 space-y-1 text-xs">
+          {rows.map(([label, value]) => (
+            <li key={label} className="flex justify-between gap-3">
+              <span className="text-white/65">{label}</span>
+              <span className={`num ${value < 0 ? 'text-neon-amber' : 'text-neon-lime'}`}>{points(value)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-[11px] text-white/55">
+        {tr
+          ? `Ağ sağlığı ${Math.round(drivers.health)}: her puan yaklaşık ${decimal(drivers.perHealthPoint)} itibar eder.`
+          : `Network health ${Math.round(drivers.health)}: each point is worth about ${decimal(drivers.perHealthPoint)} reputation.`}
+      </p>
       {failed > 0 && (
         <p className="mt-3 text-xs text-neon-amber">
           {tr
@@ -71,9 +141,21 @@ export default function ReputationGuidance() {
             {tr ? 'Kapasite kaybını incele' : 'Review capacity loss'}
           </button>
         )}
-        {outlook.satisfaction < 85 && (
+        {drivers.price <= -0.5 && (
           <button className="btn text-xs" onClick={() => open('company', 'pricing')}>
-            {tr ? 'Fiyat ve memnuniyeti incele' : 'Review pricing and satisfaction'}
+            {tr ? 'Fiyatları aç' : 'Open pricing'}
+          </button>
+        )}
+        {drivers.load <= -0.5 && busiest && (
+          <button
+            className="btn text-xs"
+            onClick={() => {
+              setScreen('map');
+              focus(busiest.gx, busiest.gy);
+              select({ type: 'node', id: busiest.id });
+            }}
+          >
+            {tr ? 'En yüklü noktayı göster' : 'Show the busiest site'}
           </button>
         )}
       </div>

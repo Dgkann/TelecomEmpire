@@ -77,6 +77,9 @@ export interface District {
   // Mobile subscribers here. Unlike fixed lines these are not tied to a building.
   mobileSubs: number;
   satisfaction: number; // 0..100
+  // Satisfaction points lost to network load, averaged over about a day so the evening peak and the
+  // quiet night even out. Explanations read it; the simulation does not. Absent until the first step.
+  loadPenalty?: number;
   unlocked: boolean;
   entryCost: number;
   center: { gx: number; gy: number };

@@ -7,6 +7,8 @@ export interface ScenarioObjective {
   id: 'customers' | 'districts' | 'reputation' | 'debt' | 'market-share' | 'mobile' | 'data-centre';
   label: string;
   labelTr: string;
+  // The number the objective asks for, where it is a single figure.
+  target?: number;
   progress: (state: GameState) => number;
   detail: (state: GameState) => string;
   detailTr: (state: GameState) => string;
@@ -45,6 +47,7 @@ const districts = (target: number): ScenarioObjective => ({
 
 const reputation = (target: number): ScenarioObjective => ({
   id: 'reputation',
+  target,
   label: `${target} reputation`,
   labelTr: `${target} itibar`,
   progress: (state) => bounded(state.reputation / target),
@@ -159,6 +162,7 @@ export function scenarioStatus(state: GameState) {
     id: objective.id,
     label: objective.label,
     labelTr: objective.labelTr,
+    target: objective.target,
     detail: objective.detail(state),
     detailTr: objective.detailTr(state),
     progress: objective.progress(state),
