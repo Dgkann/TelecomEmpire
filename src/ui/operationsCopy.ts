@@ -33,7 +33,9 @@ export function operationsCopy(item: OperationsInsight, game: GameState, tr: boo
     };
   }
   const district = game.districts.find((d) => d.id === item.target.id);
-  const pct = item.title.match(/\d+%/)?.[0] ?? '';
+  // The English title carries the figure as "28%"; Turkish puts the sign first.
+  const figure = item.title.match(/(\d+)%/)?.[1];
+  const pct = figure ? `%${figure}` : '';
   const copies: Array<[string, string, string, string]> = [
     [
       'incident-',

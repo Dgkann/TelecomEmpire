@@ -5413,6 +5413,21 @@ group('Reputation explanations');
   check('an empty service footprint still has a finite outlook', Number.isFinite(reputationOutlook(g).target));
 }
 
+group('Translated insight copy');
+{
+  const g = newGame(4242);
+  const pricey = operationsInsights({
+    ...g,
+    packages: g.packages.map((p) => (p.segment === 'residential' ? { ...p, price: p.price * 1.4 } : p)),
+  }).find((i) => i.id === 'pricing-high');
+  const english = pricey?.title.match(/(\d+)%/)?.[1];
+  check(
+    'Turkish insight titles put the percent sign before the figure',
+    !!english && operationsCopy(pricey!, g, true).title === `Piyasanın %${english} üzerindesin`,
+    pricey && operationsCopy(pricey, g, true).title,
+  );
+}
+
 group('Where reputation settles');
 {
   const g = newGame(4242);
