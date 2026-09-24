@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { createNewGame } from '../src/game/simulation';
+import { createNewGame } from '../src/game/newGame';
 import { computeRoutes, loadServices } from '../src/game/network';
 
 const game = createNewGame({

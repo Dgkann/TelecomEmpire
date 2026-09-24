@@ -4,7 +4,7 @@ import type { NegotiationMode } from '../game/contracts';
 import type { ExpansionKind } from '../game/expansion';
 import type { FailureTarget } from '../game/failureDrill';
 import type { RepairMode } from '../game/incidents';
-import type { NewGameOptions } from '../game/simulation';
+import type { NewGameOptions } from '../game/newGame';
 import type { SmartPauseKind, SmartPauseNotice, SmartPausePreferences } from '../game/smartPause';
 import type {
   CampaignKind,

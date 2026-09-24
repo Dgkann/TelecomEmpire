@@ -1,5 +1,6 @@
 // Plays a year with a rough sensible-player policy and prints the economy.
-import { createNewGame, step, residentialSubs, totalCustomers } from '../src/game/simulation';
+import { step, residentialSubs, totalCustomers } from '../src/game/simulation';
+import { createNewGame } from '../src/game/newGame';
 import {
   nodeCapacity,
   MINUTES_PER_DAY,

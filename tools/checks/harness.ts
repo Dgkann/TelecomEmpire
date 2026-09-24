@@ -1,5 +1,6 @@
 import { MINUTES_PER_DAY } from '../../src/game/constants';
-import { createNewGame, step } from '../../src/game/simulation';
+import { step } from '../../src/game/simulation';
+import { createNewGame } from '../../src/game/newGame';
 import type { GameState } from '../../src/game/types';
 
 // Headless check harness: a localStorage stand-in for the store, the tally and shared fixtures.

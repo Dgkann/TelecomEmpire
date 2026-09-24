@@ -1,7 +1,8 @@
 // Diagnostic playthrough: real store actions, no free cash, research or customers.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { useGame } from '../src/store/gameStore';
-import { createNewGame, step, totalCustomers } from '../src/game/simulation';
+import { step, totalCustomers } from '../src/game/simulation';
+import { createNewGame } from '../src/game/newGame';
 import { MINUTES_PER_DAY, NODE_SPECS, TRANSIT_TIERS } from '../src/game/constants';
 import { monthlyBreakdown } from '../src/game/economy';
 import { RESEARCH, researchModifiers, researchPrice } from '../src/game/research';

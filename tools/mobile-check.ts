@@ -1,5 +1,6 @@
 // Forces a game to 4G, plants towers and reports what spectrum does to the mobile side.
-import { createNewGame, step, mobileSubs, mobileCoverageTarget } from '../src/game/simulation';
+import { step, mobileSubs, mobileCoverageTarget } from '../src/game/simulation';
+import { createNewGame } from '../src/game/newGame';
 import { MINUTES_PER_DAY, SPECTRUM_BANDS, towerCapacity, towerRadius, nodeCapacity } from '../src/game/constants';
 import { monthlyBreakdown } from '../src/game/economy';
 import { researchModifiers } from '../src/game/research';
