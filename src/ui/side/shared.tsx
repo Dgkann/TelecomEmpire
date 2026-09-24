@@ -7,7 +7,8 @@ export function Stars({ n }: { n: number }) {
   );
 }
 
-export function scrollToAnchor(id: string) {
+// `focus` also moves keyboard focus to the target, for skip links.
+export function scrollToAnchor(id: string, focus = false) {
   const networkView =
     id === 'traffic-policy' || id === 'interconnect'
       ? 'policy'
@@ -15,7 +16,9 @@ export function scrollToAnchor(id: string) {
         ? 'operations'
         : id === 'transit'
           ? 'interconnect'
-          : null;
+          : id === 'sites'
+            ? 'capacity'
+            : null;
   // Screens are lazy loaded. A fixed frame count can expire before a mobile
   // browser downloads the target screen, even though navigation succeeds.
   const deadline = performance.now() + 5000;
@@ -28,6 +31,7 @@ export function scrollToAnchor(id: string) {
     if (el && shell && shell.clientHeight > 0 && el.getClientRects().length > 0) {
       requestAnimationFrame(() => {
         if (!el.isConnected) return;
+        if (focus) el.focus({ preventScroll: true });
         shell.scrollTo({
           top: shell.scrollTop + el.getBoundingClientRect().top - shell.getBoundingClientRect().top - 16,
           behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',

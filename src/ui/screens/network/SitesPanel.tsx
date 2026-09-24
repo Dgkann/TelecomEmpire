@@ -1,16 +1,26 @@
 import { nodeUtil } from '../../../game/network';
 import { t } from '../../i18n';
 import SiteIcon, { SITE_VISUAL, TierBadge } from '../../SiteIcon';
+import { siteLabel } from '../../map/labels';
 import { Meter } from './Meter';
 import type { NetworkModel } from './model';
 
 export default function SitesPanel({ m }: { m: NetworkModel }) {
   const tr = m.locale === 'tr';
   return (
-    <div className={`panel panel-tone-green p-5 ${m.networkView === 'capacity' ? '' : 'hidden'}`}>
+    // The map's skip link lands here, so keyboard and screen reader users can reach every site without
+    // tabbing through the map.
+    <section
+      id="sites"
+      tabIndex={-1}
+      aria-labelledby="sites-heading"
+      className={`panel panel-tone-green scroll-mt-6 p-5 ${m.networkView === 'capacity' ? '' : 'hidden'}`}
+    >
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">{t(m.locale, 'sites')}</h2>
+          <h2 id="sites-heading" className="text-sm font-semibold uppercase tracking-widest text-white/50">
+            {t(m.locale, 'sites')}
+          </h2>
           <p className="mt-1 text-[11px] text-white/40">
             {tr
               ? 'T numarası büyüdükçe ekipman katmanı ve kapasite de artar.'
@@ -27,6 +37,7 @@ export default function SitesPanel({ m }: { m: NetworkModel }) {
         {m.game.nodes.map((n) => (
           <button
             key={n.id}
+            aria-label={siteLabel(n, tr)}
             onClick={() => {
               m.focus(n.gx, n.gy);
               m.select({ type: 'node', id: n.id });
@@ -59,6 +70,6 @@ export default function SitesPanel({ m }: { m: NetworkModel }) {
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

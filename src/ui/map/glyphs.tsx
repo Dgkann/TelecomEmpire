@@ -4,6 +4,7 @@ import { linkUtil, nodeUtil } from '../../game/network';
 import type { NetLink, NetNode, Technician } from '../../game/types';
 import { isoX, isoY, mix } from '../iso';
 import { SITE_SIZE, SITE_VISUAL, SitePlate } from '../SiteIcon';
+import { fibreLabel, siteLabel } from './labels';
 import { COMPANY } from './palette';
 
 export const LinkGlyph = memo(function LinkGlyph({
@@ -45,11 +46,7 @@ export const LinkGlyph = memo(function LinkGlyph({
       data-map-placement-blocker="true"
       role="button"
       tabIndex={0}
-      aria-label={
-        tr
-          ? `${a.name} – ${b.name} fiber hattı, seviye ${link.tier}, yüzde ${Math.round(util * 100)} yük${link.down ? ', kesik' : ''}`
-          : `${a.name} to ${b.name} fibre, tier ${link.tier}, ${Math.round(util * 100)} percent load${link.down ? ', down' : ''}`
-      }
+      aria-label={fibreLabel(link, a, b, tr)}
       onClick={(e) => (e.stopPropagation(), onSelect(link.id))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -183,11 +180,7 @@ export const NodeGlyph = memo(function NodeGlyph({
       data-map-placement-blocker="true"
       role="button"
       tabIndex={0}
-      aria-label={
-        tr
-          ? `${node.name}, ${kindLabel}, seviye ${node.tier}, yüzde ${Math.round(util * 100)} yük${node.down ? ', devre dışı' : ''}`
-          : `${node.name}, ${kindLabel}, tier ${node.tier}, ${Math.round(util * 100)} percent load${node.down ? ', down' : ''}`
-      }
+      aria-label={siteLabel(node, tr)}
       onClick={(e) => (e.stopPropagation(), onSelect(node.id))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

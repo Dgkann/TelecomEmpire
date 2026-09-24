@@ -1,5 +1,6 @@
 import { linkUtil } from '../../../game/network';
 import { t } from '../../i18n';
+import { fibreLabel } from '../../map/labels';
 import { Meter } from './Meter';
 import type { NetworkModel } from './model';
 
@@ -21,6 +22,7 @@ export default function FibreSpansPanel({ m }: { m: NetworkModel }) {
           return (
             <button
               key={l.id}
+              aria-label={a && b ? fibreLabel(l, a, b, tr) : undefined}
               onClick={() => {
                 if (a) m.focus((a.gx + (b?.gx ?? a.gx)) / 2, (a.gy + (b?.gy ?? a.gy)) / 2);
                 m.select({ type: 'link', id: l.id });

@@ -30,6 +30,7 @@ import {
   CustomersLayer,
 } from './map/layers';
 import { LinkGlyph, NodeGlyph, TechnicianGlyph } from './map/glyphs';
+import { scrollToAnchor } from './side/shared';
 
 const PLACEMENT_BLOCKER = '[data-map-placement-blocker="true"]';
 
@@ -531,6 +532,16 @@ export default function MapView() {
           dim={overlay === 'load' || overlay === 'rivals' || overlay === 'customers'}
         />
       </div>
+      {/* Shown on keyboard focus: every site is also listed on the network screen. */}
+      <button
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-sm focus:border focus:border-neon-cyan/60 focus:bg-ink-900 focus:px-3 focus:py-2 focus:text-xs focus:text-neon-cyan"
+        onClick={() => {
+          useGame.getState().setScreen('network');
+          scrollToAnchor('sites', true);
+        }}
+      >
+        {tr ? 'Nokta listesine geç' : 'Skip to the site list'}
+      </button>
       <svg
         ref={svgRef}
         role="application"
