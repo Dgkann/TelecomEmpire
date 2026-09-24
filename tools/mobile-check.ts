@@ -57,6 +57,7 @@ const core = g.nodes.find((n) => n.kind === 'core')!;
       health: 100,
       down: false,
       builtAt: 0,
+      servicedAt: 0,
     },
   ];
   const len = Math.hypot(core.gx - gx, core.gy - gy);

@@ -19,7 +19,6 @@ import {
   TRAINING_COOLDOWN,
 } from '../src/game/signalTraining';
 import {
-  initialCompetition,
   startMarketOperation,
   cancelMarketOperation,
   operationCost,
@@ -27,7 +26,6 @@ import {
   rivalMarketEffects,
   servicePromiseReady,
   tickCompetition,
-  OPERATION_MINUTES,
   RIVAL_MOVES,
 } from '../src/game/competition';
 import { capacityOptions, capacityPlan, commissionCapacityPlan, testCapacity } from '../src/game/capacityLab';
@@ -334,6 +332,7 @@ group('save archive and NOC telemetry');
     startedAt: 0,
     termMonths: 12,
     segment: 'enterprise' as const,
+    requiresRedundancy: false,
   };
   check('contract risk reports consumed SLA allowance', contractRisk(stressed, synthetic).usage > 0);
   clearSave(0);
@@ -825,6 +824,7 @@ group('spectrum and mobile');
     health: 100,
     down: false,
     builtAt: 0,
+    servicedAt: 0,
   };
   const backhaul: NetLink = {
     id: 'backhaul1',
@@ -1359,6 +1359,7 @@ group('a tower with no fibre behind it');
     health: 100,
     down: false,
     builtAt: 0,
+    servicedAt: 0,
   };
   g = {
     ...g,

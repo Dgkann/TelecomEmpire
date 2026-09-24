@@ -61,6 +61,7 @@ function buildPop(g: GameState, districtId: string) {
       health: 100,
       down: false,
       builtAt: g.minutes,
+      servicedAt: g.minutes,
     },
   ];
   const others = g.nodes.filter((n) => n.id !== id && (n.kind === 'core' || n.kind === 'pop'));
