@@ -48,7 +48,7 @@ export function cityShare(s: GameState) {
 
 const customers = (target: number): RankRequirement => ({
   action: () => ({ screen: 'company', label: 'Review customer growth', labelTr: 'Müşteri büyümesini incele' }),
-  label: `${target.toLocaleString()} ${plural(target, 'customer')}`,
+  label: `${target.toLocaleString('en-US')} ${plural(target, 'customer')}`,
   labelTr: `${target.toLocaleString('tr-TR')} müşteri`,
   progress: (s) => clamp(customerCount(s) / target, 0, 1),
   detail: (s, tr) => {

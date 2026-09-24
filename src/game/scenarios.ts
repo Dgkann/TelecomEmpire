@@ -26,10 +26,10 @@ const bounded = (value: number) => Math.max(0, Math.min(1, value));
 
 const customers = (target: number): ScenarioObjective => ({
   id: 'customers',
-  label: `${target.toLocaleString()} ${plural(target, 'customer')}`,
+  label: `${target.toLocaleString('en-US')} ${plural(target, 'customer')}`,
   labelTr: `${target.toLocaleString('tr-TR')} müşteri`,
   progress: (state) => bounded(customerCount(state) / target),
-  detail: (state) => `${Math.round(customerCount(state)).toLocaleString()} / ${target.toLocaleString()}`,
+  detail: (state) => `${Math.round(customerCount(state)).toLocaleString('en-US')} / ${target.toLocaleString('en-US')}`,
   detailTr: (state) =>
     `${Math.round(customerCount(state)).toLocaleString('tr-TR')} / ${target.toLocaleString('tr-TR')}`,
 });

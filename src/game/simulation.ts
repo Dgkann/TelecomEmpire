@@ -61,7 +61,7 @@ import { initialEnergy, siteDrawKw, tickEnergyMonth } from './energy';
 import { initialSignalTraining } from './signalTraining';
 import { researchModifiers, researchById, type ResearchMods } from './research';
 import { researchCopy } from './researchCopy';
-import { line } from './lang';
+import { isTurkish, line } from './lang';
 import { CAMPAIGN_STAGES, scenarioStatus } from './scenarios';
 import { staffModifiers, trainEmployee, trainTechnician } from './staff';
 import {
@@ -173,7 +173,7 @@ export const fmtClock = (minutes: number) => {
 
 export const fmtDate = (minutes: number) => {
   const d = dateFromMinutes(minutes);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(isTurkish() ? 'tr-TR' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export interface NewGameOptions {

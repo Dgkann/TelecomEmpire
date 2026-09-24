@@ -10,7 +10,7 @@ type ManagerStatus = { tone: 'good' | 'bad' | 'info'; text: string };
 function saveContext(slot: number, meta: SaveMeta, tr: boolean) {
   return tr
     ? `Yuva ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString('tr-TR')} müşteri\nKaydedildi: ${new Date(meta.savedAt).toLocaleString('tr-TR')}`
-    : `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+    : `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString('en-US')} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString('en-GB')}`;
 }
 
 const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) => a?.savedAt === b?.savedAt && a?.company === b?.company;
@@ -200,7 +200,7 @@ export default function SaveManager() {
                     </div>
                     <div className="num text-[10px] text-white/[0.38]">
                       {meta
-                        ? `${meta.city} · ${meta.customers.toLocaleString(isTr ? 'tr-TR' : undefined)} ${isTr ? 'müşteri' : plural(meta.customers, 'customer')} · ${new Date(meta.savedAt).toLocaleString(isTr ? 'tr-TR' : undefined)}`
+                        ? `${meta.city} · ${meta.customers.toLocaleString(isTr ? 'tr-TR' : 'en-US')} ${isTr ? 'müşteri' : plural(meta.customers, 'customer')} · ${new Date(meta.savedAt).toLocaleString(isTr ? 'tr-TR' : 'en-GB')}`
                         : isTr
                           ? 'Yeni kayıt için hazır'
                           : 'Ready for a new snapshot'}

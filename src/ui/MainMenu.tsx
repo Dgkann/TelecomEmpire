@@ -19,7 +19,7 @@ type ImportStatus = { tone: 'good' | 'bad' | 'info'; text: string };
 function saveContext(slot: number, meta: SaveMeta, tr: boolean) {
   return tr
     ? `Yuva ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString('tr-TR')} müşteri\nKaydedildi: ${new Date(meta.savedAt).toLocaleString('tr-TR')}`
-    : `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString()} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString()}`;
+    : `Slot ${slot + 1}: ${meta.company}\n${meta.city} · ${meta.customers.toLocaleString('en-US')} ${plural(meta.customers, 'customer')}\nSaved ${new Date(meta.savedAt).toLocaleString('en-GB')}`;
 }
 
 const sameSnapshot = (a: SaveMeta | null, b: SaveMeta | null) => a?.savedAt === b?.savedAt && a?.company === b?.company;
@@ -172,9 +172,9 @@ export default function MainMenu() {
                         {locale === 'tr' ? 'Devam et · Yuva' : 'Continue · Slot'} {slot + 1}
                       </div>
                       <div className="num truncate text-[10px] text-white/45">
-                        {meta.company} · {meta.city} · {meta.customers.toLocaleString()}{' '}
+                        {meta.company} · {meta.city} · {meta.customers.toLocaleString(tr ? 'tr-TR' : 'en-US')}{' '}
                         {tr ? 'müşteri' : plural(meta.customers, 'customer')} ·{' '}
-                        {new Date(meta.savedAt).toLocaleString(tr ? 'tr-TR' : undefined)}
+                        {new Date(meta.savedAt).toLocaleString(tr ? 'tr-TR' : 'en-GB')}
                       </div>
                     </button>
                     <button

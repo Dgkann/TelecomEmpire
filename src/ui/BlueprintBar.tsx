@@ -45,7 +45,7 @@ export default function BlueprintBar() {
       <p className="mb-2 text-xs text-teal-200">
         {tr
           ? `Kurulumdan sonra +${homes.toLocaleString('tr-TR')} potansiyel hane`
-          : `+${homes.toLocaleString()} potential homes after commissioning`}
+          : `+${homes.toLocaleString('en-US')} potential homes after commissioning`}
       </p>
       <p className="mb-2 text-[11px] text-white/65">
         {preview.error ??

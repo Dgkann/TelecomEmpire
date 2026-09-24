@@ -81,7 +81,7 @@ export default function IncidentModal() {
                 <span>
                   {tr
                     ? `Arıza başladığında ${incident.affected.toLocaleString('tr-TR')} müşteri`
-                    : `${incident.affected.toLocaleString()} ${plural(incident.affected, 'customer')} at incident start`}
+                    : `${incident.affected.toLocaleString('en-US')} ${plural(incident.affected, 'customer')} at incident start`}
                 </span>
               </div>
             </div>

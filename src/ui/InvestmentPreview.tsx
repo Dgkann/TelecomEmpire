@@ -30,7 +30,7 @@ export default function InvestmentPreview({ kind, nodeId }: { kind: NodeKind; no
         <div className="mt-2 text-xs text-teal-200">
           {tr
             ? `+${reach.homes.toLocaleString('tr-TR')} potansiyel hane · kapsama %${Math.round(reach.before * 100)} → %${Math.round(reach.after * 100)}`
-            : `+${reach.homes.toLocaleString()} potential homes · ${Math.round(reach.before * 100)}% → ${Math.round(reach.after * 100)}% reach`}
+            : `+${reach.homes.toLocaleString('en-US')} potential homes · ${Math.round(reach.before * 100)}% → ${Math.round(reach.after * 100)}% reach`}
           <p className="mt-1 text-[10px] text-white/45">{t(locale, 'coverageSettlesBlurb')}</p>
         </div>
       )}

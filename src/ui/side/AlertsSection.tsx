@@ -48,7 +48,7 @@ export default function AlertsSection({ sp }: { sp: SideModel }) {
                             : `Crew on it · ${Math.round((i.repairMinutesLeft ?? 0) / 60)}h left`
                           : tr
                             ? `Atanmadı · ${i.affected.toLocaleString('tr-TR')} etkilenen`
-                            : `Unassigned · ${i.affected.toLocaleString()} affected`}
+                            : `Unassigned · ${i.affected.toLocaleString('en-US')} affected`}
                       </div>
                     </button>
                   );

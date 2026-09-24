@@ -1,4 +1,5 @@
 import { energyPriceIndex, siteDrawKw } from './energy';
+import { isTurkish } from './lang';
 import {
   BASELINE_ARPU,
   DATACENTER_HOSTING_BASE,
@@ -160,18 +161,25 @@ export function priceIndex(state: GameState) {
   return price > 0 ? price / BASELINE_ARPU : 1;
 }
 
+// A decimal comma in Turkish and a decimal point in English.
+const decimals = (value: number, digits: number) =>
+  value.toLocaleString(isTurkish() ? 'tr-TR' : 'en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+
 export const fmtMoney = (n: number) => {
   const abs = Math.abs(n);
   const sign = n < 0 ? '-' : '';
-  if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(2)}B ₺`;
-  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(2)}M ₺`;
+  if (abs >= 1e9) return `${sign}${decimals(abs / 1e9, 2)}B ₺`;
+  if (abs >= 1e6) return `${sign}${decimals(abs / 1e6, 2)}M ₺`;
   if (abs >= 10000) return `${sign}${Math.round(abs / 1000)}k ₺`;
   return `${sign}${Math.round(abs).toLocaleString('tr-TR')} ₺`;
 };
 export const fmtMoneyExact = (n: number) => `${n < 0 ? '-' : ''}${Math.abs(Math.round(n)).toLocaleString('tr-TR')} ₺`;
 
 export const fmtNum = (n: number) => {
-  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-  if (Math.abs(n) >= 10000) return `${(n / 1000).toFixed(1)}k`;
-  return Math.round(n).toLocaleString('en-US');
+  if (Math.abs(n) >= 1e6) return `${decimals(n / 1e6, 2)}M`;
+  if (Math.abs(n) >= 10000) return `${decimals(n / 1000, 1)}k`;
+  return Math.round(n).toLocaleString(isTurkish() ? 'tr-TR' : 'en-US');
 };
