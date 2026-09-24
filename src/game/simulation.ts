@@ -1,5 +1,5 @@
 import { initialCompetition, tickCompetition, marketEffects } from './competition';
-import { averageSatisfaction, reputationOutlook } from './reputation';
+import { REPUTATION_PER_DAY, averageSatisfaction, reputationOutlook, satisfactionTarget } from './reputation';
 import { initialProcurement, tickProcurement } from './procurement';
 import { fixedCoverageTarget } from './reach';
 import { initialStrategy, tickBoard, developDistrict } from './board';
@@ -870,21 +870,15 @@ export function step(prev: GameState): GameState {
       transitPressureFor('mobile'),
     );
     const outage = outages[d.id];
-    const pIndex = priceIndex(s);
-    let satTarget = 92;
-    if (outage) satTarget = 8;
-    else {
-      satTarget -= clamp((dPressure - 0.85) * 110, 0, 70);
-      satTarget -= clamp((pIndex - 1) * 55, -12, 30);
-      satTarget += (s.reputation - 50) * 0.12;
-      satTarget += staff.supportSatisfaction;
-      if (activeCampaign(s, d.id, 'retention')) satTarget += 6;
-    }
-    const satisfaction = approach(
-      d.satisfaction,
-      clamp(satTarget, 0, 100),
-      outage ? 0.5 * dayFrac * 24 : 1.6 * dayFrac,
-    );
+    const satTarget = satisfactionTarget({
+      outage: !!outage,
+      pressure: dPressure,
+      priceIndex: priceIndex(s),
+      reputation: s.reputation,
+      support: staff.supportSatisfaction,
+      retention: !!activeCampaign(s, d.id, 'retention'),
+    });
+    const satisfaction = approach(d.satisfaction, satTarget, outage ? 0.5 * dayFrac * 24 : 1.6 * dayFrac);
 
     const mobileCoverage = approach(d.mobileCoverage, mobileCoverageTarget(s, d, liveTowers), 0.06 * dayFrac * 24);
 
@@ -938,7 +932,7 @@ export function step(prev: GameState): GameState {
 
   // 6. Reputation
   const { target: repTarget, outages: outageCount } = reputationOutlook(s);
-  s.reputation = approach(s.reputation, repTarget, 1.2 * dayFrac);
+  s.reputation = approach(s.reputation, repTarget, REPUTATION_PER_DAY * dayFrac);
 
   // 7. Incidents, technicians, contracts
   tickIncidents(s, mods, diff, dt, rng, staff);
